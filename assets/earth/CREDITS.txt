@@ -1,0 +1,32 @@
+Earth data for the "Trái Đất" scene (js/scenes/rocky.js) — all public domain (U.S. Government works).
+
+earth_color_8k.jpg  8192x4096 sRGB JPEG q90
+  NASA Earth Observatory, Blue Marble: Next Generation, base map (no shaded relief, no clouds),
+  June 2004 (world.200406.3x21600x10800.jpg), Reto Stöckli / NASA GSFC, MODIS surface reflectance.
+  https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-base/june/world.200406.3x21600x10800.jpg
+  Downsampled (Lanczos) from 21600x10800.
+
+earth_himalaya_color.jpg  2048x1024 sRGB JPEG q92
+  Same Blue Marble NG June 2004 map, native 1 arc-minute crop: lon 66.0..100.133 E, lat 22.0..39.067 N.
+
+earth_elev_4k.webp  4096x2048 lossless WebP
+earth_himalaya_elev.webp  2048x1024 lossless WebP (same 1' crop as above)
+  NOAA NCEI ETOPO 2022 Global Relief Model, 60 arc-second, ice surface + bathymetry, EGM2008 heights.
+  https://www.ngdc.noaa.gov/mgg/global/relief/ETOPO2022/data/60s/60s_surface_elev_gtif/ETOPO_2022_v1_60s_N90W180_surface.tif
+  doi:10.25921/fd45-gt74. Area-averaged to 4096x2048 for the global map.
+  Encoding: R,G = (elevation in metres + 11000) as a 16-bit big-endian integer (1 m steps on land,
+  2 m on the shelf, 25 m below -250 m); B = water fraction (ocean from ETOPO < -50 m, lakes and
+  coastlines from the Blue Marble ocean colour).
+
+earth_night_8k.jpg  8192x4096 greyscale JPEG
+  NASA Earth Observatory, Black Marble 2016 (Suomi NPP VIIRS day-night band), 3 km colour composite
+  (BlackMarble_2016_3km.jpg, image record 144898), Joshua Stevens / Miguel Román / NASA GSFC.
+  https://eoimages.gsfc.nasa.gov/images/imagerecords/144000/144898/BlackMarble_2016_3km.jpg
+  The blue moonlit/airglow land background was removed (lights = luminance - min(0.66*B, 58)).
+
+earth_clouds_4k.jpg  4096x2048 greyscale JPEG
+  NASA Visible Earth, Blue Marble cloud composite (cloud_combined_8192.tif, image record 57747),
+  MODIS, R. Stöckli / NASA GSFC.
+  https://eoimages.gsfc.nasa.gov/images/imagerecords/57000/57747/cloud_combined_8192.tif
+
+Built with Pillow + NumPy (scripts not shipped).

@@ -61,6 +61,7 @@ Reserved keys (do not use for actions): `u [ ] k h s m f ? /` and Escape.
 | `hud(ctx)` | optional; returns live `[[label, value], ...]` rows for the info card (called at 10 Hz) |
 | `onClick(info, ctx)` | optional; `info = { x, y, ndcX, ndcY, dir, origin, shift }` (`dir`/`origin` are world-space Vector3) |
 | `enter(ctx)` / `exit(ctx)` | optional hooks when the scene becomes active / inactive |
+| `ready` | optional Promise that resolves when large assets (textures, data) have loaded; the host keeps the transition (and snapshots) waiting on it, up to 15 s (60 s in snap mode). Put assets under `assets/<scene>/` |
 | `setQuality(q)` | optional; `q = { scale, steps, k }` when the user changes quality (`steps` is the black-hole march budget: 200 / 320 / 480 / 720) |
 
 ## ctx

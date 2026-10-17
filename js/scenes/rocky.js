@@ -96,15 +96,24 @@ void tangents(vec3 p, out vec3 t1, out vec3 t2){
 const HEAD = COMMON_GLSL + ROCKY_GLSL;
 
 /* ================================================================================================
-   EARTH
+   EARTH — real data: NASA Blue Marble NG (colour), NOAA ETOPO 2022 (relief + bathymetry),
+   NASA Black Marble 2016 (night lights), NASA Blue Marble cloud composite.
    ================================================================================================ */
+// High-resolution Himalaya / Karakoram / Tibet patch (1 arc-minute): lon 66°E … +2048′, lat 22°N … +1024′
+const PATCH = { lon0: 66, lat0: 22, w: 2048, h: 1024 };
 const EARTH_FRAG = HEAD + /* glsl */`
 uniform vec3 uSunDir, uAurN, uAurS;
-uniform float uRot, uCloudRot, uClouds, uCities, uAtmo, uKp, uAurora;
+uniform float uRot, uClouds, uCities, uAtmo, uKp, uAurora;
+uniform float uExag, uHMax, uTexOK, uCloudT, uTexel, uCloudTexel;
+uniform sampler2D uColTex, uElevTex, uNightTex, uCloudTex, uPatchCol, uPatchElev;
 const float RKM = 6371.0;
 const float RTOP = 1.0 + 70.0 / RKM;
-const float RCL = 1.0 + 8.0 / RKM;       // effective cloud-top shell, ~8 km
+const float HCL = 8.0 / RKM;             // cloud deck: ~8 km above the (smoothed) ground
 const float ESUN = 4.0;                  // solar irradiance in scene radiance units
+// the 1′ patch, in global uv; PRATIO = patch texels per global texel
+const vec2 P0 = vec2(${((PATCH.lon0 + 180) / 360).toFixed(7)}, ${((PATCH.lat0 + 90) / 180).toFixed(7)});
+const vec2 PS = vec2(${(PATCH.w / 60 / 360).toFixed(7)}, ${(PATCH.h / 60 / 180).toFixed(7)});
+const float PRATIO = ${(PATCH.w / (PATCH.w / 60 / 360) / 4096).toFixed(4)};
 
 Atm atmE(){
   Atm A;
@@ -113,100 +122,141 @@ Atm atmE(){
   A.bR = vec3(5.8, 13.5, 33.1) * 6.371 * uAtmo;
   // ozone (Chappuis band) — really a layer near 25 km; put on the molecular profile ×2 to match its column
   A.bA = vec3(0.65, 1.881, 0.085) * 6.371 * 2.0 * uAtmo;
-  A.bMs = vec3(21.0 * 6.371) * uAtmo; A.bMe = A.bMs / 0.9; A.g = vec3(0.76);
+  // continental-average aerosol: vertical optical depth ≈ 0.08 at 550 nm (global mean AOD ≈ 0.1)
+  A.bMs = vec3(60.0 * 6.371) * uAtmo; A.bMe = A.bMs / 0.9; A.g = vec3(0.76);
   return A;
 }
 
-// ---- terrain -----------------------------------------------------------------------------
-vec3 warpE(vec3 p){ return 0.3 * vec3(snoise(p * 1.3 + 11.0), snoise(p * 1.3 + 23.0), snoise(p * 1.3 + 37.0)); }
-// elevation: > 0 land, < 0 sea (arbitrary units, ~1 ≈ 6 km)
-float elevE(vec3 p, vec3 W){
-  vec3 q = p + W;
-  float hills = fbm(q * 13.0, 3);
-  float c = fbm(q * 1.15 + 4.0, 5) - 0.075 + 0.045 * hills;
-  c += 0.75 * smoothstep(-0.84, -0.94, p.y);             // Antarctica
-  c -= 0.35 * smoothstep(0.86, 0.97, p.y);               // an Arctic ocean
-  float r = 1.0 - abs(snoise(q * 4.2 + 2.0)); r *= r * r;
-  float land = smoothstep(0.0, 0.2, c);
-  return c + land * (0.3 * r * smoothstep(0.02, 0.3, c + 0.15 * hills) + 0.06 * hills);
+// ---- data access -----------------------------------------------------------------------------
+// body-fixed unit vector → equirectangular uv (u = east longitude, v = latitude; north up)
+vec2 uvOf(vec3 p){ return vec2(atan(p.x, p.z) * (0.5 / PI) + 0.5, asin(clamp(p.y, -1.0, 1.0)) / PI + 0.5); }
+// seam-free uv derivatives: analytic Jacobian of uvOf applied to the screen derivatives of p
+vec2 uvD(vec3 p, vec3 dp){
+  float q = max(p.x * p.x + p.z * p.z, 1e-6);
+  return vec2((p.z * dp.x - p.x * dp.z) / q * (0.5 / PI), dp.y / (PI * sqrt(q)));
 }
-
-// biome albedo from latitude (temperature) and a moisture field with a Hadley-cell desert belt
-vec3 landAlbedo(vec3 p, float e, out float habit){
-  float alat = abs(asin(clamp(p.y, -1.0, 1.0))) * 57.2958;
-  float nz = fbm(p * 7.0 + 9.0, 3);
-  float temp = 1.0 - alat / 80.0 - max(e - 0.32, 0.0) * 1.0 + nz * 0.06;
-  float moist = 0.55 + 0.5 * fbm(p * 2.3 + 17.0, 3)
-              - 0.65 * exp(-pow((alat - 23.0) / 8.0, 2.0))          // subtropical highs → deserts
-              + 0.35 * exp(-pow(alat / 9.0, 2.0))                    // ITCZ rain belt → rainforest
-              + 0.3 * (1.0 - smoothstep(0.0, 0.12, e));               // coasts are wetter
-  vec3 desert = mix(vec3(0.42, 0.30, 0.17), vec3(0.40, 0.21, 0.09), smoothstep(-0.3, 0.4, nz));
-  vec3 savanna = vec3(0.17, 0.14, 0.065), rain = vec3(0.018, 0.045, 0.016);
-  vec3 steppe = vec3(0.19, 0.16, 0.10), grass = vec3(0.08, 0.10, 0.04), forest = vec3(0.03, 0.06, 0.022);
-  vec3 tundra = vec3(0.10, 0.09, 0.07), boreal = vec3(0.022, 0.038, 0.024), rock = vec3(0.13, 0.115, 0.10);
-  vec3 warm = mix(desert, savanna, smoothstep(0.15, 0.35, moist));
-  warm = mix(warm, rain, smoothstep(0.5, 0.75, moist));
-  vec3 temperate = mix(mix(steppe, grass, smoothstep(0.2, 0.42, moist)), forest, smoothstep(0.45, 0.65, moist));
-  vec3 cold = mix(tundra, boreal, smoothstep(0.3, 0.5, moist));
-  vec3 c = mix(cold, temperate, smoothstep(0.3, 0.42, temp));
-  c = mix(c, warm, smoothstep(0.56, 0.68, temp));
-  c = mix(c, tundra, smoothstep(0.2, 0.1, temp));
-  c = mix(c, rock, smoothstep(0.2, 0.45, e) * 0.7);
-  float snow = max(smoothstep(0.08, 0.0, temp), smoothstep(-0.82, -0.88, p.y));
-  c = mix(c, vec3(0.8, 0.83, 0.88), snow);
-  c *= 0.85 + 0.3 * fbm(p * 40.0, 2);
-  habit = smoothstep(0.25, 0.45, temp) * smoothstep(0.08, 0.3, moist) * (1.0 - snow) * (1.0 - smoothstep(0.25, 0.5, e));
+float patchW(vec2 uv, out vec2 q){
+  q = (uv - P0) / PS;
+  vec2 m = min(q, 1.0 - q);
+  return smoothstep(0.0, 0.06, min(m.x, m.y));
+}
+// (elevation km, water fraction) at a global-texture LOD (the patch is sampled PRATIO× finer)
+vec2 elevAt(vec2 uv, float lod){
+  vec2 q; float w = patchW(uv, q);
+  if (w > 0.0){
+    vec2 hp = textureLod(uPatchElev, q, max(lod + log2(PRATIO), 0.0)).rg;
+    if (w >= 1.0) return hp;
+    return mix(textureLod(uElevTex, uv, max(lod, 0.0)).rg, hp, w);
+  }
+  return textureLod(uElevTex, uv, max(lod, 0.0)).rg;
+}
+float texelAt(vec2 uv){ vec2 q; return patchW(uv, q) > 0.5 ? uTexel / PRATIO : uTexel; }
+vec3 colorAt(vec2 uv, vec2 gx, vec2 gy){
+  vec3 c = textureGrad(uColTex, uv, gx, gy).rgb;
+  vec2 q; float w = patchW(uv, q);
+  if (w > 0.0) c = mix(c, textureGrad(uPatchCol, q, gx / PS, gy / PS).rgb, w);
   return c;
 }
+float hgtKm(vec3 pb, float lod){ return max(elevAt(uvOf(pb), lod).r, 0.0); }
 
-// night lights: population follows climate and coasts, clustered into cities (Worley cells)
-vec3 cityLights(vec3 p, float e, float habit){
-  float pop = habit * smoothstep(0.0, 0.45, fbm(p * 3.2 + 31.0, 3));
-  pop *= 0.35 + 1.0 * (1.0 - smoothstep(0.0, 0.08, e));                // coasts and lowlands
-  if (pop < 0.01) return vec3(0.0);
-  vec3 w = worleyId(p * 70.0);
-  float big = step(1.0 - pop * 0.9, w.z);                                // larger cities where people are
-  float city = exp(-w.x * w.x * 40.0) * big * (0.5 + 1.5 * fract(w.z * 13.7));
-  vec3 w2 = worleyId(p * 260.0);
-  float town = exp(-w2.x * w2.x * 30.0) * step(1.0 - pop * 0.9, w2.z);
-  float roads = (1.0 - smoothstep(0.0, 0.035, w.y - w.x)) * smoothstep(0.3, 0.8, pop) * 0.12;
-  float l = 2.0 * city + 0.7 * town + roads;
-  return mix(bb(2100.0), bb(3600.0), smoothstep(0.5, 0.95, fract(w.z * 7.13))) * l * 0.6;
-}
-
-// ---- clouds ------------------------------------------------------------------------------------
-// extratropical cyclones: twist the sample domain around nearby (hashed) storm centres
-vec3 cyclones(vec3 p){
-  vec3 g = p * 2.6, i = floor(g), f = fract(g);
-  float best = 9.0, second = 9.0, hid = 0.0; vec3 bc = vec3(0.0, 1.0, 0.0);
-  for (int z = -1; z <= 1; z++) for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++){
-    vec3 o = vec3(x, y, z), c = o + hash33(i + o + 71.0);
-    float d = length(c - f);
-    if (d < best){ second = best; best = d; bc = (i + c) / 2.6; hid = hash13(i + o + 5.0); }
-    else if (d < second) second = d;
+// ---- relief ray march ------------------------------------------------------------------------
+// First crossing of the ray with the exaggerated height field r = 1 + k·max(e, 0) inside the shell,
+// between tA (shell entry) and tB (sea-level sphere, or shell exit for rays that miss the planet).
+// Uniform steps whose samples are prefiltered (mip LOD) to the lateral step length, then two secant
+// refinements. Returns −1 for no hit.
+float marchRelief(vec3 ro, vec3 rd, float tA, float tB, bool onSphere, mat3 R, float k, float pixAng){
+  vec3 pm = normalize(ro + rd * (0.5 * (tA + tB)));
+  float sinT = max(length(cross(rd, pm)), 0.02);
+  float lat = (tB - tA) * sinT;                                   // lateral distance covered
+  float tex = texelAt(uvOf(R * pm));
+  float n = clamp(ceil(lat / max(1.6 * tex, tA * pixAng)), 2.0, 72.0);
+  float dt = (tB - tA) / n;
+  float lodS = log2(max(dt * sinT, 1e-7) / uTexel) - 0.5;
+  float tP = tA, dP = 1.0;
+  for (int i = 0; i <= 72; i++){
+    if (float(i) > n) break;
+    float t = tA + dt * float(i);
+    vec3 q = ro + rd * t; float r = length(q);
+    float lod = max(lodS, log2(t * pixAng / uTexel));
+    float d = r - 1.0 - k * hgtKm(R * (q / r), lod);
+    if (d <= 0.0 || (onSphere && float(i) >= n)){
+      if (i == 0) return t;
+      for (int j = 0; j < 2; j++){
+        float tc = tP + (t - tP) * dP / max(dP - d, 1e-9);
+        vec3 qc = ro + rd * tc; float rc = length(qc);
+        float dc = rc - 1.0 - k * hgtKm(R * (qc / rc), lod);
+        if (dc <= 0.0){ t = tc; d = dc; } else { tP = tc; dP = dc; }
+      }
+      return tP + (t - tP) * dP / max(dP - d, 1e-9);
+    }
+    tP = t; dP = d;
   }
-  vec3 ax = normalize(bc);
-  float s = sign(ax.y) * smoothstep(0.35, 0.6, abs(ax.y)) * step(0.45, hid);   // mid-latitude storm tracks
-  // the twist fades to zero at the cell borders so the warped domain stays continuous
-  float ang = s * 4.0 * exp(-best * best * 7.0) * smoothstep(0.0, 0.35, second - best);
-  float ca = cos(ang), sa = sin(ang);
-  return p * ca + cross(ax, p) * sa + ax * dot(ax, p) * (1.0 - ca);
+  return -1.0;
 }
-float cloudCov(vec3 pw, int oct){
-  vec3 p = rotY(uCloudRot) * normalize(pw);
-  float lat = p.y;
-  vec3 q = cyclones(p);
-  float t = uTime * 0.0015;
-  vec3 w = vec3(snoise(q * 1.7 + vec3(t, 3.0, 0.0)), snoise(q * 1.7 + vec3(7.0, t, 1.0)), snoise(q * 1.7 + vec3(13.0, 0.0, t)));
-  q = q * vec3(1.0, 1.3, 1.0);                                      // zonal stretching by the jets
-  float n = fbm(q * 2.4 + w * 0.45 + vec3(0.0, 0.0, t), oct) * 0.5 + 0.5;
-  // convective detail (cumulus fields, ragged edges) only for the directly viewed layer
-  if (oct >= 5) n += 0.07 * fbm(q * 34.0 + w * 3.0, 2) + 0.04 * (abs(snoise(q * 90.0)) - 0.4);
-  // general circulation: ITCZ (cloudy), subtropical highs (clear), storm tracks (cloudy)
-  float band = 0.09 * exp(-pow(lat / 0.1, 2.0)) - 0.13 * exp(-pow((abs(lat) - 0.42) / 0.12, 2.0))
-             + 0.08 * exp(-pow((abs(lat) - 0.8) / 0.14, 2.0));
-  float thr = 1.0 - uClouds;
-  return smoothstep(thr - 0.01, thr + 0.14, n + band) * (0.6 + 0.4 * smoothstep(0.4, 0.75, n));
+
+// Soft shadow of the relief toward the Sun: geometric steps up to the shell top. The penumbra is
+// widened beyond the Sun's 0.27° radius to the data resolution (no sharper detail exists).
+float reliefShadow(vec3 pw, vec3 L, mat3 R, float k, float ds, float shellTop){
+  // ds: the scale the surface was resolved at (≥ one data texel, ≥ the pixel footprint); finer
+  // samples than that would make the surface shadow itself
+  float t = ds * 1.5, res = 1.0;
+  for (int i = 0; i < 22; i++){
+    vec3 q = pw + L * t; float r = length(q);
+    if (r > shellTop) break;
+    float h = 1.0 + k * hgtKm(R * (q / r), log2(max(t * 0.25, ds) / uTexel));
+    res = min(res, (r - h) / (t * 0.012 + ds * 0.25));
+    if (res < -0.5) break;
+    t *= 1.3;
+  }
+  return smoothstep(-0.5, 1.0, res);
+}
+
+// ridged fractal for sub-texel relief (sharp crests, rounded valleys — like eroded mountains)
+float ridged(vec3 x){
+  float s = 0.0, a = 0.5;
+  for (int i = 0; i < 4; i++){ float n = 1.0 - abs(snoise(x)); s += a * n * n; x = x * 2.07 + vec3(3.1, -1.7, 5.3); a *= 0.5; }
+  return s;
+}
+
+// ---- clouds (NASA composite + flow-map advection: trades westward, westerlies eastward) ---------
+vec2 windUV(vec2 uv){
+  float lat = (uv.y - 0.5) * PI;
+  float a = abs(lat);
+  float zonal = -0.8 * exp(-pow((a - 0.25) / 0.17, 2.0)) + 1.0 * exp(-pow((a - 0.8) / 0.22, 2.0));   // trades / westerlies
+  return vec2(zonal / max(cos(lat), 0.15), 0.12 * sin(uv.x * TAU * 6.0 + lat * 9.0)) * 0.0045;
+}
+float cloudTex(vec2 uv, vec2 gx, vec2 gy){
+  vec2 w = windUV(uv);
+  float f0 = fract(uCloudT), f1 = fract(uCloudT + 0.5);
+  float a = textureGrad(uCloudTex, uv - w * (f0 - 0.5), gx, gy).r;
+  float b = textureGrad(uCloudTex, uv - w * (f1 - 0.5), gx, gy).r;
+  return mix(a, b, abs(2.0 * f0 - 1.0));
+}
+// coverage 0.5 = the composite as observed; lower keeps only the thickest cloud, 1 = overcast
+float cloudAlpha(float v){
+  float lo = 0.1 + (0.5 - uClouds) * 1.7;
+  return smoothstep(lo, lo + 0.52, v) * smoothstep(0.0, 0.04, uClouds);
+}
+// intersection with a cloud deck draped over the smoothed relief (fixed-point iteration)
+float cloudHit(vec3 ro, vec3 rd, mat3 R, float k, out float lift){
+  lift = 0.0;
+  // the deck height is exaggerated half as much as the relief, so it keeps clear of most peaks
+  float hcl = HCL * (1.0 + 0.5 * max(uExag * uTexOK - 1.0, 0.0));
+  vec2 h = sphereHit(ro, rd, vec3(0.0), 1.0 + hcl);
+  float tt = h.x;
+  if (h.x > h.y){
+    h = sphereHit(ro, rd, vec3(0.0), 1.0 + hcl + k * uHMax * 0.7);
+    if (h.x > h.y || h.y < 0.0) return -1.0;
+    tt = max(-dot(ro, rd), 0.0);
+  }
+  for (int i = 0; i < 2; i++){
+    vec3 q = normalize(ro + rd * tt);
+    lift = k * hgtKm(R * q, 3.5);
+    vec2 g = sphereHit(ro, rd, vec3(0.0), 1.0 + hcl + lift);
+    if (g.x > g.y) return -1.0;
+    tt = g.x;
+  }
+  return tt > 0.0 ? tt : -1.0;
 }
 
 // ---- aurora: oxygen 557.7 nm (green, ~100–150 km) and 630 nm (red, 200–300 km), N₂⁺ 427.8 nm fringe
@@ -243,42 +293,99 @@ vec3 aurora(vec3 ro, vec3 rd, float tEnd){
   return acc * 16.0 * uAurora;
 }
 
-vec3 cloudShade(vec3 pc, float a, vec3 L, Atm A){
-  vec3 nc = normalize(pc);
-  float mu0 = dot(nc, L);
-  vec3 Ts = sunTrans(A, RCL - 1.0, mu0);
-  float ahead = cloudCov(pc + L * 0.006, 2);                 // cloud mass toward the sun: self-shadow
-  float self = 1.0 - 0.5 * clamp(ahead - 0.6 * a, 0.0, 1.0);
-  float alb = mix(0.45, 0.8, a);
-  float lit = max(mu0 + 0.06, 0.0) / 1.06 * self;     // tall cloud tops still catch the sun after ground sunset
-  vec3 skyAmb = vec3(0.05, 0.08, 0.14) * smoothstep(-0.1, 0.3, mu0) * uAtmo;
-  return alb / PI * ESUN * (Ts * lit + skyAmb);
+// city lights (Black Marble, stored with its display stretch): low-pressure/high-pressure sodium
+// orange in the suburbs, whiter (LED, metal halide, saturation) in the brightest cores
+vec3 cityLight(float v){
+  float l = pow(v, 2.4);
+  return mix(bb(2100.0), bb(3900.0), smoothstep(0.35, 0.95, v)) * l * 1.2;
 }
 
-vec3 earthSurface(vec3 pw, vec3 rd, vec3 L, Atm A){
+// ---- surface -------------------------------------------------------------------------------
+// pw: world hit, pb: body direction, fp: pixel footprint (scene units), gx/gy: uv derivatives
+vec3 earthSurface(vec3 pw, vec3 pb, vec3 rd, vec3 L, Atm A, mat3 R, float k, float fp, vec2 gx, vec2 gy, float shellTop, float cloudDim){
   vec3 n0 = normalize(pw);
-  mat3 R = rotY(uRot);
-  vec3 p = R * n0;
-  vec3 W = warpE(p);
-  float e = elevE(p, W);
-  float mu0s = dot(n0, L);
-  vec3 Ts = sunTrans(A, 0.0, mu0s);
-  float shadow = 1.0;
-  if (uClouds > 0.001 && mu0s > -0.1){
-    float b = dot(pw, L);
-    float tc = -b + sqrt(max(b * b - dot(pw, pw) + RCL * RCL, 0.0));
-    shadow = 1.0 - 0.75 * cloudCov(pw + L * tc, 3);
+  vec2 uv = uvOf(pb);
+  float tex = texelAt(uv);
+  float ds = max(fp, tex);                                   // finite-difference step ≥ one data texel
+  float lod = log2(ds / uTexel);
+  float cphi = max(length(pb.xz), 0.02);
+  float du = ds / (TAU * cphi), dv = ds / PI;
+  vec2 c0 = elevAt(uv, lod);
+  float e = c0.r, water = smoothstep(0.25, 0.75, c0.g);
+  float hE = max(elevAt(uv + vec2(du, 0.0), lod).r, 0.0), hW = max(elevAt(uv - vec2(du, 0.0), lod).r, 0.0);
+  float hN = max(elevAt(uv + vec2(0.0, dv), lod).r, 0.0), hS = max(elevAt(uv - vec2(0.0, dv), lod).r, 0.0);
+  vec3 east = vec3(pb.z, 0.0, -pb.x) / cphi, north = cross(pb, east);
+  vec2 g = vec2(hE - hW, hN - hS) * k / (2.0 * ds);          // exaggerated slope (east, north)
+  float slope = length(g);
+  vec3 nb = pb - g.x * east - g.y * north;
+  // sub-texel relief: a ridged fractal continuing the measured slope spectrum (amplitude ∝ slope ×
+  // texel size), only where the pixel footprint is finer than the data
+  float fd = smoothstep(0.7, 0.2, fp / tex) * (1.0 - water);
+  float rn = 0.5;
+  if (fd > 0.0){
+    float F = 1.6 / tex;
+    float eps = max(fp * 0.7, tex * 0.03);
+    rn = ridged(pb * F);
+    float rx = ridged((pb + east * eps) * F), ry = ridged((pb + north * eps) * F);
+    float amp = (slope * 0.3 + 0.003 * uExag) * tex / 1.6 * fd;
+    nb -= (east * (rx - rn) + north * (ry - rn)) / eps * amp;
   }
-  vec3 skyAmb = vec3(0.05, 0.085, 0.16) * smoothstep(-0.15, 0.4, mu0s) * uAtmo;
-  vec3 col;
-  float alat = abs(p.y);
-  if (e <= 0.0){
-    float shelf = smoothstep(-0.08, 0.0, e);
-    vec3 alb = mix(vec3(0.004, 0.011, 0.03), vec3(0.012, 0.05, 0.065), shelf);
-    float ice = smoothstep(0.95, 0.975, alat + 0.02 * fbm(p * 9.0, 3)) + smoothstep(-0.9, -0.93, p.y);
-    ice = clamp(ice, 0.0, 1.0);
-    alb = mix(alb, vec3(0.6, 0.65, 0.7), ice);
-    col = alb / PI * ESUN * (Ts * max(mu0s, 0.0) * shadow + skyAmb);
+  vec3 n = transpose(R) * normalize(nb);
+  float hGeo = k * max(e, 0.0), hTrue = max(e, 0.0) / RKM;
+
+  vec3 cl = colorAt(uv, gx, gy);
+  float mu0s = dot(n0, L);
+  // sun transmittance: true altitude for the air mass, but the horizon of the exaggerated relief
+  float muE = mu0s + sqrt(2.0 * hGeo) - sqrt(2.0 * hTrue);
+  vec3 Ts = sunTrans(A, hTrue, muE);
+  float sh = cloudDim;
+  if (hGeo > 0.0 && muE > -0.02 && dot(Ts, vec3(1.0)) > 0.003){
+    // long shadows only where they are wider than a pixel (always near the terminator)
+    float tanZ = sqrt(max(1.0 - mu0s * mu0s, 0.0)) / max(mu0s, 0.02);
+    if (hGeo * tanZ > 0.4 * fp) sh *= reliefShadow(pw, L, R, k, ds, shellTop);
+  }
+  // ambient sky light with a cavity term (valleys see less sky)
+  float eC = max(elevAt(uv, lod + 3.0).r, 0.0);
+  float ao = clamp(1.0 - (eC - max(e, 0.0)) * k / (ds * 10.0), 0.55, 1.0) * (0.75 + 0.25 * dot(n, n0));
+  vec3 skyAmb = vec3(0.05, 0.085, 0.16) * smoothstep(-0.15, 0.4, mu0s) * uAtmo * ao;
+  // water fraction: the 4k mask, sharpened at the coast by the 8k colour (Blue Marble's ocean fill is
+  // a near-black navy, rgb 2,5,20)
+  float wc = max((1.0 - smoothstep(0.006, 0.02, max(cl.r, cl.g))) * step(cl.r, cl.b) * smoothstep(0.0, 0.15, c0.g),
+                 (1.0 - smoothstep(0.02, 0.06, dot(cl, vec3(0.2126, 0.7152, 0.0722)))) * smoothstep(0.1, 0.4, c0.g)) * (1.0 - smoothstep(0.25, 0.9, e));
+  water = clamp(max(water, wc), 0.0, 1.0);
+  vec3 land = vec3(0.0), sea = vec3(0.0);
+  if (water < 0.999){
+    // Blue Marble reflectance (linear ≈ 1.25 × albedo); its snow is sharpened at close range by
+    // the sub-texel relief: snow holds on crests and gentle slopes, slides off steep faces
+    vec3 alb = cl * 0.8;
+    float mx = max(cl.r, max(cl.g, cl.b)), mn = min(cl.r, min(cl.g, cl.b));
+    float snow = smoothstep(0.32, 0.6, mn) * smoothstep(0.75, 0.9, mn / max(mx, 1e-4));
+    float fs = smoothstep(1.6, 0.6, fp / tex) * step(0.01, snow);
+    if (fs > 0.0){
+      // below the data resolution, a snowfield is broken by rock: snow sheds from slopes steeper than
+      // ~35° and survives in hollows and on gentle crests (ridged noise stands in for the gullies)
+      if (fd <= 0.0) rn = ridged(pb * (1.6 / tex));
+      float steep = smoothstep(0.25, 0.7, slope / max(uExag, 1.0));
+      float s2 = smoothstep(0.25, 0.75, snow * 1.2 - steep * 0.55 + (rn - 0.42) * 0.9);
+      s2 = mix(snow, s2, fs);
+      vec3 rock = mix(vec3(0.065, 0.06, 0.055), alb, 0.2);
+      alb = mix(rock, vec3(0.74, 0.76, 0.8), s2) * mix(1.0, 0.92 + 0.16 * rn, fd);
+    } else if (fd > 0.0) alb *= 0.92 + 0.16 * rn * fd;
+    float mu0 = max(dot(n, L), 0.0);
+    land = alb / PI * ESUN * (Ts * mu0 * sh + skyAmb);
+  }
+  if (water > 0.001){
+    // open water: absorbing deep ocean, brighter shelves (bottom reflectance + sediment) from the
+    // bathymetry; the Blue Marble colour wins where it shows real shallow-water colour
+    float depth = max(-e, 0.0);
+    vec3 alb = mix(vec3(0.0035, 0.011, 0.032), vec3(0.012, 0.045, 0.058), exp(-depth / 0.06));
+    alb = max(alb, cl * 0.8 * (1.0 - wc));
+    // seasonal sea ice (June: Arctic pack north of ~75°, Antarctic winter pack to ~62°S)
+    float nz = fbm(pb * 9.0, 3);
+    float ice = max(smoothstep(0.955, 0.975, pb.y + 0.03 * nz), smoothstep(-0.875, -0.895, pb.y + 0.03 * nz));
+    alb = mix(alb, vec3(0.55, 0.6, 0.66) * (0.85 + 0.2 * nz), ice);
+    float shw = cloudDim;
+    sea = alb / PI * ESUN * (Ts * max(mu0s, 0.0) * shw + skyAmb);
     // sun glint: GGX microfacet ocean (wind-roughened, α ≈ 0.12) with Schlick Fresnel, F0 = 0.02
     vec3 V = -rd, H = normalize(L + V);
     float nh = max(dot(n0, H), 0.0), nv = max(dot(n0, V), 1e-3), nl = max(mu0s, 0.0);
@@ -286,51 +393,133 @@ vec3 earthSurface(vec3 pw, vec3 rd, vec3 L, Atm A){
     float dd = nh * nh * (a2 - 1.0) + 1.0;
     float D = a2 / (PI * dd * dd);
     float F = 0.02 + 0.98 * pow(1.0 - max(dot(V, H), 0.0), 5.0);
-    float k = 0.06;
-    float G = nl / (nl * (1.0 - k) + k) * nv / (nv * (1.0 - k) + k);
-    col += (1.0 - ice) * D * F * G / (4.0 * nv) * ESUN * Ts * shadow;
-  } else {
-    vec3 t1, t2; tangents(p, t1, t2);
-    float eps = 0.0015, kb = 0.02;
-    float hx = max(elevE(normalize(p + t1 * eps), W), 0.0), hy = max(elevE(normalize(p + t2 * eps), W), 0.0);
-    vec3 nb = normalize(p - (t1 * (hx - e) + t2 * (hy - e)) * kb / eps);
-    vec3 n = transpose(R) * nb;
-    float habit;
-    vec3 alb = landAlbedo(p, e, habit);
-    float mu0 = max(dot(n, L), 0.0) * smoothstep(-0.05, 0.05, mu0s);
-    col = alb / PI * ESUN * (Ts * mu0 * shadow + skyAmb);
-    float night = smoothstep(0.03, -0.12, mu0s);
-    if (uCities > 0.5 && night > 0.0) col += cityLights(p, e, habit) * night;
+    float kk = 0.06;
+    float G = nl / (nl * (1.0 - kk) + kk) * nv / (nv * (1.0 - kk) + kk);
+    sea += (1.0 - ice) * D * F * G / (4.0 * nv) * ESUN * Ts * shw;
+    // skylight reflected at grazing angles
+    float Fv = 0.02 + 0.98 * pow(1.0 - nv, 5.0);
+    sea += (1.0 - ice) * Fv * vec3(0.06, 0.11, 0.22) * ESUN * 0.25 * smoothstep(-0.1, 0.3, mu0s) * uAtmo;
+  }
+  vec3 col = mix(land, sea, water);
+  // night: city lights (dimmed by overhead cloud)
+  float night = smoothstep(0.03, -0.12, mu0s);
+  if (uCities > 0.5 && night > 0.0){
+    float v = textureGrad(uNightTex, uv, gx, gy).r;
+    col += cityLight(v) * night * (0.35 + 0.65 * cloudDim);
   }
   return col;
+}
+
+vec3 cloudShade(vec3 pcw, vec3 pcb, vec2 uvc, float v, float a, vec3 L, Atm A, mat3 R, float lod, float fp){
+  vec3 nc = normalize(pcw);
+  float mu0 = dot(nc, L);
+  // cloud-top relief: thicker (brighter) cloud stands taller (≈ 2 → 12 km); bump from the gradient
+  float cphi = max(length(pcb.xz), 0.02);
+  float ds = uCloudTexel * exp2(max(lod, 0.0)) * 1.5;
+  float vE = textureLod(uCloudTex, uvc + vec2(ds / (TAU * cphi), 0.0), lod).r;
+  float vN = textureLod(uCloudTex, uvc + vec2(0.0, ds / PI), lod).r;
+  vec3 east = vec3(pcb.z, 0.0, -pcb.x) / cphi, north = cross(pcb, east);
+  float hk = 10.0 / RKM;
+  vec3 nb = normalize(pcb - ((vE - v) * east + (vN - v) * north) * hk / ds);
+  vec3 n = transpose(R) * nb;
+  // self-shadowing: cloud mass a little toward the sun
+  vec3 Lb = R * L;
+  vec3 lt = normalize(Lb - pcb * dot(Lb, pcb));
+  vec2 duvL = vec2(dot(lt, east) / (TAU * cphi), dot(lt, north) / PI) * ds * 2.0;
+  float ahead = cloudAlpha(textureLod(uCloudTex, uvc + duvL, lod + 1.0).r);
+  float self = 1.0 - 0.45 * clamp(ahead - 0.7 * a, 0.0, 1.0);
+  vec3 Ts = sunTrans(A, HCL, mu0);
+  float alb = mix(0.5, 0.86, smoothstep(0.25, 0.85, v));
+  // wrapped Lambert (multiple scattering in the deck), tall tops catch the sun after ground sunset
+  float lit = max(dot(n, L) * 0.75 + 0.25 * mu0 + 0.06, 0.0) / 1.06 * self;
+  vec3 skyAmb = vec3(0.05, 0.08, 0.14) * smoothstep(-0.1, 0.3, mu0) * uAtmo;
+  return alb / PI * ESUN * (Ts * lit + skyAmb);
 }
 
 void main(){
   vec3 rd = camRay(), ro = uCamPos, L = uSunDir;
   Atm A = atmE();
+  mat3 R = rotY(uRot);
+  float k = uExag / RKM * uTexOK;
+  float shellTop = 1.0 + k * uHMax + 1e-5;
+  float pixAng = 2.0 * uTanHalfFov / uRes.y;
+  // derivatives for texture filtering, from a seam-free and silhouette-continuous direction field:
+  // the sea-level hit, or the closest approach for rays that miss
+  vec2 hs = sphereHit(ro, rd, vec3(0.0), 1.0);
+  bool onSphere = hs.x < hs.y && hs.x > 0.0;
+  float tS = onSphere ? hs.x : max(-dot(ro, rd), 0.0);
+  vec3 pS = R * normalize(ro + rd * tS);
+  vec3 dpx = dFdx(pS), dpy = dFdy(pS);
+
   vec3 col = sky(rd, 1.0) * 0.6;
-  vec2 hg = sphereHit(ro, rd, vec3(0.0), 1.0);
-  bool ground = hg.x < hg.y && hg.x > 0.0;
-  if (!ground) col += sunDisk(rd, L, 1.0);
-  vec2 ha = sphereHit(ro, rd, vec3(0.0), RTOP);
-  if (ha.x < ha.y && ha.y > 0.0){
-    float t0 = max(ha.x, 0.0), t1 = ground ? hg.x : ha.y;
-    vec3 bg = ground ? earthSurface(ro + rd * hg.x, rd, L, A) : col;
+  // ---- relief ----
+  float tG = -1.0;
+  vec2 hO = sphereHit(ro, rd, vec3(0.0), shellTop);
+  if (hO.x < hO.y && hO.y > 0.0){
+    float tA = max(hO.x, 0.0), tB = onSphere ? hs.x : hO.y;
+    tG = marchRelief(ro, rd, tA, tB, onSphere, R, k, pixAng);
+  }
+  bool ground = tG > 0.0;
+  if (!ground) col += sunDisk(rd, L, 1.0) * 0.35;
+  // ---- cloud deck ----
+  float tC = -1.0, lift = 0.0;
+  if (uClouds > 0.001) tC = cloudHit(ro, rd, R, k, lift);
+  if (ground && tC > tG) tC = -1.0;                          // a peak in front of the deck
+  vec3 pcw = ro + rd * max(tC, 0.0), pcb = R * normalize(pcw);
+  vec2 uvc = uvOf(pcb);
+  vec2 gxc = uvD(pcb, dpx), gyc = uvD(pcb, dpy);
+  float cv = 0.0, ca = 0.0;
+  if (tC > 0.0){
+    cv = cloudTex(uvc, gxc, gyc);
+    // finer structure at close range (the composite is ~10 km per pixel)
+    float fpc = tC * pixAng;
+    float fc = smoothstep(1.0, 0.25, fpc / uCloudTexel);
+    if (fc > 0.0) cv += fc * fbm(pcb / uCloudTexel * 0.3 + vec3(0.0, uCloudT * 0.2, 0.0), 3) * 0.15 * smoothstep(0.05, 0.4, cv) * (1.2 - cv);
+    ca = cloudAlpha(cv);
+  }
+  // ---- surface ----
+  vec3 bg = col;
+  if (ground){
+    vec3 pw = ro + rd * tG, pb = R * normalize(pw);
+    // cloud shadow: the deck where the sun ray from this point crosses it
+    float cd = 1.0;
     if (uClouds > 0.001){
-      vec2 hc = sphereHit(ro, rd, vec3(0.0), RCL);
-      if (hc.x < hc.y && hc.x > 0.0){
-        vec3 pc = ro + rd * hc.x;
-        float a = cloudCov(pc, 5);
-        if (a > 0.002) bg = mix(bg, cloudShade(pc, a, L, A), a);
+      float rDeck = 1.0 + HCL * (1.0 + 0.5 * max(uExag - 1.0, 0.0)) + k * hgtKm(pb, 3.5);
+      vec2 hc = sphereHit(pw, L, vec3(0.0), rDeck);
+      if (hc.y > 0.0 && dot(pw, pw) < rDeck * rDeck){       // (peaks above the deck are in the clear)
+        vec3 pq = R * normalize(pw + L * hc.y);
+        vec2 uq = uvOf(pq);
+        cd = 1.0 - 0.8 * cloudAlpha(cloudTex(uq, uvD(pq, dpx) * 2.0, uvD(pq, dpy) * 2.0));
       }
     }
-    vec3 T;
-    vec3 S = atmosphere(ro, rd, t0, t1, L, A, T) * ESUN;
-    col = S + T * bg;
+    bg = earthSurface(pw, pb, rd, L, A, R, k, tG * pixAng, uvD(pb, dpx), uvD(pb, dpy), shellTop, cd);
   }
-  if (uAurora > 0.0) col += aurora(ro, rd, ground ? hg.x : 1e9);
+  if (ca > 0.002){
+    float lodc = log2(max(tC * pixAng, 1e-7) / uCloudTexel);
+    vec3 cc = cloudShade(pcw, pcb, uvc, cv, ca, L, A, R, lodc, tC * pixAng);
+    // city glow scattered through the deck from below
+    float nightC = smoothstep(0.0, -0.15, dot(normalize(pcw), L));
+    if (uCities > 0.5 && nightC > 0.0) cc += cityLight(textureLod(uNightTex, uvOf(R * normalize(pcw)), max(lodc + 1.5, 2.0)).r) * 0.35 * nightC;
+    bg = mix(bg, cc, ca);
+  }
+  // ---- atmosphere: single scattering from the entry point to whatever the ray hits ----
+  vec2 ha = sphereHit(ro, rd, vec3(0.0), RTOP);
+  if (ha.x < ha.y && ha.y > 0.0){
+    float t0 = max(ha.x, 0.0);
+    float tEnd = ground ? tG : ha.y;
+    if (ca > 0.002) tEnd = mix(tEnd, tC, ca);
+    float t1 = min(tEnd, ha.y);
+    if (t1 > t0){
+      vec3 T;
+      vec3 S = atmosphere(ro, rd, t0, t1, L, A, T) * ESUN;
+      bg = S + T * bg;
+    }
+  }
+  col = bg;
+  if (uAurora > 0.0) col += aurora(ro, rd, ground ? tG : 1e9);
   gl_FragColor = vec4(col, 1.0);
 }`;
+
 
 /* ================================================================================================
    MARS
@@ -769,6 +958,115 @@ function sunElevStr(n, L) {
   return `Mặt Trời cao <b>${e.toFixed(1)}°</b> (${tag})`;
 }
 
+/* Earth uses a right-handed geography (east = counter-clockwise seen from the north, like the real
+   planet and the NASA maps): body = rotY(−spin)·world, east longitude = atan2(x, z). */
+const llE = (lat, lon) => [Math.cos(lat * D2R) * Math.sin(lon * D2R), Math.sin(lat * D2R), Math.cos(lat * D2R) * Math.cos(lon * D2R)];
+// afternoon puts the Sun west of the meridian (= −azimuth for this spin sense)
+function sunFromHourE(cam, hour, declDeg, out) {
+  const az = Math.atan2(cam.x, cam.z) - (hour - 12) * Math.PI / 12, d = declDeg * D2R;
+  return out.set(Math.cos(d) * Math.sin(az), Math.sin(d), Math.cos(d) * Math.cos(az));
+}
+const bodyLatLonE = (p, spin) => ({ lat: Math.asin(p.y / p.length()) / D2R, lon: wrap180((Math.atan2(p.x, p.z) - spin) / D2R) });
+const localHourE = (p, L) => (((12 + (Math.atan2(p.x, p.z) - Math.atan2(L.x, L.z)) / D2R / 15) % 24) + 24) % 24;
+/* ================================================================================================
+   Earth assets (assets/earth/, see CREDITS.txt)
+   ================================================================================================ */
+const EARTH_URL = f => new URL(`../../assets/earth/${f}`, import.meta.url).href;
+// float32 → IEEE half (round-to-nearest, tiny values flushed to 0)
+const _f32 = new Float32Array(1), _u32 = new Uint32Array(_f32.buffer);
+function toHalf(v) {
+  _f32[0] = v; const x = _u32[0], s = (x >>> 16) & 0x8000, e = ((x >>> 23) & 0xff) - 112;
+  if (e <= 0) return s;
+  if (e >= 31) return s | 0x7bff;
+  return s | ((e << 10) + (((x & 0x7fffff) + 0x1000) >>> 13));
+}
+// exact 8-bit pixels of a (colour-profile-free) lossless image
+function decodeImage(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const W = img.naturalWidth, H = img.naturalHeight;
+      const cv = Object.assign(document.createElement('canvas'), { width: W, height: H });
+      const g = cv.getContext('2d', { willReadFrequently: true });
+      g.drawImage(img, 0, 0);
+      resolve({ W, H, px: g.getImageData(0, 0, W, H).data });
+    };
+    img.onerror = () => reject(new Error(`không tải được ${url}`));
+    img.src = url;
+  });
+}
+// Elevation PNG/WebP: R,G = (metres + 11000) as a 16-bit big-endian integer, B = water fraction.
+// → RG16F texture (km, water) with a CPU-built box-filtered mip chain; rows flipped so v = 0 is south.
+// Also returns a coarse float copy for CPU look-ups (click read-out, camera clearance).
+async function loadElevation(url, keep = 1, repeat = true) {
+  const { W, H, px } = await decodeImage(url);
+  let lv = new Float32Array(W * H * 2), max = -1e9;
+  for (let y = 0; y < H; y++) {
+    let si = (H - 1 - y) * W * 4, di = y * W * 2;
+    for (let x = 0; x < W; x++, si += 4, di += 2) {
+      const e = (((px[si] << 8) | px[si + 1]) - 11000) / 1000;
+      lv[di] = e; lv[di + 1] = px[si + 2] / 255;
+      if (e > max) max = e;
+    }
+  }
+  const mips = [];
+  let w = W, h = H, cpu = null;
+  for (;;) {
+    const half = new Uint16Array(w * h * 2);
+    for (let i = 0; i < half.length; i++) half[i] = toHalf(lv[i]);
+    mips.push({ data: half, width: w, height: h });
+    if (w === W / keep && !cpu) cpu = { data: lv, W: w, H: h };
+    if (w === 1 && h === 1) break;
+    const w2 = Math.max(1, w >> 1), h2 = Math.max(1, h >> 1), nx = new Float32Array(w2 * h2 * 2);
+    const sx = w > 1 ? 2 : 1, sy = h > 1 ? 2 : 1;
+    for (let y = 0; y < h2; y++) for (let x = 0; x < w2; x++) for (let c = 0; c < 2; c++) {
+      const a = ((y * sy) * w + x * sx) * 2 + c, b = a + (sx - 1) * 2, d = a + (sy - 1) * w * 2, f = d + (sx - 1) * 2;
+      nx[(y * w2 + x) * 2 + c] = 0.25 * (lv[a] + lv[b] + lv[d] + lv[f]);
+    }
+    lv = nx; w = w2; h = h2;
+  }
+  const tex = new THREE.DataTexture(mips[0].data, W, H, THREE.RGFormat, THREE.HalfFloatType);
+  tex.mipmaps = mips;
+  tex.generateMipmaps = false;
+  tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter;
+  tex.wrapS = repeat ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping; tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.needsUpdate = true;
+  return { tex, max, cpu };
+}
+// colour / grey JPEGs through the browser decoder; downscaled on a canvas if the GPU cannot hold them
+function loadImageTex(url, { srgb = false, red = false, aniso = 1, maxSize = 16384, repeat = true }) {
+  return new Promise((resolve, reject) => new THREE.TextureLoader().load(url, tex => {
+    const img = tex.image;
+    if (img.width > maxSize) {
+      const s = maxSize / img.width, cv = document.createElement('canvas');
+      cv.width = Math.round(img.width * s); cv.height = Math.round(img.height * s);
+      const g = cv.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(img, 0, 0, cv.width, cv.height);
+      tex.image = cv;
+    }
+    tex.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+    if (red) tex.format = THREE.RedFormat;
+    tex.wrapS = repeat ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping; tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter;
+    tex.generateMipmaps = true; tex.anisotropy = aniso;
+    tex.needsUpdate = true;
+    resolve(tex);
+  }, undefined, () => reject(new Error(`không tải được ${url}`))));
+}
+// a busy static server occasionally drops a request: retry once with a cache-busting query
+const retry = (fn, url, ...a) => fn(url, ...a).catch(() => new Promise(r => setTimeout(r, 500)).then(() => fn(url + '?r=' + Date.now(), ...a)));
+// 1×1 stand-ins until the data arrive (an ocean planet)
+function solidTex(data, format, type) {
+  const t = new THREE.DataTexture(data, 1, 1, format, type); t.needsUpdate = true; return t;
+}
+// bilinear look-up in a CPU elevation copy (lat, lon in degrees; rows south → north)
+function sampleElev(cpu, lat, lon, lon0 = -180, lat0 = -90, spanLon = 360, spanLat = 180) {
+  const { data, W, H } = cpu;
+  const x = (lon - lon0) / spanLon * W - 0.5, y = (lat - lat0) / spanLat * H - 0.5;
+  const x0 = Math.floor(x), y0 = Math.max(0, Math.min(H - 2, Math.floor(y))), fx = x - x0, fy = Math.max(0, Math.min(1, y - y0));
+  const at = (i, j) => data[(j * W + ((i % W) + W) % W) * 2];
+  return (at(x0, y0) * (1 - fx) + at(x0 + 1, y0) * fx) * (1 - fy) + (at(x0, y0 + 1) * (1 - fx) + at(x0 + 1, y0 + 1) * fx) * fy;
+}
+
 /* ================================================================================================
    Scene definitions
    ================================================================================================ */
@@ -780,13 +1078,15 @@ export default [
   order: 20,
   subtitle: 'Hành tinh đất đá · ngôi nhà của chúng ta',
   swatch: ['#9fd0ff', '#0b2a5a'],
-  blurb: 'Hành tinh duy nhất được biết có sự sống, 71 % bề mặt là đại dương. Viền khí quyển xanh lam và bầu trời xanh đến từ <b>tán xạ Rayleigh</b> (∝ 1/λ⁴): ánh sáng xanh bị tán xạ mạnh gấp ~5 lần ánh sáng đỏ — cũng vì thế mà dải phân chia ngày–đêm nhuốm màu cam.',
-  intro: 'Kéo <b>Giờ địa phương</b> về khoảng 18:00 để thấy hoàng hôn cam trên đường phân chia, hoặc 00:00 để thấy ánh đèn thành phố và cực quang. Nhấn <b>N</b> cho ban đêm.',
+  blurb: 'Hành tinh duy nhất được biết có sự sống, 71 % bề mặt là đại dương. Bề mặt ở đây là <b>dữ liệu thật</b>: ảnh vệ tinh Blue Marble của NASA, địa hình và đáy biển ETOPO 2022, ánh đèn đêm Black Marble. Viền khí quyển xanh lam đến từ <b>tán xạ Rayleigh</b> (∝ 1/λ⁴): ánh sáng xanh bị tán xạ mạnh gấp ~5 lần ánh sáng đỏ — cũng vì thế mà dải phân chia ngày–đêm nhuốm màu cam.',
+  intro: 'Nhấn <b>Y</b> để bay tới dãy Himalaya lúc bình minh. Kéo <b>Phóng đại địa hình</b> để thấy núi nổi lên; <b>N</b> cho ban đêm, <b>J</b> cho hoàng hôn.',
   facts: [
     ['Bán kính trung bình', '6 371 km'], ['Khối lượng', '5,97×10²⁴ kg'], ['Trọng lực bề mặt', '9,81 m/s²'],
     ['Độ nghiêng trục quay', '23,44°'], ['Ngày Mặt Trời / ngày sao', '24 h / 23 h 56 min 4 s'],
     ['Suất phản chiếu Bond', '0,30'], ['Khí quyển', 'N₂ 78 %, O₂ 21 %, Ar 0,9 % · 1 013 hPa'],
     ['Độ cao thang (Rayleigh / Mie)', '8 km / 1,2 km'],
+    ['Đỉnh cao nhất / điểm sâu nhất', 'Everest 8 849 m / vực Challenger −10 935 m'],
+    ['Dữ liệu', 'NASA Blue Marble NG (6/2004), NOAA ETOPO 2022, NASA Black Marble 2016, mây NASA Blue Marble'],
   ],
   unitKm: 6371,
   camera: { distance: 3.2, polar: 72, azimuth: 20, min: 1.03, max: 30, fov: 45 },
@@ -794,60 +1094,186 @@ export default [
   bloom: 0.3,
   params: [
     hourParam(13.5, '12:00 = Mặt Trời sau lưng bạn (Trái Đất tròn đầy); 18:00 = đường phân chia đi qua giữa đĩa; 00:00 = mặt đêm.'),
-    { key: 'decl', label: 'Mùa (xích vĩ Mặt Trời)', type: 'range', min: -23.44, max: 23.44, step: 0.1, default: 8, fmt: v => v.toFixed(1) + '°', note: '+23,44° = hạ chí Bắc bán cầu: vùng cực Bắc có ngày dài 24 giờ.' },
-    { key: 'clouds', label: 'Độ che phủ mây', type: 'range', min: 0, max: 1, step: 0.01, default: 0.5 },
+    { key: 'decl', label: 'Mùa (xích vĩ Mặt Trời)', type: 'range', min: -23.44, max: 23.44, step: 0.1, default: 20, fmt: v => v.toFixed(1) + '°', note: '+23,44° = hạ chí Bắc bán cầu: vùng cực Bắc có ngày dài 24 giờ. (Ảnh bề mặt và mây chụp vào tháng 6.)' },
+    { key: 'exag', label: 'Phóng đại địa hình', type: 'range', min: 1, max: 40, step: 0.5, default: 8, fmt: v => '×' + v.toFixed(1), note: '×1 = tỉ lệ thật: Everest chỉ cao 0,14 % bán kính, gần như vô hình từ quỹ đạo. Phóng đại theo chiều đứng để núi nổi lên, đổ bóng và in bóng trên đường chân trời.' },
+    { key: 'clouds', label: 'Độ che phủ mây', type: 'range', min: 0, max: 1, step: 0.01, default: 0.5, note: '0,5 = đúng ảnh mây tổng hợp của NASA; mây trôi theo gió mậu dịch (về phía tây) và gió tây ôn đới (về phía đông).' },
     { key: 'atmo', label: 'Mật độ khí quyển', type: 'range', min: 0, max: 3, step: 0.01, default: 1, fmt: v => '×' + v.toFixed(2), note: 'Nhân hệ số tán xạ Rayleigh, Mie và hấp thụ ozone.' },
     { key: 'cities', label: 'Đèn thành phố', type: 'toggle', default: true },
     { key: 'kp', label: 'Bão địa từ (chỉ số Kp)', type: 'range', min: 0, max: 9, step: 0.1, default: 4, fmt: v => 'Kp ' + v.toFixed(1), note: 'Kp càng lớn, vành cực quang càng mở rộng về phía xích đạo và ánh đỏ 630 nm ở độ cao 200–300 km càng rõ.' },
     { key: 'aurora', label: 'Cực quang', type: 'toggle', default: true },
   ],
   actions: [
-    { label: 'Ban đêm', key: 'n', title: 'Nhìn mặt đêm: đèn thành phố và cực quang', run: ctx => { ctx.params.hour = 0.5; ctx.toast('Nửa đêm dưới camera: ánh đèn đô thị bám theo bờ biển và vùng ôn đới; vành cực quang xanh lục (oxy 557,7 nm) bao quanh cực từ.'); } },
-    { label: 'Hoàng hôn', key: 'j', title: 'Đặt đường phân chia ngày–đêm vào giữa đĩa', run: ctx => { ctx.params.hour = 17.8; ctx.toast('Ánh nắng chiều đi xuyên qua ~40 lần bề dày khí quyển: ánh xanh bị tán xạ hết, chỉ còn đỏ cam.'); } },
+    { label: 'Himalaya', key: 'y', title: 'Bay tới dãy Himalaya lúc bình minh (bấm lần nữa để quay lại)', run: ctx => ctx.scene._earthShot?.(ctx) },
+    { label: 'Ban đêm', key: 'n', title: 'Nhìn mặt đêm: đèn thành phố và cực quang', run: ctx => { ctx.params.hour = 0.5; ctx.toast('Nửa đêm dưới camera: ánh đèn đô thị (ảnh Black Marble 2016 của NASA) bám theo bờ biển, sông ngòi và đường sá; vành cực quang xanh lục (oxy 557,7 nm) bao quanh cực từ.'); } },
+    { label: 'Hoàng hôn', key: 'j', title: 'Đặt đường phân chia ngày–đêm vào giữa đĩa', run: ctx => { ctx.params.hour = 17.8; ctx.toast('Ánh nắng chiều đi xuyên qua ~40 lần bề dày khí quyển: ánh xanh bị tán xạ hết, chỉ còn đỏ cam. Gần đường phân chia, núi đổ bóng dài hàng trăm km.'); } },
     { label: 'Bão địa từ', key: 'g', title: 'Bão địa từ cực mạnh (Kp 8,7 như tháng 5/2024)', run: ctx => { ctx.params.kp = 8.7; ctx.params.aurora = true; ctx.params.hour = 0.5; ctx.toast('Bão địa từ G5 (5/2024, Kp ≈ 9): vành cực quang mở rộng xuống vĩ độ ~45°, ánh đỏ oxy 630 nm ở độ cao lớn hiện rõ.'); } },
   ],
   create(ctx) {
+    const R = ctx.renderer, caps = R.capabilities;
+    const maxTex = caps.maxTextureSize, aniso = Math.min(8, caps.getMaxAnisotropy());
+    const ocean = () => solidTex(new Uint16Array([toHalf(-4), toHalf(1)]), THREE.RGFormat, THREE.HalfFloatType);
+    const black = () => solidTex(new Uint8Array([0]), THREE.RedFormat, THREE.UnsignedByteType);
+    const navy = () => solidTex(new Uint8Array([2, 5, 20, 255]), THREE.RGBAFormat, THREE.UnsignedByteType);
     const uniforms = {
       ...ctx.shared,
       uSunDir: { value: new THREE.Vector3(1, 0, 0) }, uAurN: { value: new THREE.Vector3(0, 1, 0) }, uAurS: { value: new THREE.Vector3(0, -1, 0) },
-      uRot: { value: 0 }, uCloudRot: { value: 0 }, uClouds: { value: 0.5 }, uCities: { value: 1 }, uAtmo: { value: 1 }, uKp: { value: 4 }, uAurora: { value: 1 },
+      uRot: { value: 0 }, uClouds: { value: 0.5 }, uCities: { value: 1 }, uAtmo: { value: 1 }, uKp: { value: 4 }, uAurora: { value: 1 },
+      uExag: { value: 8 }, uHMax: { value: 8.2 }, uTexOK: { value: 0 }, uCloudT: { value: 0 },
+      uTexel: { value: 2 * Math.PI / 4096 }, uCloudTexel: { value: 2 * Math.PI / 4096 },
+      uColTex: { value: navy() }, uElevTex: { value: ocean() }, uNightTex: { value: black() }, uCloudTex: { value: black() },
+      uPatchCol: { value: navy() }, uPatchElev: { value: ocean() },
     };
     const material = makeMaterial(EARTH_FRAG, uniforms);
+    const U = uniforms;
+    let elevCPU = null, patchCPU = null;
+    const ready = Promise.all([
+      retry(loadImageTex, EARTH_URL('earth_color_8k.jpg'), { srgb: true, aniso, maxSize: maxTex }),
+      retry(loadElevation, EARTH_URL('earth_elev_4k.webp'), 2),
+      retry(loadImageTex, EARTH_URL('earth_night_8k.jpg'), { red: true, aniso: 4, maxSize: maxTex }),
+      retry(loadImageTex, EARTH_URL('earth_clouds_4k.jpg'), { red: true, aniso: 4, maxSize: maxTex }),
+      retry(loadImageTex, EARTH_URL('earth_himalaya_color.jpg'), { srgb: true, aniso, repeat: false }),
+      retry(loadElevation, EARTH_URL('earth_himalaya_elev.webp'), 1, false),
+    ]).then(([col, el, night, cl, pcol, pel]) => {
+      U.uColTex.value = col; U.uElevTex.value = el.tex; U.uNightTex.value = night; U.uCloudTex.value = cl;
+      U.uPatchCol.value = pcol; U.uPatchElev.value = pel.tex;
+      U.uTexel.value = 2 * Math.PI / el.tex.image.width;
+      U.uCloudTexel.value = 2 * Math.PI / cl.image.width;
+      U.uHMax.value = Math.max(el.max, pel.max);
+      elevCPU = el.cpu; patchCPU = pel.cpu;
+      for (const t of [col, el.tex, night, cl, pcol, pel.tex]) R.initTexture(t);
+      U.uTexOK.value = 1;
+    });
+    // elevation (m) and water at a body-frame lat/lon from the CPU copies
+    const elevAt = (lat, lon) => {
+      if (!elevCPU) return null;
+      const pl = (lon - PATCH.lon0 + 360) % 360;
+      if (patchCPU && pl < PATCH.w / 60 && lat > PATCH.lat0 && lat < PATCH.lat0 + PATCH.h / 60)
+        return 1000 * sampleElev(patchCPU, lat, PATCH.lon0 + pl, PATCH.lon0, PATCH.lat0, PATCH.w / 60, PATCH.h / 60);
+      return 1000 * sampleElev(elevCPU, lat, lon);
+    };
+
     // geomagnetic north pole ≈ 80.7°N 72.7°W (body frame); the oval is displaced ~4° toward the night side
-    const magB = new THREE.Vector3(...ll(80.7, -72.7)), mW = new THREE.Vector3(), anti = new THREE.Vector3(), Y = new THREE.Vector3(0, 1, 0);
+    const magB = new THREE.Vector3(...llE(80.7, -72.7)), mW = new THREE.Vector3(), anti = new THREE.Vector3(), Y = new THREE.Vector3(0, 1, 0);
     const OMEGA = 0.004;   // visual spin rate (rad per sim-second)
     const rotOf = t => t * OMEGA;
+    let lastRot = null;
+
+    /* ---- the Himalaya close-up: a camera that rides with the rotating Earth ---------------- */
+    const shot = { on: false, tw: null, pending: false };
+    const V = () => new THREE.Vector3();
+    const bodyDir = (lat, lon) => new THREE.Vector3(...llE(lat, lon));
+    const toWorld = (v, rot) => v.clone().applyAxisAngle(Y, rot);
+    const toBody = (v, rot) => v.clone().applyAxisAngle(Y, -rot);
+    const def = ctx.scene;
+    function frameOf(cam, ctl) { return { pos: cam.position.clone(), tgt: ctl.target.clone(), up: cam.up.clone() }; }
+    function startTween(c, toBodyFrame, dur, onDone) {
+      const rot = rotOf(c.time.sim);
+      const from = frameOf(c.camera, c.controls);
+      shot.tw = {
+        t0: performance.now(), dur: dur * 1000, onDone,
+        a: { pos: toBody(from.pos, rot), tgt: toBody(from.tgt, rot), up: toBody(from.up, rot) },
+        b: toBodyFrame,
+      };
+    }
+    const SHOT = (new URLSearchParams(location.search).get('shotGeo') || '23.5,87.5,330,28.6,86.0').split(',').map(Number);
+    function himalayaFrame() {
+      // like ISS031-E-67020: from ~380 km over the Ganges plain, looking north across the Himalaya to Tibet
+      const tgt = bodyDir(SHOT[3], SHOT[4]);
+      const pos = bodyDir(SHOT[0], SHOT[1]).multiplyScalar(1 + SHOT[2] / 6371);
+      return { pos, tgt, up: pos.clone().normalize().add(tgt).normalize() };
+    }
+    function globalFrame(c) {
+      const cam = def.camera, rot = rotOf(c.time.sim);
+      const pos = new THREE.Vector3().setFromSphericalCoords(cam.distance, cam.polar * D2R, cam.azimuth * D2R);
+      return { pos: toBody(pos, rot), tgt: V(), up: toBody(Y, rot) };
+    }
+    function goShot(c, instant) {
+      const p = c.params, keep = instant ? (new URLSearchParams(location.search).get('params') || '') : '';
+      const set = (k, v) => { if (!keep.includes(k + ':')) p[k] = v; };
+      set('exag', 3); set('hour', 7.4); set('decl', 21); set('clouds', Math.min(p.clouds, 0.22));
+      shot.on = true;
+      c.controls.minDistance = 0.004;
+      if (instant) { applyFrame(c, himalayaFrame(), rotOf(c.time.sim)); shot.tw = null; }
+      else startTween(c, himalayaFrame(), 4.5);
+      c.toast?.(`Buổi sáng trên dãy Himalaya, nhìn từ độ cao ~330 km (như từ Trạm Vũ trụ Quốc tế) qua đồng bằng sông Hằng về phía cao nguyên Tây Tạng. <b>Everest cao 8 849 m — chỉ bằng 0,14 % bán kính Trái Đất (6 371 km)</b>, nên ở đây địa hình được phóng đại <b>×${p.exag}</b> theo chiều đứng (kéo thanh <b>Phóng đại địa hình</b> về ×1 để thấy tỉ lệ thật). Nắng sớm từ phía đông chiếu xiên làm các sườn núi đổ bóng dài về phía tây; mây gió mùa trôi bên dưới các đỉnh tuyết.`, 11000);
+    }
+    function leaveShot(c) {
+      c.params.exag = 8; c.params.hour = 13.5;
+      startTween(c, globalFrame(c), 3.5, () => { shot.on = false; c.controls.minDistance = def.camera.min; c.camera.up.set(0, 1, 0); c.controls.target.set(0, 0, 0); });
+    }
+    function applyFrame(c, f, rot) {
+      c.camera.position.copy(toWorld(f.pos, rot));
+      c.controls.target.copy(toWorld(f.tgt, rot));
+      c.camera.up.copy(toWorld(f.up, rot)).normalize();
+      c.camera.lookAt(c.controls.target);
+    }
+    def._earthShot = c => { if (!shot.tw) (shot.on ? leaveShot(c) : goShot(c, false)); };
+    // deep link / snapshot hook: ?earthShot=himalaya
+    shot.pending = new URLSearchParams(location.search).get('earthShot') === 'himalaya';
+
     return {
       material,
-      update(dt, ctx) {
-        const p = ctx.params, U = uniforms, L = U.uSunDir.value;
-        sunFromHour(ctx.camera.position, p.hour, p.decl, L);
-        const rot = rotOf(ctx.time.sim);
-        U.uRot.value = rot;
-        U.uCloudRot.value = rot * 0.97;
+      ready,
+      exit(c) {
+        if (shot.on) { shot.on = false; shot.tw = null; c.controls.minDistance = def.camera.min; c.camera.up.set(0, 1, 0); }
+      },
+      update(dt, c) {
+        const p = c.params, L = U.uSunDir.value;
+        const rot = rotOf(c.time.sim);
+        if (shot.pending && U.uTexOK.value > 0) { shot.pending = false; goShot(c, true); }
+        // camera that co-rotates with the ground while in the close-up
+        if (shot.tw) {
+          const tw = shot.tw, k0 = Math.min(1, (performance.now() - tw.t0) / tw.dur), e = k0 * k0 * (3 - 2 * k0);
+          const ra = tw.a.pos.length(), rb = tw.b.pos.length();
+          const dir = tw.a.pos.clone().normalize().lerp(tw.b.pos.clone().normalize(), e);
+          if (dir.lengthSq() < 1e-6) dir.copy(tw.b.pos).normalize();
+          // log-radius ease, lifted mid-way so the path clears the planet
+          const r = Math.exp(Math.log(ra) * (1 - e) + Math.log(rb) * e) * (1 + 0.35 * Math.sin(Math.PI * e) * Math.min(1, Math.abs(ra - rb)));
+          applyFrame(c, { pos: dir.normalize().multiplyScalar(r), tgt: tw.a.tgt.clone().lerp(tw.b.tgt, e), up: tw.a.up.clone().lerp(tw.b.up, e) }, rot);
+          if (k0 >= 1) { shot.tw = null; tw.onDone?.(); }
+        } else if (shot.on && lastRot !== null && rot !== lastRot) {
+          const d = rot - lastRot;
+          c.camera.position.applyAxisAngle(Y, d); c.controls.target.applyAxisAngle(Y, d); c.camera.up.applyAxisAngle(Y, d);
+          c.camera.lookAt(c.controls.target);
+        }
+        lastRot = rot;
+        // keep the camera above the (exaggerated) relief
+        const top = 1 + (U.uHMax.value * p.exag + 12) / 6371;
+        if (c.camera.position.length() < top) c.camera.position.setLength(top);
+
+        sunFromHourE(c.camera.position, p.hour, p.decl, L);
+        U.uRot.value = -rot;          // body = rotY(−spin)·world
+        U.uCloudT.value = c.time.sim / 40;
         U.uClouds.value = p.clouds; U.uCities.value = p.cities ? 1 : 0; U.uAtmo.value = p.atmo;
         U.uKp.value = p.kp; U.uAurora.value = p.aurora ? 1 : 0;
-        // world = rotYᵀ(rot) · body ; rotYᵀ(a) = rotY(−a)
-        mW.copy(magB).applyAxisAngle(Y, -rot);
+        // the exaggeration eases toward the slider so mountains rise smoothly
+        U.uExag.value += (p.exag - U.uExag.value) * Math.min(1, dt * 4);
+        if (Math.abs(p.exag - U.uExag.value) < 0.01) U.uExag.value = p.exag;
+        // world = rotY(spin) · body
+        mW.copy(magB).applyAxisAngle(Y, rot);
         anti.copy(L).addScaledVector(mW, -L.dot(mW)).normalize();
         U.uAurN.value.copy(mW).addScaledVector(anti, -0.07).normalize();
         U.uAurS.value.copy(mW).negate().addScaledVector(anti, -0.07).normalize();
       },
-      hud(ctx) {
-        const c = ctx.camera.position, ll2 = bodyLatLon(c, rotOf(ctx.time.sim));
+      hud(c) {
+        const cp = c.camera.position, ll2 = bodyLatLonE(cp, rotOf(c.time.sim));
+        const e = elevAt(ll2.lat, ll2.lon);
         return [
-          ...orbitRows(ctx, 6371),
-          ['Điểm dưới camera', `${latStr(ll2.lat)} ${lonStr(ll2.lon)}`],
-          ['Giờ Mặt Trời tại đó', hhmm(ctx.params.hour)],
-          ['Chu kỳ quỹ đạo tròn ở độ cao này', ctx.fmt.time(2 * Math.PI * Math.sqrt(Math.pow(c.length() * 6.371e6, 3) / 3.986e14))],
+          ...orbitRows(c, 6371),
+          ['Điểm dưới camera', `${latStr(ll2.lat)} ${lonStr(ll2.lon)}` + (e === null ? '' : e >= 0 ? ` · cao ${Math.round(e).toLocaleString('vi-VN')} m` : ` · biển sâu ${Math.round(-e).toLocaleString('vi-VN')} m`)],
+          ['Giờ Mặt Trời tại đó', hhmm(c.params.hour)],
+          ['Phóng đại địa hình', '×' + U.uExag.value.toFixed(1)],
+          ['Chu kỳ quỹ đạo tròn ở độ cao này', c.fmt.time(2 * Math.PI * Math.sqrt(Math.pow(cp.length() * 6.371e6, 3) / 3.986e14))],
         ];
       },
-      onClick(info, ctx) {
+      onClick(info, c) {
         const t = hitSphere(info.origin, info.dir);
         if (t === null) return;
-        const p = info.origin.clone().addScaledVector(info.dir, t).normalize(), L = uniforms.uSunDir.value;
-        const g = bodyLatLon(p, rotOf(ctx.time.sim));
-        ctx.toast(`Vĩ độ <b>${latStr(g.lat)}</b>, kinh độ <b>${lonStr(g.lon)}</b> · giờ địa phương <b>${hhmm(localHour(p, L))}</b> · ${sunElevStr(p, L)}.`);
+        const p = info.origin.clone().addScaledVector(info.dir, t).normalize(), L = U.uSunDir.value;
+        const g = bodyLatLonE(p, rotOf(c.time.sim));
+        const e = elevAt(g.lat, g.lon);
+        const hs = e === null ? '' : e >= 0 ? ` · độ cao <b>${Math.round(e).toLocaleString('vi-VN')} m</b>` : ` · độ sâu đáy biển <b>${Math.round(-e).toLocaleString('vi-VN')} m</b>`;
+        c.toast(`Vĩ độ <b>${latStr(g.lat)}</b>, kinh độ <b>${lonStr(g.lon)}</b>${hs} · giờ địa phương <b>${hhmm(localHourE(p, L))}</b> · ${sunElevStr(p, L)}.`);
       },
     };
   },

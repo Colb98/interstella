@@ -19,7 +19,7 @@
 import * as THREE from 'three';
 import { COMMON_GLSL, FULLSCREEN_VERT } from '../glsl/common.js';
 
-const NS = 16, NL = 8, NF = 4;           // spots, loops (prominences / flare loops), flares
+const NS = 16, NL = 8, NF = 4, NP = 24;   // spots, loops (flare loops / 171 Å loops), flares, volumetric prominences
 const R_SUN_KM = 695700, AU_KM = 1.495978707e8, C_KMS = 299792.458, G_SUN = 274.0; // m/s²
 
 /* ============================================================================================== */
@@ -90,17 +90,38 @@ float sunGranule(vec3 p, float t, float seed){
     if (d < d1){ d2 = d1; d1 = d; h1 = h; g1 = g; w1 = w; } else if (d < d2) d2 = d;
   }
   float life = 0.5 + 0.5 * sin(t * 0.45 + TAU * h1.y);
-  float prof = 1.0 - smoothstep(0.0, 0.95, d1);                  // soft dome, brightest in the middle
-  float body = (0.55 + 0.45 * h1.x) * (0.5 + 0.5 * life) * (0.1 + 0.9 * prof * prof * (3.0 - 2.0 * prof));
+  float prof = 1.0 - smoothstep(0.0, 0.85, d1);                  // dome: hot up-flow in the middle, cooling outward
+  float body = (0.55 + 0.45 * h1.x) * (0.5 + 0.5 * life) * (0.0 + 1.0 * pow(prof, 1.4));
   if (g1.y > 0.8 && w1 > 1.1) body *= 1.0 - 0.65 * exp(-d1 * d1 / 0.048);   // exploding granule
-  float lw = 0.22 + 0.22 * (0.5 + 0.5 * snoise(p * 0.7 + seed));          // lanes of varying width
+  float sn = snoise(p * 0.7 + seed);
+  float lw = 0.16 + 0.2 * (0.5 + 0.5 * sn);                                 // lanes of varying width, soft edges
   float lane = 1.0 - smoothstep(0.0, lw, d2 - d1);
   lane *= lane * (3.0 - 2.0 * lane);
   float bp = lane * smoothstep(0.55, 0.9, snoise(p * 2.7 + seed * 1.7)); // bright points in the lanes
-  return mix(body, -1.3, lane) + 1.6 * bp + 0.12;
+  return mix(body, -0.8 - 0.3 * sn, lane * lane) + 1.6 * bp + 0.1;
 }
+// ---- prominences, rendered as volumes (see promMarch) ------------------------------------------------
+uniform vec4 uPrA[NP];   // foot-point centre C (unit vector, world), type (0 hedgerow, 1 flux-rope arch, 2 loop arcade, 3 erupting rope)
+uniform vec4 uPrB[NP];   // axis direction T (unit, tangent at C), seed
+uniform vec4 uPrC[NP];   // half-length L, height H, sheet half-thickness / rope radius a, density scale (0 = empty slot)
+uniform vec4 uPrD[NP];   // bounding box in the local frame: half-length, top, half-width, depth below the tangent plane
+uniform vec4 uPrE[NP];   // twist (turns from foot to foot), number of legs, lean, unused
+uniform vec4 uCme;       // CME bubble centre, radius (0 = none)
+uniform float uCmeB;     // CME brightness
+uniform float uView;     // 0 white light, 1 H-alpha 656.3 nm, 2 He II 30.4 nm, 3 Fe IX 17.1 nm
+uniform float uLoopK;    // brightness of the 171 Å coronal loops
+// Narrow-band images are monochrome; observatories and astrophotographers show them through colour tables.
+// H-alpha uses a heat table like the best published Hα images: faint levels in the deep red of 656 nm (which
+// sRGB can only approximate), brighter ones through orange toward white. The EUV channels use SDO/AIA's
+// conventional false colours (304 Å red-orange, 171 Å gold).
+vec3 lutHa(float x){ x = max(x, 0.0); return vec3(x, 0.46 * pow(x, 2.2) + 0.01 * x, 0.2 * pow(x, 3.6) + 0.012 * x); }
+vec3 lut304(float x){ x = max(x, 0.0); return vec3(x, 0.42 * x * sqrt(x), 0.07 * x * x * x); }
+vec3 lut171(float x){ x = max(x, 0.0); return vec3(x, 0.6 * pow(x, 1.15), 0.1 * x * x) + vec3(0.05, 0.08, 0.08) * x * x * x; }
+vec3 lutView(float x){ return uView < 1.5 ? lutHa(x) : (uView < 2.5 ? lut304(x) : lut171(x)); }
 #endif
 vec3 warp3(vec3 p){ return p + 0.45 * vec3(snoise(p * 0.31), snoise(p * 0.31 + 17.1), snoise(p * 0.31 + 31.7)); }
+// a finer second warp makes granule borders irregular and rounded instead of straight polygon edges
+vec3 warpFine(vec3 p){ return p + 0.16 * vec3(snoise(p * 1.6 + 5.3), snoise(p * 1.6 + 41.2), snoise(p * 1.6 + 77.9)); }
 
 #if KIND <= 1
 // ---- sunspots / starspots ------------------------------------------------------------------------
@@ -172,8 +193,9 @@ vec3 photosphere(vec3 q, float mu, float fp){
   float g = 0.0, net = 0.0;
   if (lodG > 0.001){
 #if KIND == 0
-    if (wA > 0.001) g += wA * sunGranule(warp3(qa * uGranF), uGranT, uEp.z * 13.0);
-    if (wB > 0.001) g += wB * sunGranule(warp3(qb * uGranF), uGranT, uEp.w * 13.0);
+    float lodW = 1.0 - smoothstep(0.08 * cs, 0.3 * cs, fp);   // the fine warp only matters when granules are big on screen
+    if (wA > 0.001){ vec3 w = warp3(qa * uGranF); if (lodW > 0.0) w = mix(w, warpFine(w), lodW); g += wA * sunGranule(w, uGranT, uEp.z * 13.0); }
+    if (wB > 0.001){ vec3 w = warp3(qb * uGranF); if (lodW > 0.0) w = mix(w, warpFine(w), lodW); g += wB * sunGranule(w, uGranT, uEp.w * 13.0); }
     g *= 0.85 + 0.3 * snoise(qa * uGranF * 0.17);  // mesogranular brightness modulation
     g += 0.08 * snoise(qa * uGranF * 3.1);         // sub-granular texture
 #else
@@ -236,7 +258,11 @@ vec3 loopsGlow(vec3 ro, vec3 rd, float tEnd){
     vec3 cen = m + n * Hh * 0.5; float rad = max(L, Hh) + C.z * 4.0;
     vec3 oc = cen - ro; float tb = dot(oc, rd);
     if (dot(oc, oc) - tb * tb > rad * rad) continue;
+#if KIND == 0
+    vec3 colk = lut171(1.0);          // the Sun only uses these tubes for 171 Å coronal loops
+#else
     vec3 colk = C.x < 100.0 ? HALPHA : bb(C.x);
+#endif
     float em = 0.0;
     if (C.w < 0.5){
       vec3 P0 = m - e; vec3 bestX = P0; float best = 0.0;
@@ -298,6 +324,330 @@ vec3 corona(vec3 s, float b){
   float plume = pow(abs(sb.y), 5.0) * (1.0 - 0.8 * A) * (0.35 + 0.65 * smoothstep(-0.2, 0.6, snoise(sb * 36.0)));
   float shape = 0.22 + 1.9 * helm * rays + 0.8 * plume;
   return bb(5772.0) * pow(K / 4.04, 0.6) * shape * uCorona * 0.06;
+}
+
+// ---- the chromosphere / transition region / low corona seen on the disc through narrow-band filters ----
+// Cellular noise that also returns the offset to the nearest feature point (the supergranule centre).
+vec4 worleyV(vec3 p){
+  vec3 i = floor(p), f = fract(p);
+  float d1 = 8.0, d2 = 8.0; vec3 r1 = vec3(0.0);
+  for (int z = -1; z <= 1; z++) for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++){
+    vec3 o = vec3(float(x), float(y), float(z));
+    vec3 r = o + hash33(i + o) - f;
+    float d = dot(r, r);
+    if (d < d1){ d2 = d1; d1 = d; r1 = r; } else if (d < d2) d2 = d;
+  }
+  return vec4(r1, sqrt(d2) - sqrt(d1));
+}
+// One epoch of the supergranular pattern (≈ 30 Mm cells). Magnetic flux swept to the cell borders makes the
+// bright network; dark fibrils (mottles, the on-disc counterparts of spicules) fan out from it into the cells.
+vec2 chromoNet(vec3 qq, float lodM){
+  vec4 w = worleyV(qq);
+  float edge = smoothstep(0.45, 0.0, w.w) * max(0.2 + 0.8 * snoise(qq * 1.7 + 4.0), 0.0);
+  // dark mottles cluster around the network; below the pixel scale they average to a darker cell rim
+  float rim = smoothstep(0.0, 0.12, w.w) * smoothstep(0.9, 0.1, w.w);
+  float mot = 0.35 * rim * (0.6 + 0.4 * snoise(qq * 3.3 + 9.0));
+  if (lodM > 0.01){
+    // fibrils radiate from the cell centre: noise in the local polar frame (direction, radius) of the cell
+    vec3 d = -w.xyz; float r = length(d);
+    vec3 cc = qq + w.xyz;                                       // cell centre: a per-cell offset
+    mot = mix(mot, smoothstep(-0.3, 0.8, snoise(d / max(r, 1e-3) * 10.0 + cc * 3.1 + r * 1.6)) * rim * 0.8, lodM);
+  }
+  return vec2(edge, mot);
+}
+// Hα fibrils: dark, field-aligned streaks fanning out of plage / around sunspots (superpenumbrae),
+// tracing the canopy field that spreads from the active region.
+float plageFibrils(vec3 q, float fp){
+  float fib = 0.0;
+  for (int i = 0; i < NS; i++){
+    vec4 sp = uSpot[i], x = uSpotX[i];
+    if (x.w <= 0.0 || x.z <= 0.0) continue;
+    vec3 dv = q - sp.xyz;
+    float r = length(dv) / (x.w * 2.0);
+    if (r > 1.7 || r < 0.05) continue;
+    vec3 e1 = tangentU(sp.xyz), e2 = cross(sp.xyz, e1);
+    float ang = atan(dot(dv, e2), dot(dv, e1)) + 0.5 * sin(r * 3.0 + x.y);   // slightly curved
+    float lodF = 1.0 - smoothstep(0.004 * x.w * 6.0, 0.02 * x.w * 6.0, fp);
+    float n = snoise(vec3(cos(ang) * 9.0, sin(ang) * 9.0, r * 1.2 + x.y));
+    float f = mix(0.45, smoothstep(-0.1, 0.7, n), lodF);
+    fib = max(fib, f * smoothstep(0.25, 0.55, r) * smoothstep(1.7, 1.0, r) * min(x.z, 1.0));
+  }
+  return fib;
+}
+// Disc intensity (1 ≈ quiet-Sun mean) in the current narrow-band view; act = plage / active-region strength.
+float chromoI(vec3 q, float mu, float fp){
+  float om = omegaAt(q.y * q.y);
+  float sgF = uGranF / 28.0;
+  float lodN = 1.0 - smoothstep(0.1 / sgF, 0.45 / sgF, fp);
+  float lodM = 1.0 - smoothstep(0.012 / sgF, 0.03 / sgF, fp);      // mottles (period ≈ 0.1/sgF) need ≥ 3 px
+  vec2 n = vec2(0.0);
+  if (lodN > 0.001){
+    if (uEpW > 0.001) n += uEpW * chromoNet(rotY(q, -om * uEp.x) * sgF + uEp.z * 7.31, lodM);
+    if (uEpW < 0.999) n += (1.0 - uEpW) * chromoNet(rotY(q, -om * uEp.y) * sgF + uEp.w * 7.31, lodM);
+    n *= lodN;
+  }
+  float fac = 0.0, gsup = 1.0;
+  float tf = spotField(q, fp, fac, gsup);
+  float spot = smoothstep(0.985, 0.72, tf);                     // 0 outside, ~1 in the umbra
+  float pen = smoothstep(0.995, 0.93, tf);
+  float lodF = 1.0 - smoothstep(0.0003, 0.0009, fp);              // 380⁻¹ R☉ period needs ≥ 3 px
+  float fine = snoise(q * 380.0) * lodF;
+  float mid = snoise(q * 90.0 + 2.0);                            // plage patchiness at ~5 Mm
+  float pl = min(fac, 1.4) * max(0.35 + 0.6 * n.x + 0.35 * mid + 0.2 * fine, 0.0);  // plage: patchy, brightest on the network
+  float I;
+  if (uView < 1.5){
+    // H-alpha line centre: weak limb darkening, bright network & plage, dark mottles and fibrils, dark spots
+    float fib = plageFibrils(q, fp);
+    float big = snoise(q * 9.0 + 4.0);                           // enhanced / quiet network patches
+    I = 0.92 + 0.32 * n.x * (1.0 + 0.5 * big) - 0.5 * n.y + 0.06 * fine + 0.05 * big + 0.6 * pl - 0.32 * fib * (1.0 - min(fac, 1.0) * 0.6);
+    I *= (0.6 + 0.4 * sqrt(mu)) * (1.0 - 0.45 * pen - 0.45 * spot);
+    I += 0.1 * exp(-mu / 0.03);                                // the chromosphere thickens toward the limb
+  } else if (uView < 2.5){
+    // He II 304 Å (~50 000–80 000 K): high-contrast network, bright active regions, limb brightening
+    I = 0.42 + 0.75 * n.x * (0.7 + 0.3 * fine) - 0.12 * n.y + 1.6 * pl;
+    I *= 1.0 + 0.7 * exp(-mu / 0.12);
+  } else {
+    // Fe IX 171 Å (~0.7 MK): faint mottled disc ("moss"), bright fuzzy active regions, dark coronal holes
+    float moss = 0.5 + 0.5 * snoise(q * 45.0) * snoise(q * 13.0 + 3.0);
+    float hole = smoothstep(0.72, 0.9, abs(q.y)) * (1.0 - 0.8 * uActivity);
+    I = (0.2 + 0.16 * moss + 0.08 * n.x + 1.1 * pow(min(fac, 1.4), 1.3) * (0.5 + 0.5 * fine)) * (1.0 - 0.75 * hole);
+    I *= 1.0 + 1.2 * exp(-mu / 0.08);
+  }
+  return I;
+}
+float viewK(){ return uView < 1.5 ? 0.6 : (uView < 2.5 ? 0.8 : 0.85); }
+
+// The chromosphere seen edge-on through a narrow-band filter: a dense ~2 Mm layer and above it the
+// forest of spicules — jets ~0.5 Mm wide, 5–10 Mm tall, tilted, each living 5–10 min ("burning prairie").
+// Sampled in the plane of the sky (sp: unit vector toward the limb point, vh: toward the camera).
+float spiculeForest(vec3 sp, vec3 vh, float h, float fpx){
+  if (h > 0.02) return 0.0;
+  vec3 tang = cross(vh, sp);
+  vec3 s = sp + tang * h * (0.8 * snoise(sp * 35.0));            // jets lean in clumps
+  const float F = 1150.0;
+  float lodS = 1.0 - smoothstep(0.5 / F, 2.5 / F, fpx);
+  float n = snoise(s * F + vh * (h * 110.0 - uGranT * 0.12));
+  float n2 = snoise(s * 700.0 + vh * (uGranT * 0.05));
+  float n3 = snoise(s * 70.0 + 5.0);
+  float hn = 0.5 + 0.5 * n2;
+  float top = (0.003 + 0.0095 * hn * hn) * (0.75 + 0.35 * n3);               // jet tops: 2–9 Mm, most short
+  float jets = mix(0.3, pow(max(n, 0.0), 1.3) * 2.2, lodS) * smoothstep(top, top * 0.15, h) * (0.65 + 0.35 * n3);
+  return 0.95 * exp(-h / 0.0011) + 0.45 * jets * exp(-h / 0.007);
+}
+
+// ---- prominences --------------------------------------------------------------------------------------
+float wave(float x, float s){ return 0.5 * sin(x + s) + 0.3 * sin(2.3 * x + 1.7 * s) + 0.2 * sin(5.1 * x + 2.9 * s); }
+// Field-aligned fine structure, built explicitly as threads: in each cell across the field sits one thread
+// with a Gaussian cross-section that wanders slowly along the field and is loaded with plasma only along
+// some stretches (Hinode SOT: threads ~200–300 km wide, 5–20 Mm long). Band-limiting: the profile is
+// convolved with the pixel / march-step footprint bw (widths add in quadrature, the integral is kept), so a
+// thread finer than the footprint turns into a smooth haze instead of sparkle.
+//   u: position across the field, s: along it (R☉); sp: thread spacing, w: half-width, ka: along-field wavenumber
+float threadLayer(float u, float s, float seed, float sp, float w, float bw, float ka){
+  float we = sqrt(w * w + 0.3 * bw * bw);
+  float f = smoothstep(0.3 * sp, 0.75 * sp, we);                 // fully blurred: just the mean
+  if (f > 0.999) return 0.5;
+  float x = u / sp, j0 = floor(x), sum = 0.0;
+  for (int i = -1; i <= 1; i++){
+    float j = j0 + float(i);
+    vec3 h = hash33(vec3(j, seed, sp * 977.0));
+    float c = j + 0.5 + 0.5 * (h.x - 0.5) + 0.3 * sin(s * ka * (0.5 + 0.6 * h.y) + TAU * h.z);   // gentle wander
+    float load = 0.5 + 0.5 * sin(s * ka * (1.0 + 1.5 * h.z) + TAU * h.y);
+    load = smoothstep(0.1, 0.9, load);                            // loaded / empty stretches along the thread
+    float d = (x - c) * sp / we;
+    sum += load * exp(-d * d);
+  }
+  return mix(sum * (w / we) * sp / (w * 1.7725), 0.5, f);
+}
+float threads(vec2 c, float s, float seed, float bw, float ka, float fc){
+  // strands (~1–3 Mm): smooth noise stretched ×20 along the field, faded to its mean below ~2 footprints
+  float n1 = snoise(vec3(c * 300.0, s * 14.0 + seed));
+  float st = mix(0.55, smoothstep(-0.35, 0.75, n1), 1.0 - smoothstep(0.0015, 0.005, bw));
+  // threads (~0.4 Mm FWHM, 1 Mm apart): explicit band-limited Gaussian threads
+  float L2 = threadLayer(c.x + 0.37 * c.y, s, seed + 17.0, 0.0011, 0.00026, bw, ka);
+  return (0.15 + 1.55 * st) * (1.0 - 0.7 * fc + 1.4 * fc * L2);                  // mean ≈ 1
+}
+float gStepZ = 0.0;   // march step projected across the hedgerow sheet (set by promMarch)
+float gSkip = 0.0;    // hedgerow: distance (across the sheet) that is certainly empty — lets the march skip it
+// Density in the prominence's frame: p.x along the axis (the filament channel), p.y height above the
+// photosphere, p.z across. G = (L, H, a, ·), E = (twist, legs, lean, ·). Roughly 0…1.5.
+float promDensity(vec3 p, float type, vec4 G, vec4 E, float seed, float bw, float t){
+  float L = G.x, H = G.y, a = G.z;
+  if (p.y < -0.002) return 0.0;
+  if (type < 0.5){
+    // Quiescent "hedgerow": a thin vertical sheet of mostly vertical threads, standing on a few legs
+    // (barbs) rooted in the chromosphere, with arches of empty corona between them. Plasma constantly
+    // drains down the threads while dark plumes rise from below (Hinode SOT, Berger et al. 2008).
+    float xn = p.x / L, ax = abs(xn);
+    if (ax > 1.1) return 0.0;
+    float yn = p.y / H;
+    float zc = L * 0.15 * wave(xn * 2.0, seed) + a * (0.8 * wave(xn * 5.0, seed + 7.0) + 2.0 * yn * wave(xn * 1.7, seed + 2.0));   // sinuous, leaning sheet
+    float dz = p.z - zc;
+    float del0 = a * (0.45 + 0.85 * clamp(yn, 0.0, 1.3));
+    // a sheet thinner than the march step (seen obliquely) is widened to ~1 step, keeping its column density
+    float del = sqrt(del0 * del0 + 0.5 * gStepZ * gStepZ);
+    float mz = dz * dz / (del * del);
+    if (mz > 4.5){ gSkip = abs(dz) - 2.1 * del; return 0.0; }
+    float top = H * (1.0 - pow(min(ax, 1.0), 4.0)) * (0.78 + 0.28 * wave(xn * 4.0, seed + 5.0));
+    if (p.y > top * 1.5) return 0.0;
+    // legs at irregular intervals, of different widths; the gaps between them have different heights
+    float ph = (xn * 0.5 + 0.5) * E.y + 0.3 * wave(xn * 3.1, seed + 1.0);
+    float bot = H * 0.6 * pow(abs(sin(PI * ph)), 0.9 + 0.8 * (0.5 + 0.5 * wave(ph * 1.7, seed + 9.0)))
+              * max(0.15 + 0.85 * (0.5 + 0.5 * wave(ph * 2.3, seed + 3.0)), 0.0) * smoothstep(1.0, 0.85, ax);
+    float xu = p.x + 0.0006 * wave(p.y * 45.0 + p.x * 150.0, seed);
+    float th = threads(vec2(xu, xu + 0.2 * dz), p.y + t * 0.012, seed, bw, 60.0, 0.7);
+    float te = min(th, 1.4);                                     // ragged, thread-following outline
+    float env = smoothstep(top * (1.0 + 0.3 * te), top * 0.55, p.y)
+              * smoothstep(bot - 0.002 - 0.008 * te * yn, bot + 0.007, p.y)
+              * exp(-mz) * smoothstep(1.1, 0.8, ax);
+    if (env < 0.01) return 0.0;
+    // one noise for both: dark plumes rising through the sheet, and brighter, denser knots
+    float v = snoise(vec3(p.x * 55.0, (p.y - t * 0.02) * 36.0, seed + 11.0));
+    env *= 1.0 - 0.7 * smoothstep(0.35, 0.85, v) * smoothstep(top * 0.95, top * 0.2, p.y);
+    env *= 0.75 + 0.7 * smoothstep(-0.2, -0.75, v);
+    return env * th * 1.35 * del0 / del;
+  }
+  if (type < 1.5 || type > 2.5){
+    // Flux-rope arch (and the erupting rope): plasma threaded on the helical field lines of a twisted
+    // tube whose axis is an elliptical arch between two feet.
+    float h0 = 0.25 * H + 2.0 * a;
+    float x = (p.x - E.z * p.y) / (1.0 + E.w * smoothstep(0.1, 0.9, p.y / H));   // lean; an erupting rope balloons at the top
+    vec2 q = vec2(x / L, (p.y + h0) / (H + h0));
+    float rho = length(q);
+    float d = (rho - 1.0) * rho / max(length(vec2(q.x / L, q.y / (H + h0))), 1e-5);   // ≈ distance from the axis
+    float phi = atan(q.y, q.x);                                  // 0 … π, foot to foot
+    float sphi = sin(clamp(phi, 0.0, PI));
+    float rad = a * (0.55 + 0.45 * sphi);
+    vec2 cr = vec2(d, p.z - a * 1.2 * wave(phi * 2.0, seed));
+    float rr = dot(cr, cr) / (rad * rad);
+    if (rr > 3.2) return 0.0;
+    float tw = TAU * E.x * phi / PI;                             // the cross-section turns along the rope
+    float ct = cos(tw), st = sin(tw);
+    cr = vec2(ct * cr.x - st * cr.y, st * cr.x + ct * cr.y);
+    float sl = (phi - PI * 0.5) * (L + H) * 0.5;                 // ≈ arc length from the apex
+    float th = threads(cr * (0.012 / max(a, 0.012)), abs(sl) - t * 0.01, seed, bw, 160.0, 1.0);   // drains down both legs
+    float env = smoothstep(1.0 + 0.9 * th, 0.2, rr) * (0.45 + 0.55 * sphi);
+    // only some bundles of field lines are loaded with cool plasma: gaps and bright knots along the rope;
+    // an erupting rope frays into separate strands and blobs
+    float bn = snoise(vec3(cr * (1.1 / max(a, 0.006)), sl * (type > 2.5 ? 7.0 : 4.0) / max(1.0, a / 0.012) + seed * 1.3 - t * 0.004));
+    env *= type > 2.5 ? 0.1 + 1.4 * smoothstep(-0.05, 0.75, bn) : 0.3 + 0.95 * smoothstep(-0.35, 0.6, bn);
+    return env * th * 1.3;
+  }
+  // Active-region (post-flare) loop arcade with coronal rain: a row of distinct loops in planes across the
+  // axis, each with its own height; plasma cooling at the loop tops condenses into blobs that slide down
+  // both legs (~50–100 km/s).
+  float xn = p.x / L;
+  if (abs(xn) > 1.1) return 0.0;
+  float nl = E.y;                                                // number of loops
+  float u = (xn * 0.5 + 0.5) * nl;
+  float j = floor(u);
+  float hj = hash13(vec3(j, seed, 1.7));
+  float xj = (j + 0.5 + 0.3 * (hj - 0.5)) / nl * 2.0 - 1.0;      // loop plane
+  float h0 = 0.3 * H;
+  float R2 = H + h0;
+  vec3 hk = hash33(vec3(j, seed, 4.1));
+  float Rj = R2 * (0.45 + 0.55 * pow(hk.x, 0.7));
+  // each loop has its own footpoint offset, inclination and flattening
+  vec2 q = vec2(p.z - 0.12 * H * wave(xn * 2.0, seed) - (hk.y - 0.5) * 0.35 * Rj + (hk.z - 0.5) * 0.8 * p.y, (p.y + h0) / (0.8 + 0.45 * hk.z));
+  float rn = length(q);
+  float wj = 0.0012 + 0.0016 * hj;                               // loop half-thickness ~1–2 Mm
+  float dx = (xn - xj) * L, dr = rn - Rj;
+  float tube = exp(-(dx * dx + dr * dr) / (wj * wj));
+  if (tube < 0.02) return 0.0;
+  float phi = atan(q.y, q.x);
+  float sl = abs(phi - PI * 0.5) * Rj;                           // distance from the loop top
+  float th = threads(vec2(dx, dr) * 1.3, sl * 0.6 - t * 0.02, seed + j, bw, 160.0, 1.0);
+  // rain: soft condensations ~2–4 Mm long along the loop, sliding toward the feet
+  float bph = (sl - t * 0.03) * (220.0 + 120.0 * hk.y) + TAU * hk.z + dr * 300.0;
+  float blob = pow(0.5 + 0.5 * sin(bph), 4.0) * (0.6 + 0.4 * sin(bph * 0.37 + hj * 9.0));
+  float legs = 0.35 + 0.65 * smoothstep(0.2 * Rj, 0.9 * Rj, sl);  // the rain collects in the legs
+  return tube * th * (0.25 + 1.6 * blob) * legs * 1.3;
+}
+// Front-to-back emission + absorption through every prominence bounding box the ray crosses. Returns the
+// emitted radiance; "trans" is the remaining transmission (filaments on the disc absorb the light behind).
+vec3 promMarch(vec3 ro, vec3 rd, float tEnd, float pixAng, inout float trans){
+  vec3 acc = vec3(0.0);
+  // step jitter: the densities are band-limited to the step, so a random (unstructured) jitter only leaves
+  // a faint grain, which the host's film grain hides; structured (interleaved-gradient) jitter would
+  // show as a regular hatch without temporal accumulation
+  float jit = hash13(vec3(gl_FragCoord.xy, 3.7));
+  float tm = uGranT;
+  // Source functions: Hα and 304 Å S ≈ 0.25–0.6 of the disc (dark filaments on the disc); 171 Å: the cool
+  // plasma barely emits, it absorbs the EUV behind it (H I / He I / He II continua); white light: faint pink
+  // (Balmer lines — seen only at the limb, best during eclipses). Opacity ∝ density, κ chosen so that a dense
+  // sheet is optically thick (τ ≈ 3–10) along a few Mm, as for Hα line centre.
+  float kap = 190.0 * uProm;
+  // Hα: the source function is well below the disc intensity (filaments are dark on the disc). Like the
+  // two-exposure composites of solar photographers, light from prominences seen against the sky gets a
+  // longer "exposure" (gain 2.2) — the continuous ramp sits in the bright limb band, where it isn't seen.
+  float bC = length(ro + rd * max(-dot(ro, rd), 0.0));
+  float gHa = mix(1.0, uView < 1.5 ? 2.2 : 3.2, smoothstep(1.0, 1.006, bC) * step(1e8, tEnd));
+  for (int k = 0; k < NP; k++){
+    vec4 G = uPrC[k];
+    if (G.w <= 0.0) continue;
+    vec4 A = uPrA[k], B = uPrB[k], D = uPrD[k], E = uPrE[k];
+    vec3 N = A.xyz, X = B.xyz, Z = cross(X, N);
+    vec3 o = ro - N;
+    vec3 lo = vec3(dot(o, X), dot(o, N), dot(o, Z)), ld = vec3(dot(rd, X), dot(rd, N), dot(rd, Z));
+    vec3 inv = (step(vec3(0.0), ld) * 2.0 - 1.0) / max(abs(ld), vec3(1e-6));
+    vec3 ta = (vec3(-D.x, -D.w, -D.z) - lo) * inv, tb = (D.xyz - lo) * inv;
+    vec3 tn = min(ta, tb), tf = max(ta, tb);
+    float t0 = max(max(tn.x, tn.y), max(tn.z, 0.0));
+    float t1 = min(min(tf.x, tf.y), min(tf.z, tEnd));
+    if (t1 <= t0) continue;
+    float fp = max(t0, 0.02) * pixAng;
+    float len = t1 - t0;
+    // fixed step for ropes and arcades; hedgerows (a thin sheet in a wide box) march finer and skip the
+    // empty space on either side of the sheet
+    bool sheet = A.w < 0.5;
+    float dt = max(max(fp * 0.6, 0.0003), len / (sheet ? 240.0 : 72.0));
+    if (!sheet) dt = max(dt, len / 72.0);
+    int n = sheet ? 96 : int(ceil(len / dt));
+    // band limit for the threads: ≥ 1.5 pixel footprints, and ≥ 1.5 march steps measured across the field
+    // (a ray seen broadside through a hedgerow sheet runs along its threads and needs no step blur)
+    float across = A.w < 0.5 ? max(abs(ld.x), 0.35) : 1.0;
+    float bw = max(1.5 * fp, 1.5 * dt * across);
+    float tt = t0 + dt * fract(jit + 0.618 * float(k));
+    gStepZ = dt * abs(ld.z);
+    for (int i = 0; i < 96; i++){
+      if (i >= n || tt > t1) break;
+      vec3 P = lo + ld * tt;
+      vec3 p = vec3(P.x, P.y + 1.0 - sqrt(max(1.0 - P.x * P.x - P.z * P.z, 0.0)), P.z);
+      gSkip = 0.0;
+      float rho = promDensity(p, A.w, G, E, B.w, bw, tm);
+      // skip ahead (in whole steps, so the jittered sampling grid is kept) when far from the sheet
+      tt += gSkip > 0.0 ? dt * max(1.0, floor(0.6 * gSkip / max(abs(ld.z), 0.05) / dt)) : dt;
+      if (rho <= 0.0) continue;
+      rho *= G.w;
+      float al = 1.0 - exp(-kap * rho * dt);
+      float x = min(rho, 1.6);
+      vec3 S = uView < 0.5 ? HALPHA * (0.1 + 0.08 * x)
+             : uView < 1.5 ? lutHa((0.12 + 0.3 * x) * gHa)
+             : uView < 2.5 ? lut304((0.1 + 0.3 * x) * gHa)
+             : lut171(0.05 + 0.03 * x);
+      acc += trans * al * S;
+      trans *= 1.0 - al;
+      if (trans < 0.01) break;
+    }
+    if (trans < 0.01) break;
+  }
+  return acc;
+}
+// CME: the expanding magnetic bubble ahead of an erupting prominence, seen by Thomson scattering of
+// photospheric light (the bright front of the classic three-part CME). Column through a thick spherical shell.
+float cmeShell(vec3 ro, vec3 rd, float tEnd){
+  vec3 oc = uCme.xyz - ro; float tb = dot(oc, rd);
+  float R = uCme.w, b2 = dot(oc, oc) - tb * tb;
+  if (b2 > R * R || tb < -R) return 0.0;
+  float l1 = sqrt(R * R - b2), l2 = sqrt(max(0.64 * R * R - b2, 0.0));
+  // chord lengths through the outer and inner spheres, counting only t > 0
+  float c1 = max(tb + l1 - max(tb - l1, 0.0), 0.0), c2 = l2 > 0.0 ? max(tb + l2 - max(tb - l2, 0.0), 0.0) : 0.0;
+  float col = (c1 - c2) / R;
+  vec3 pq = (ro + rd * tb - uCme.xyz) / R, pb = normalize(pq);
+  col *= max(0.3 + 0.7 * (0.5 + 0.5 * snoise(pq * 2.5 + uCme.w)) + 0.25 * snoise(pq * 7.0), 0.0);   // loops and knots in the front
+  col *= smoothstep(-0.2, 0.4, dot(pb, normalize(uCme.xyz)));   // open at the bottom, where it is rooted
+  if (tEnd < 1e8) col *= 0.3;
+  return col;
 }
 #endif
 
@@ -377,7 +727,10 @@ void main(){
     vec3 q = normalize(ro + rd * tHit);
     float mu = clamp(hh / R, 0.0, 1.0);
     float fp = tHit * pixAng / max(mu, 0.04);
-#if KIND <= 1
+#if KIND == 0
+    if (uView < 0.5) surf = photosphere(q, mu, fp);
+    else surf = lutView(chromoI(q, mu, fp) * viewK());
+#elif KIND == 1
     surf = photosphere(q, mu, fp);
 #elif KIND == 2
     surf = rsgSurface(q, mu);
@@ -392,13 +745,20 @@ void main(){
   // telescope image is shown. Raising the radiance relative to the disc centre to uStretch (≈ 2.2 ⇒
   // displayed brightness ∝ intensity, like a linear scientific image) restores the true limb darkening and
   // granulation contrast on screen. Above the disc-centre level (flares) the response stays linear.
+#if KIND == 0
+  if (uView < 0.5)
+#endif
   {
     vec3 ref = uBright * bb(uTeff) * pow(uTeff / uTref, uIexp);   // the star's own mean surface
     vec3 x = surf / ref;
     surf = ref * mix(pow(max(x, 0.0), vec3(uStretch)), x, step(1.0, x));
   }
   float tEnd = cov > 0.5 ? tHit : 1e9;
-  vec3 col = mix(sky(rd, 1.0) * uSkyK, surf, cov);
+  float skyK = uSkyK;
+#if KIND == 0
+  if (uView > 0.5) skyK *= 0.25;      // a narrow-band filter passes almost nothing of the night sky
+#endif
+  vec3 col = mix(sky(rd, 1.0) * skyK, surf, cov);
   float h = max(b - R, 0.0);
 
 #if KIND <= 1
@@ -406,14 +766,45 @@ void main(){
   // features stay exactly radial on screen whatever the perspective
   vec3 vh = normalize(ro);
   vec3 sp = pc - vh * dot(pc, vh); sp = length(sp) > 1e-5 ? normalize(sp) : s;
-  if (tEnd > 1e8){
-    vec3 halo = chromosphere(sp, h) * (1.0 + 4.0 * uEclipse);
   #if KIND == 0
-    halo += corona(sp, b) * (1.0 + 7.0 * uEclipse);
-  #endif
-    col += halo;
+  // Optically thin layers above the limb are drawn from their plane-of-sky value (closest approach b) times
+  // the fraction of the line-of-sight column that lies in front of the camera: for a layer of scale height
+  // Hs the column is a Gaussian in t around the closest approach, so the fraction is ½·erfc(−t_c/√(2·Hs·b)).
+  // From far away this is 1; a camera skimming the surface (limb close-ups) sees half looking horizontally
+  // and almost nothing looking up.
+  float tcu = -dot(ro, rd);
+  vec3 pcu = ro + rd * tcu; float bu = max(length(pcu), 1e-5), hu = max(bu - R, 0.0);
+  vec3 spu = pcu / bu;
+  #define FRONT(Hs) (0.5 + 0.5 * erfA(tcu / sqrt(2.0 * (Hs) * bu)))
+  if (tEnd > 1e8){
+    if (uView < 0.5) col += chromosphere(spu, hu) * FRONT(0.002) * (1.0 + 4.0 * uEclipse) + corona(spu, bu) * FRONT(0.25) * (1.0 + 7.0 * uEclipse);
+    else if (uView < 1.5) col += lutHa(0.95 * spiculeForest(spu, vh, hu, pxW) * FRONT(0.003) * viewK());
+    else if (uView < 2.5){
+      float I = 0.75 * spiculeForest(spu, vh, hu, pxW) * FRONT(0.003) + 0.3 * exp(-hu / 0.006) * FRONT(0.006) + 0.05 * exp(-hu / 0.08) * FRONT(0.08);
+      col += lut304(I * viewK()) + corona(spu, bu) * 0.15 * FRONT(0.25);
+    } else {
+      // 171 Å: optically thin ~1 MK plasma, emission ∝ n², so it falls off much faster than the white-light K corona
+      vec3 k = corona(spu, bu) / max(uCorona, 1e-3);
+      float I = dot(k, vec3(0.3, 0.6, 0.1)) * 9.0 * exp(-(bu - 1.0) / 0.3) * FRONT(0.15) + 0.35 * exp(-hu / 0.02) * FRONT(0.02);
+      col += lut171(I * viewK()) * (0.4 + 0.6 * uCorona);
+    }
   }
+  if (uView > 2.5 && uLoopK > 0.0) col += loopsGlow(ro, rd, tEnd) * uLoopK;
+  if (uProm > 0.0 && !(uView < 0.5 && tEnd < 1e8)){
+    // in white light a prominence is invisible against the disc, so those rays are skipped
+    float tr = 1.0;
+    vec3 pe = promMarch(ro, rd, tEnd, pixAng, tr);
+    if (uView < 0.5) pe *= 1.0 + 3.0 * uEclipse;
+    col = col * (uView < 0.5 ? 1.0 : tr) + pe;
+  }
+  if (uCme.w > 0.0 && uCmeB > 0.0 && uView != 1.0){
+    float c = cmeShell(ro, rd, tEnd) * uCmeB;
+    col += c * (uView < 0.5 ? bb(5772.0) * 0.035 * (1.0 + 3.0 * uEclipse) : uView < 2.5 ? lut304(0.1) : lut171(0.22));
+  }
+  #else
+  if (tEnd > 1e8) col += chromosphere(sp, h) * (1.0 + 4.0 * uEclipse);
   if (uProm > 0.0) col += loopsGlow(ro, rd, tEnd) * uProm * (1.0 + uEclipse);
+  #endif
   #if KIND == 0
   if (uEclipse > 0.0){
     // the Moon covers the photosphere exactly (angular diameters 0.53° vs 0.52–0.55°)
@@ -648,9 +1039,11 @@ function makeStar(ctx, kind, cfg) {
     uDust: { value: new THREE.Vector4(0, 0, 0, 1) },
     uNeb: { value: 1 }, uKnots: { value: 1 }, uIR: { value: 0 },
     uEarthPos: { value: new THREE.Vector3() }, uEarthOn: { value: 0 }, uSirA: { value: 0 }, uSirDir: { value: new THREE.Vector3(0, 0, 1) },
+    uPrA: { value: v4arr(NP) }, uPrB: { value: v4arr(NP) }, uPrC: { value: v4arr(NP) }, uPrD: { value: v4arr(NP) }, uPrE: { value: v4arr(NP) },
+    uCme: { value: new THREE.Vector4() }, uCmeB: { value: 0 }, uView: { value: 0 }, uLoopK: { value: 0 },
   };
   const material = new THREE.ShaderMaterial({
-    uniforms: U, defines: { KIND: kind, NS, NL, NF },
+    uniforms: U, defines: { KIND: kind, NS, NL, NF, NP },
     vertexShader: FULLSCREEN_VERT, fragmentShader: FRAG, depthTest: false, depthWrite: false,
   });
   return { U, material };
@@ -698,6 +1091,82 @@ function activeRegions(t, tRot, activity, omegaFn, cfg, out) {
 const SUN_OMEGA_DEG = [14.713, -2.396, -1.787];
 const SUN_DPS = 0.05;         // days of solar rotation per sim-second (≈ 85 s per rotation at 6×)
 
+// ---- prominences (CPU side) ----------------------------------------------------------------------------
+// 39 candidate prominences (30 quiescent filament channels); each is re-born every `life` sim-seconds at a new place (a hash of its slot and
+// cycle), anchored in the photosphere and carried by differential rotation. The NP that matter for the
+// current view (limb first, plus the one the camera follows / that erupts) are uploaded to the shader.
+const VIEWS = ['wl', 'ha', 'euv304', 'euv171'];
+const VIEW_NAME = ['Ánh sáng trắng (quang cầu, ~5 800 K)', 'Hα 656,3 nm (sắc cầu, ~10 000 K)', 'EUV 30,4 nm He II (~80 000 K)', 'EUV 17,1 nm Fe IX (~0,7 triệu K)'];
+const PROM_NAME = ['tai lửa yên tĩnh dạng “hàng rào”', 'tai lửa hình vòm (dây từ thông xoắn)', 'hệ vòng sau bùng nổ & mưa nhật hoa', 'tai lửa phun trào'];
+// the first cycle of three candidates is placed so the default view opens with them on the limb
+const PROM_HEROES = {
+  0: { lat: 30, lon: -20, az: 80, L: 0.12, H: 0.06, a: 0.0042 },
+  // two long quiescent filaments crossing the disc as seen from the default view (disc centre ≈ lon 70°)
+  1: { lat: -30, lon: 50, az: 25, L: 0.22, H: 0.045, a: 0.007 },
+  2: { lat: 47, lon: 100, az: -12, L: 0.18, H: 0.04, a: 0.006 },
+  30: { lat: -24, lon: 166, az: 70, L: 0.05, H: 0.07, a: 0.009, twist: 1.6, lean: 0.25 },
+  35: { lat: 12, lon: -15, az: 5, L: 0.022, H: 0.028 },
+};
+function promCatalog() {
+  const list = [];
+  for (let i = 0; i < 39; i++) {
+    const type = i < 30 ? 0 : i < 35 ? 1 : 2;
+    const life = type === 0 ? 700 + 500 * hashJS(i, 1, 1) : type === 1 ? 350 + 250 * hashJS(i, 1, 1) : 160 + 120 * hashJS(i, 1, 1);
+    list.push({ i, type, life, off: PROM_HEROES[i] ? 0.35 : hashJS(i, 1, 2) });
+  }
+  return list;
+}
+// Sizes in R☉ (1 R☉ = 696 Mm): quiescent hedgerows 60–350 Mm long (longer and more of them at high activity), 20–50 Mm tall, sheets ~5 Mm thick;
+// arches 40–90 Mm across; active-region arcades 15–35 Mm. Quiescent ones sit at mid/high latitude.
+function promGeom(pr, k, activity) {
+  const h = j => hashJS(pr.i, k, 20 + j);
+  const sgn = h(1) < 0.5 ? -1 : 1, T = pr.type;
+  const g = { type: T, seed: h(0) * 60, lon: h(9) * Math.PI * 2, twist: 0, legs: 0, lean: 0, on: true };
+  let latDeg;
+  if (T === 0) {
+    latDeg = sgn * (18 + 45 * h(2));
+    // more and longer filaments on an active Sun (polar-crown and active-region filament channels)
+    Object.assign(g, { az: (h(3) - 0.5) * 1.6, L: (0.06 + 0.2 * h(4)) * (0.7 + 0.6 * activity), H: 0.025 + 0.045 * h(5), a: 0.005 + 0.004 * h(6) });   // sheet + barbs: 7–12 Mm wide filaments on the disc
+    g.on = h(7) < 0.45 + 0.5 * activity;
+  } else if (T === 1) {
+    latDeg = sgn * (10 + 30 * h(2));
+    Object.assign(g, { az: h(3) * Math.PI, L: 0.03 + 0.035 * h(4), H: 0.035 + 0.045 * h(5), a: 0.006 + 0.004 * h(6), twist: 0.7 + 1.3 * h(7), lean: (h(8) - 0.5) * 0.6 });
+  } else {
+    latDeg = sgn * (8 + 22 * h(2));
+    Object.assign(g, { az: h(3) * Math.PI, L: 0.012 + 0.016 * h(4), H: 0.016 + 0.018 * h(5), a: 0 });
+    g.on = h(7) < 0.25 + 0.85 * activity;
+  }
+  const hero = k === 0 && PROM_HEROES[pr.i];
+  if (hero) { Object.assign(g, hero); latDeg = hero.lat; g.lon = hero.lon * D2R; g.az = hero.az * D2R; g.on = true; }
+  g.lat = latDeg * D2R;
+  if (T === 0) g.legs = 2 + Math.floor(g.L / 0.03);
+  if (T === 2) g.legs = 5 + Math.floor(g.L / 0.003);   // number of loops in the arcade
+  return g;
+}
+// Eruption kinematics (u = wall-clock seconds since onset): a slow rise while the rope is activated, then
+// the torus instability takes over — exponential acceleration, h ∝ e^{t/τ} (Kliem & Török 2006). The rope
+// expands self-similarly, its twist relaxes (it unwinds), it rotates about the vertical (writhe) and its
+// density drops. 27 s on screen ≈ 45 min on the Sun.
+const ERUPT_DUR = 27, REAL_PER_WALL = 100;
+function eruptState(base, u) {
+  const act = smooth(0, 5, u);
+  let H = base.H * (1 + 0.35 * act);
+  if (u > 5) H += 0.012 * (Math.exp((u - 5) / 3.2) - 1);
+  const x = H / base.H;
+  return {
+    H, L: base.L * (1 + 2.2 * (1 - 1 / Math.sqrt(x))), a: base.a * Math.pow(x, 0.8), twist: base.twist / (1 + 0.15 * (x - 1)),
+    bulge: 2.5 * (1 - 1 / Math.sqrt(x)), rot: 0.8 * (1 - 1 / Math.sqrt(x)), dens: Math.pow(x, -0.6) * (1 + 0.3 * act) * (1 - smooth(19, 26, u)),
+    v: u > 5 ? 0.012 / 3.2 * Math.exp((u - 5) / 3.2) : base.H * 0.07 * (u < 5 ? 1 : 0),   // R☉ per wall second
+  };
+}
+function promBox(it) {
+  let bx, top, bz;
+  if (it.type === 0) { bx = it.L * 1.12; top = it.H * 1.5 + 0.004; bz = it.L * 0.16 + it.a * 7.5 + 0.002; }
+  else if (it.type === 2) { bx = it.L * 1.16; top = it.H * 1.3 + 0.002; bz = it.H * 1.3 * 1.2 + 0.15 * it.H + 0.002; }
+  else { bx = it.L * (1 + (it.bulge || 0)) + Math.abs(it.lean) * it.H + 2.4 * it.a + 0.002; top = it.H + 2.2 * it.a + 0.003; bz = 3.4 * it.a + 0.002; }
+  return [bx, top, bz, (bx * bx + bz * bz) / 2 + 0.004];
+}
+
 const sun = {
   id: 'sun',
   name: 'Mặt Trời',
@@ -705,8 +1174,8 @@ const sun = {
   order: 10,
   subtitle: 'Sao lùn vàng G2V · ngôi sao của chúng ta',
   swatch: ['#fff6e0', '#ff9a2a'],
-  blurb: 'Bề mặt sôi sục: mỗi <b>hạt sáng</b> (~1 000 km) là một cột plasma nóng trồi lên rồi nguội đi, chìm xuống ở rãnh tối. Rìa đĩa tối và đỏ hơn tâm (<b>hiệu ứng tối rìa</b>) vì ở đó ta chỉ nhìn được vào những lớp nông, nguội hơn. Xích đạo quay nhanh hơn hai cực — Mặt Trời không phải vật rắn.',
-  intro: 'Cuộn lại thật gần để thấy <b>hạt đối lưu</b> và cấu trúc vết đen. Nhấn <b>E</b> để xem <b>nhật thực toàn phần</b>: vành nhật hoa và tai lửa hiện ra.',
+  blurb: 'Bề mặt sôi sục: mỗi <b>hạt sáng</b> (~1 000 km) là một cột plasma nóng trồi lên rồi nguội đi, chìm xuống ở rãnh tối. Phía trên, trong vành nhật hoa triệu độ, những <b>tai lửa</b> — rèm plasma nguội ~10 000 K, đặc gấp trăm lần xung quanh — được từ trường nâng đỡ: ở rìa đĩa chúng sáng hồng trong vạch <b>Hα</b>, trên đĩa chúng thành những <b>sợi tối</b>.',
+  intro: 'Nhấn <b>V</b> để đổi bước sóng (thử <b>Hα 656 nm</b>), <b>L</b> để bay tới cận cảnh <b>tai lửa</b> ở rìa đĩa, <b>R</b> để xem một tai lửa <b>phun trào</b>, <b>E</b> cho nhật thực toàn phần.',
   facts: [
     ['Phân loại', 'G2V — sao lùn vàng dãy chính'],
     ['Bán kính', '695 700 km (109 × Trái Đất)'],
@@ -716,6 +1185,7 @@ const sun = {
     ['Tự quay', '25,4 ngày (xích đạo) · ~35 ngày (cực)'],
     ['Nhiệt độ lõi / vành nhật hoa', '15,7 triệu K / 1–2 triệu K'],
     ['Hạt đối lưu', '~1 000 km, sống 8–10 phút'],
+    ['Tai lửa', '~10 000 K, cao 10–100 Mm, sợi mảnh ~300 km; sống vài giờ đến vài tháng'],
     ['Tuổi', '4,6 tỷ năm'],
   ],
   unitKm: R_SUN_KM,
@@ -723,14 +1193,26 @@ const sun = {
   exposure: 1.0,
   bloom: 0.25,
   params: [
+    { key: 'view', label: 'Bước sóng quan sát', type: 'seg', options: [['wl', 'Ánh sáng trắng'], ['ha', 'Hα 656 nm'], ['euv304', 'EUV 304 Å'], ['euv171', 'EUV 171 Å']], default: 'wl', note: 'Ánh sáng trắng: quang cầu. Hα: sắc cầu — tai lửa sáng ở rìa, sợi tối trên đĩa. 304 Å (He II): sắc cầu–vùng chuyển tiếp. 171 Å (Fe IX): vành nhật hoa ~1 triệu K với các vòng từ. Ảnh hẹp băng là đơn sắc; màu là bảng màu quy ước (như SDO).' },
     { key: 'activity', label: 'Mức hoạt động (vết đen)', type: 'range', min: 0, max: 1, step: 0.01, default: 0.6, note: 'Chu kỳ 11 năm: 0 = cực tiểu (đĩa trơn, vành nhật hoa dẹt theo xích đạo), 1 = cực đại (nhiều nhóm vết đen, các tia vành nhật hoa tỏa mọi hướng).' },
     { key: 'granulation', label: 'Độ tương phản hạt', type: 'range', min: 0, max: 2, step: 0.01, default: 1, note: 'Hạt nóng hơn rãnh tối ~200–300 K; thấy rõ khi lại gần (khoảng cách < 1.2).' },
     { key: 'corona', label: 'Vành nhật hoa', type: 'range', min: 0, max: 2, step: 0.01, default: 0.6 },
-    { key: 'prominences', label: 'Sắc cầu & tai lửa', type: 'range', min: 0, max: 2, step: 0.01, default: 1, note: 'Phát xạ H-alpha (656 nm) màu hồng của sắc cầu, gai (spicule) và tai lửa ở rìa đĩa.' },
-    { key: 'eclipse', label: 'Nhật thực toàn phần', type: 'toggle', default: false, note: 'Mặt Trăng che vừa khít quang cầu.' },
+    { key: 'prominences', label: 'Sắc cầu & tai lửa', type: 'range', min: 0, max: 2, step: 0.01, default: 1, note: 'Mật độ plasma trong tai lửa. Ở ánh sáng trắng tai lửa gần như vô hình (chỉ lộ ra khi nhật thực); hãy xem ở Hα.' },
+    { key: 'eclipse', label: 'Nhật thực toàn phần', type: 'toggle', default: false, note: 'Mặt Trăng che vừa khít quang cầu (chỉ ở ánh sáng trắng).' },
   ],
   actions: [
-    { label: 'Nhật thực', key: 'e', title: 'Bật/tắt nhật thực toàn phần', run: ctx => { ctx.params.eclipse = !ctx.params.eclipse; ctx.toast(ctx.params.eclipse ? 'Nhật thực toàn phần: quang cầu bị che, lộ ra <b>vành nhật hoa</b> (1–2 triệu K) và các <b>tai lửa</b> hồng H-alpha.' : 'Quang cầu sáng trở lại — vành nhật hoa mờ hơn ~một triệu lần nên chìm trong ánh chói.'); } },
+    { label: 'Bước sóng', key: 'v', title: 'Đổi bước sóng quan sát', run: ctx => {
+      const p = ctx.params; p.view = VIEWS[(VIEWS.indexOf(p.view) + 1) % VIEWS.length];
+      ctx.toast({
+        wl: 'Ánh sáng trắng: <b>quang cầu</b> 5 800 K. Tai lửa sáng kém đĩa cả triệu lần nên chỉ thấy khi <b>nhật thực</b>.',
+        ha: '<b>Hα 656,3 nm</b> — vạch đỏ của hydro: thấy <b>sắc cầu</b> (~10 000 K). Ở rìa, tai lửa phát sáng trên nền trời tối; trên đĩa chúng hấp thụ ánh sáng phía sau thành <b>sợi tối</b> (filament). Viền rìa lởm chởm là rừng <b>gai spicule</b>.',
+        euv304: '<b>EUV 304 Å</b> (He II, ~80 000 K, như kính SDO/AIA): mạng lưới sắc cầu sáng, vùng hoạt động rực, tai lửa ở rìa sáng rõ nhất ở bước sóng này.',
+        euv171: '<b>EUV 171 Å</b> (Fe IX, ~0,7 triệu K): vành nhật hoa và các <b>vòng từ</b> trên vùng hoạt động. Plasma lạnh của tai lửa ở đây lại <b>tối</b> — nó hấp thụ tia EUV.',
+      }[p.view], 7000);
+    } },
+    { label: 'Cận cảnh rìa', key: 'l', title: 'Bay tới tai lửa ở rìa đĩa (nhấn tiếp để đổi loại, rồi quay về)', run: ctx => sun.__inst?.limbTour(ctx) },
+    { label: 'Phun trào', key: 'r', title: 'Cho một tai lửa phun trào (CME)', run: ctx => sun.__inst?.erupt(ctx) },
+    { label: 'Nhật thực', key: 'e', title: 'Bật/tắt nhật thực toàn phần', run: ctx => { ctx.params.eclipse = !ctx.params.eclipse; if (ctx.params.eclipse) ctx.params.view = 'wl'; ctx.toast(ctx.params.eclipse ? 'Nhật thực toàn phần: quang cầu bị che, lộ ra <b>vành nhật hoa</b> (1–2 triệu K) và các <b>tai lửa</b> hồng (vạch Balmer của hydro).' : 'Quang cầu sáng trở lại — vành nhật hoa mờ hơn ~một triệu lần nên chìm trong ánh chói.'); } },
   ],
   create(ctx) {
     const { U, material } = makeStar(ctx, 0, {
@@ -743,73 +1225,269 @@ const sun = {
     const omegaFn = s2 => om[0] + om[1] * s2 + om[2] * s2 * s2;
     const spots = { spot: U.uSpot.value, spotX: U.uSpotX.value };
     const regCfg = { slots: 8, life: 420, latMin: 5, latMax: 35, sMin: 0.012, sMax: 0.055, sep: 3.4, pairs: true, umbra: 0.38, fac: 1.0, facR: 3.2 };
-    // prominences: quiescent hedgerows (mid/high latitudes, long-lived) and active-region loops
-    const proms = [];
-    for (let i = 0; i < 22; i++) {
-      const sheet = i < 13;
-      proms.push({
-        sheet, life: sheet ? 500 + 400 * hashJS(i, 1, 1) : 200 + 200 * hashJS(i, 1, 1), off: hashJS(i, 1, 2),
-        lat: (hashJS(i, 1, 3) < 0.5 ? -1 : 1) * (sheet ? 15 + 50 * hashJS(i, 1, 4) : 6 + 28 * hashJS(i, 1, 4)) * D2R,
-        lon: hashJS(i, 1, 5) * Math.PI * 2,
-        span: sheet ? 0.07 + 0.2 * hashJS(i, 1, 6) : 0.025 + 0.04 * hashJS(i, 1, 6),
-        height: sheet ? 0.035 + 0.07 * hashJS(i, 1, 7) : 0.02 + 0.035 * hashJS(i, 1, 7),
-        az: hashJS(i, 1, 8) * Math.PI, seed: hashJS(i, 1, 9) * 60,
-      });
-    }
-    const camDir = new THREE.Vector3(), A = new THREE.Vector3(), B = new THREE.Vector3(), C = new THREE.Vector3();
-    let regs = [];
-    return {
+    const proms = promCatalog();
+    const V3 = THREE.Vector3, Y = new V3(0, 1, 0);
+    const camDir = new V3();
+    const gone = new Set();
+    let regs = [], items = [], erupt = null, lastT = null, nVisible = 0, nFil = 0;
+    // camera: 0 free, 1 flying to the featured prominence, 2 following it, 3 flying back to the full disc
+    const cam = { mode: 0, i: -1, k: -1, t0: 0, dur: 2.2, fromPos: new V3(), fromTgt: new V3(), fromUp: new V3(0, 1, 0), step: -1 };
+    const defMin = sun.camera.min;
+
+    const collect = (t, activity) => {
+      const out = [];
+      for (const pr of proms) {
+        const tt = t + pr.off * pr.life, k = Math.floor(tt / pr.life), f = tt / pr.life - k;
+        if (gone.has(pr.i + ':' + k)) continue;
+        const isE = !!erupt && erupt.i === pr.i && erupt.k === k;
+        const env = smooth(0, 0.12, f) * (1 - smooth(0.85, 1, f));
+        if (env <= 0.01 && !isE) continue;
+        const g = promGeom(pr, k, activity);
+        if (!g.on) continue;
+        const lonW = g.lon - omegaFn(Math.sin(g.lat) ** 2) * t;
+        const C = dirLL(g.lat, lonW);
+        const T = new V3(-Math.sin(lonW), 0, Math.cos(lonW)).multiplyScalar(Math.cos(g.az))
+          .addScaledVector(new V3(-Math.sin(g.lat) * Math.cos(lonW), Math.cos(g.lat), -Math.sin(g.lat) * Math.sin(lonW)), Math.sin(g.az));
+        const it = { pr, k, g, C, T, type: g.type, L: g.L, H: g.H * (0.55 + 0.45 * env), a: g.a, twist: g.twist, lean: g.lean, legs: g.legs, dens: env, env, erupting: isE };
+        if (isE) {
+          const base = g.type === 0 ? { L: g.L * 0.6, H: g.H, a: Math.max(g.a * 2.5, 0.008), twist: 1.6 } : { L: g.L, H: g.H, a: g.a, twist: g.twist };
+          const e = eruptState(base, erupt.age);
+          Object.assign(it, { type: 3, L: e.L, H: e.H, a: e.a, twist: e.twist, dens: e.dens, lean: g.lean * 0.5, bulge: e.bulge });
+          it.T.applyAxisAngle(C, e.rot);
+          erupt.cur = { C, H: e.H, v: e.v, base };
+        }
+        out.push(it);
+      }
+      return out;
+    };
+    const findItem = (i, k) => items.find(it => it.pr.i === i && it.k === k);
+    const biggest = (type, pred = () => true) => {
+      let best = null, bs = -1;
+      for (const it of items) {
+        if ((type >= 0 && it.type !== type) || it.env < 0.5 || !pred(it)) continue;
+        const s = it.L * it.H * (1.2 - Math.abs(it.C.dot(camDir)));
+        if (s > bs) { bs = s; best = it; }
+      }
+      return best;
+    };
+    // camera pose that shows prominence `it` exactly on the limb: looking along the surface, broadside for
+    // sheets and ropes, along the axis for an arcade (so the loops are seen in profile)
+    const framing = (it, ctx, pos, tgt) => {
+      const W = new V3().crossVectors(it.T, it.C).normalize();
+      const D = it.type === 2 ? it.T.clone() : W;
+      if (D.dot(camDir) < 0) D.negate();
+      const tanV = Math.tan(ctx.camera.fov * D2R / 2), asp = ctx.camera.aspect || 16 / 9;
+      const H = Math.min(it.H, 1.6);
+      const halfW = (it.type === 2 ? 1.5 * it.H + 0.3 * it.L : 1.15 * it.L) + 0.012;
+      const V = Math.max((it.type === 3 ? 0.72 : 0.62) * H + 0.02, halfW / asp, 0.05);   // ≥ 0.05: keeps the camera above the spicules
+      const dist = V / tanV;
+      tgt.copy(it.C).multiplyScalar(1 + (it.type === 3 ? 0.48 : 0.42) * H);
+      pos.copy(it.C).addScaledVector(D, dist);    // in the tangent plane at the foot: the foot sits exactly on the limb
+    };
+    const setFeatured = (it, ctx, instant) => {
+      cam.i = it.pr.i; cam.k = it.k;
+      ctx.controls.minDistance = 0.04;
+      if (instant) { framing(it, ctx, ctx.camera.position, ctx.controls.target); ctx.camera.up.copy(it.C); ctx.camera.lookAt(ctx.controls.target); cam.mode = 2; return; }
+      cam.mode = 1; cam.t0 = ctx.time.wall; cam.dur = 2.4;
+      cam.fromPos.copy(ctx.camera.position); cam.fromTgt.copy(ctx.controls.target); cam.fromUp.copy(ctx.camera.up);
+    };
+    let prevView = null;
+    const toHalpha = (ctx) => { if (ctx.params.view === 'wl' && !ctx.params.eclipse) { prevView = 'wl'; ctx.params.view = 'ha'; } };
+    const exitLimb = (ctx) => {
+      if (prevView) { ctx.params.view = prevView; prevView = null; }
+      cam.mode = 3; cam.i = -1; cam.t0 = ctx.time.wall; cam.dur = 2.2; cam.step = -1;
+      cam.fromPos.copy(ctx.camera.position); cam.fromTgt.copy(ctx.controls.target); cam.fromUp.copy(ctx.camera.up);
+    };
+    const typeToast = (it, ctx) => {
+      const base = [
+        'Tai lửa yên tĩnh dạng <b>“hàng rào”</b>: một tấm plasma ~10 000 K, đặc gấp ~100 lần vành nhật hoa xung quanh, nằm trong các <b>võng</b> của đường sức từ. Nó gồm hàng nghìn <b>sợi mảnh</b> ~300 km; plasma liên tục <b>rơi xuống</b> dọc các sợi, còn những bọt tối trồi lên từ bên dưới. Các “chân” cắm xuống sắc cầu. Có thể tồn tại hàng tháng.',
+        'Tai lửa <b>hình vòm</b>: plasma lạnh nằm trên các đường sức <b>xoắn ốc</b> của một <b>dây từ thông</b>, hai chân cắm xuống quang cầu. Nhấn <b>R</b> để nó mất cân bằng và phun trào.',
+        '<b>Hệ vòng sau bùng nổ</b>: plasma bị đốt tới hàng chục triệu K trong một vụ bùng nổ nguội dần, ngưng tụ thành giọt — <b>mưa nhật hoa</b> trượt xuống hai chân vòng với vận tốc ~50–100 km/s.',
+        'Tai lửa <b>phun trào</b>: dây từ thông bị đẩy lên, nở ra và tự tháo xoắn.',
+      ][it.type];
+      ctx.toast(base + (prevView ? ' <br>Đã chuyển sang <b>Hα</b> — ở ánh sáng trắng tai lửa gần như vô hình.' : ''), 8000);
+    };
+    const pickEruptCandidate = () => {
+      const f = cam.mode === 1 || cam.mode === 2 ? findItem(cam.i, cam.k) : null;
+      if (f && f.type <= 1) return f;
+      // the biggest arch or hedgerow close to the visible limb
+      let best = null, bs = -1;
+      for (const it of items) {
+        if (it.type > 1 || it.env < 0.5) continue;
+        const s = it.L * it.H * Math.exp(-Math.abs(it.C.dot(camDir)) * 6) * (it.type === 1 ? 1.5 : 1);
+        if (s > bs) { bs = s; best = it; }
+      }
+      return best;
+    };
+
+    const inst = {
       material,
+      limbTour(ctx) {
+        if (erupt && erupt.cur && cam.i !== erupt.i) { const it = findItem(erupt.i, erupt.k); if (it) { setFeatured(it, ctx); return; } }
+        // cycle hedgerow → arch → arcade → back to the full disc
+        for (let s = cam.step + 1; s <= 3; s++) {
+          if (s === 3) { exitLimb(ctx); ctx.toast('Quay về toàn đĩa.'); return; }
+          const it = biggest(s);
+          if (it) { cam.step = s; toHalpha(ctx); setFeatured(it, ctx); typeToast(it, ctx); return; }
+        }
+      },
+      erupt(ctx, age = 0, quiet = false) {
+        if (erupt) { if (!quiet) ctx.toast('Một tai lửa đang phun trào — chờ nó rời khỏi Mặt Trời đã.'); return; }
+        const it = pickEruptCandidate();
+        if (!it) { if (!quiet) ctx.toast('Không có tai lửa nào đủ lớn ở rìa đĩa lúc này — thử lại sau ít giây.'); return; }
+        erupt = { i: it.pr.i, k: it.k, age };
+        if (cam.mode !== 1 && cam.mode !== 2) cam.step = 0;
+        if (!quiet) {
+          toHalpha(ctx);
+          setFeatured(it, ctx);
+          ctx.audio?.tone?.(55, 4, 0.2, 0, 'sawtooth');
+          ctx.toast('<b>Phun trào tai lửa!</b> Dây từ thông xoắn mất cân bằng (<b>bất ổn định xuyến</b>), bung lên, nở ra và tháo xoắn, đạt vận tốc hàng trăm km/s. Nó kéo theo một <b>CME</b> — bong bóng hàng tỷ tấn plasma. Nếu hướng về Trái Đất, CME gây bão địa từ và cực quang (như tháng 5/2024).', 9000);
+        }
+      },
       update(dt, ctx) {
         const p = ctx.params, t = ctx.time.sim;
+        const dts = lastT === null ? 0 : t - lastT; lastT = t;
         U.uGranT.value = t * 0.12;
         U.uRotT.value = t;
         epochs(U, t, 160);
         U.uActivity.value = p.activity; U.uGranAmp.value = p.granulation;
+        const view = Math.max(0, VIEWS.indexOf(p.view));
+        U.uView.value = view;
         // like a solar telescope's exposure: high-resolution close-ups are exposed a little darker so the
         // granules don't clip, the full disc a little brighter so its centre reads white
         U.uBright.value = 0.42 + 0.3 * smooth(1.1, 2.0, ctx.camera.position.length());
         U.uCorona.value = p.corona; U.uChromo.value = 0.18 * p.prominences; U.uProm.value = p.prominences;
-        U.uEclipse.value = ease(U.uEclipse.value, p.eclipse ? 1 : 0, dt * 2.5, this);
+        U.uEclipse.value = ease(U.uEclipse.value, p.eclipse && view === 0 ? 1 : 0, dt * 2.5, this);
         regs = activeRegions(t, t, p.activity, omegaFn, regCfg, spots);
-        // choose the prominences nearest to the visible limb (the only place they show in white light)
         camDir.copy(ctx.camera.position).normalize();
-        const cand = [];
-        for (const pr of proms) {
-          const tt = t + pr.off * pr.life, k = Math.floor(tt / pr.life), f = tt / pr.life - k;
-          const env = smooth(0, 0.15, f) * (1 - smooth(0.8, 1, f));
-          if (env <= 0.01 || hashJS(pr.seed | 0, k, 3) > 0.35 + 0.65 * (pr.sheet ? 0.8 : p.activity)) continue;
-          const lon = pr.lon + 2.1 * k - omegaFn(Math.sin(pr.lat) ** 2) * t;
-          dirLL(pr.lat, lon, C);
-          const score = Math.abs(C.dot(camDir));
-          if (score < 0.42) cand.push({ pr, lon, env, score, k });
+
+        // snapshot hooks for the headless checker: ?sunlimb=<0 hedgerow|1 arch|2 arcade> ?erupt=<seconds>
+        if (!this.__dbg) {
+          this.__dbg = true;
+          const q = new URLSearchParams(location.search);
+          items = collect(t, p.activity);
+          if (q.get('sunlimb') !== null) { const it = biggest(+q.get('sunlimb')); if (it) { cam.step = it.type; setFeatured(it, ctx, true); } }
+          // ?sunact=<keys>: run the dock actions in order (exercises the real fly-in / eruption code paths)
+          for (const ch of q.get('sunact') || '') ({ l: () => this.limbTour(ctx), r: () => this.erupt(ctx), v: () => sun.actions[0].run(ctx) })[ch]?.();
+          if (q.get('erupt') !== null) {
+            this.erupt(ctx, +q.get('erupt'), true);
+            if (erupt && q.get('sunlimb') !== null) { items = collect(t, p.activity); const it = findItem(erupt.i, erupt.k); if (it) setFeatured(it, ctx, true); }
+          }
         }
-        cand.sort((a, b) => a.score - b.score);
-        for (let i = 0; i < NL; i++) {
-          const c = cand[i];
-          if (!c) { U.uLoopC.value[i].set(0, 0, 0, 0); continue; }
-          const { pr } = c;
-          // footpoints ±span/2 along an azimuth in the local tangent plane
-          dirLL(pr.lat, c.lon, C);
-          const e1 = new THREE.Vector3(0, 1, 0).cross(C).normalize(), e2 = C.clone().cross(e1);
-          const az = pr.az + c.k;
-          const tv = e1.multiplyScalar(Math.cos(az)).addScaledVector(e2, Math.sin(az)).multiplyScalar(pr.span * 0.5);
-          A.copy(C).sub(tv).normalize(); B.copy(C).add(tv).normalize();
-          U.uLoopA.value[i].set(A.x, A.y, A.z, pr.height * (0.6 + 0.4 * c.env));
-          U.uLoopB.value[i].set(B.x, B.y, B.z, pr.seed + c.k * 3.1);
-          U.uLoopC.value[i].set(0, (pr.sheet ? 0.55 : 0.9) * c.env, pr.sheet ? 0.006 : 0.0035, pr.sheet ? 1 : 0);
+        if (erupt) {
+          erupt.age += dt;
+          if (erupt.age > ERUPT_DUR) { gone.add(erupt.i + ':' + erupt.k); erupt = null; U.uCme.value.w = 0; U.uCmeB.value = 0; }
         }
+        items = collect(t, p.activity);
+
+        // ---- upload the prominences that matter for this view ----
+        const feat = cam.mode === 1 || cam.mode === 2 ? findItem(cam.i, cam.k) : null;
+        const ranked = [];
+        for (const it of items) {
+          const sc = it.C.dot(camDir);
+          const pri = it.erupting || it === feat ? -10 : Math.abs(sc);
+          if (pri > -1 && sc < -0.45) continue;
+          ranked.push([pri, it, it.erupting || it === feat ? 1 : smooth(-0.45, -0.3, sc)]);
+        }
+        ranked.sort((a, b) => a[0] - b[0]);
+        nVisible = 0; nFil = 0;
+        for (let s = 0; s < NP; s++) {
+          const r = ranked[s];
+          if (!r) { U.uPrC.value[s].set(0, 0, 0, 0); continue; }
+          const it = r[1], [bx, top, bz, depth] = promBox(it);
+          if (Math.abs(it.C.dot(camDir)) < 0.25) nVisible++;
+          else if (it.C.dot(camDir) > 0.25 && it.type <= 1) nFil++;
+          U.uPrA.value[s].set(it.C.x, it.C.y, it.C.z, it.type);
+          U.uPrB.value[s].set(it.T.x, it.T.y, it.T.z, it.g.seed);
+          U.uPrC.value[s].set(it.L, it.H, it.a, it.dens * r[2] * (it.type === 2 ? 1.2 : 1));
+          U.uPrD.value[s].set(bx, top, bz, depth);
+          U.uPrE.value[s].set(it.twist, it.legs, it.lean, it.bulge || 0);
+        }
+        // CME bubble ahead of the erupting rope
+        if (erupt && erupt.cur) {
+          const u = erupt.age, hle = erupt.cur.H * 1.6 + 0.04, Rb = 0.42 * hle;
+          U.uCme.value.set(erupt.cur.C.x, erupt.cur.C.y, erupt.cur.C.z, 0).multiplyScalar(1 + hle - Rb);
+          U.uCme.value.w = Rb;
+          U.uCmeB.value = smooth(5, 9, u) * (1 - smooth(20, 27, u));
+        }
+
+        // ---- 171 Å coronal loops over the active regions: arcs joining the two polarities of each group ----
+        let li = 0;
+        if (view === 3) {
+          for (let s = 0; s + 1 < NS && li < NL; s += 2) {
+            const xa = U.uSpotX.value[s], xb = U.uSpotX.value[s + 1];
+            if (xa.z <= 0.05 || xb.z <= 0.05) continue;
+            const A = new V3(U.uSpot.value[s].x, U.uSpot.value[s].y, U.uSpot.value[s].z), B = new V3(U.uSpot.value[s + 1].x, U.uSpot.value[s + 1].y, U.uSpot.value[s + 1].z);
+            const d = A.distanceTo(B), m = A.clone().add(B).normalize(), ax = B.clone().sub(A).normalize(), perp = new V3().crossVectors(m, ax);
+            for (const [off, hk, w] of [[0, 0.55, 1], [0.35, 0.8, 0.7], [-0.3, 0.42, 0.8]]) {
+              if (li >= NL) break;
+              const a2 = A.clone().addScaledVector(perp, off * d).normalize(), b2 = B.clone().addScaledVector(perp, -off * d * 0.6).normalize();
+              U.uLoopA.value[li].set(a2.x, a2.y, a2.z, d * hk);
+              U.uLoopB.value[li].set(b2.x, b2.y, b2.z, s * 3.7 + off * 10);
+              U.uLoopC.value[li].set(0, 0.55 * w * Math.min(1, xa.z), 0.0022 + 0.004 * d, 0);
+              li++;
+            }
+          }
+        }
+        for (; li < NL; li++) U.uLoopC.value[li].set(0, 0, 0, 0);
+        U.uLoopK.value = view === 3 ? 0.6 * (0.4 + 0.6 * p.corona) : 0;
+
+        // ---- camera: fly to / follow the featured prominence (OrbitControls still works around it) ----
+        const camera = ctx.camera, target = ctx.controls.target;
+        if (cam.mode === 1 || cam.mode === 2) {
+          if (!feat) { if (cam.mode === 1) cam.mode = 2; }
+          else {
+            // co-rotate with the Sun so the prominence stays on the limb
+            const w = omegaFn(Math.sin(feat.g.lat) ** 2) * dts;
+            if (cam.mode === 1) {
+              const k = Math.min(1, (ctx.time.wall - cam.t0) / cam.dur), e = 1 - Math.pow(1 - k, 3);
+              cam.fromPos.applyAxisAngle(Y, w); cam.fromTgt.applyAxisAngle(Y, w);
+              const P = new V3(), Tg = new V3();
+              framing(feat, ctx, P, Tg);
+              camera.position.lerpVectors(cam.fromPos, P, e); target.lerpVectors(cam.fromTgt, Tg, e);
+              cam.fromUp.applyAxisAngle(Y, w);
+              camera.up.lerpVectors(cam.fromUp, feat.C, e).normalize();
+              camera.lookAt(target);
+              if (k >= 1) cam.mode = 2;
+            } else if (feat.erupting) {
+              const P = new V3(), Tg = new V3();
+              framing(feat, ctx, P, Tg);
+              const k = 1 - Math.exp(-dt * 1.5);
+              camera.position.applyAxisAngle(Y, w).lerp(P, k); target.applyAxisAngle(Y, w).lerp(Tg, k);
+              camera.up.copy(feat.C);
+            } else {
+              camera.position.applyAxisAngle(Y, w); target.applyAxisAngle(Y, w);
+              camera.up.copy(feat.C);
+            }
+          }
+        } else if (cam.mode === 3) {
+          const k = Math.min(1, (ctx.time.wall - cam.t0) / cam.dur), e = 1 - Math.pow(1 - k, 3);
+          const P = camDir.clone().multiplyScalar(sun.camera.distance);
+          camera.position.lerpVectors(cam.fromPos, P, e); target.lerpVectors(cam.fromTgt, new V3(), e);
+          camera.up.lerpVectors(cam.fromUp, Y, e).normalize();
+          camera.lookAt(target);
+          if (k >= 1) { cam.mode = 0; ctx.controls.minDistance = defMin; camera.up.copy(Y); }
+        }
+        if (camera.position.length() < 1.004) camera.position.setLength(1.004);
       },
       hud(ctx) {
         let g = 0, s = 0;
         for (const r of regs) if (r.envS > 0.05) { g++; s += r.size > 0.016 ? 2 + Math.round(r.size * 300) : 1; }
         const lat = Math.asin(Math.max(-1, Math.min(1, ctx.camera.position.y / ctx.camera.position.length())));
         const P = 360 / (SUN_OMEGA_DEG[0] + SUN_OMEGA_DEG[1] * Math.sin(lat) ** 2 + SUN_OMEGA_DEG[2] * Math.sin(lat) ** 4);
-        return [
+        const rows = [
+          ['Bước sóng', VIEW_NAME[Math.max(0, VIEWS.indexOf(ctx.params.view))]],
           ['Số vết đen Wolf (R = 10g + s)', `${10 * g + s} · ${g} nhóm`],
-          [`Chu kỳ quay ở vĩ độ ${Math.abs(lat / D2R).toFixed(0)}°`, `${P.toFixed(1)} ngày`],
-          ...starHud(ctx, 1, 5772, 1),
+          ['Tai lửa gần rìa đĩa · sợi tối trên đĩa', `${nVisible} · ${nFil}`],
         ];
+        const f = cam.mode === 1 || cam.mode === 2 ? findItem(cam.i, cam.k) : null;
+        if (f && !f.erupting) rows.push(['Đang xem', `${PROM_NAME[f.type]} · dài ${Math.round(2 * f.L * 696)} Mm, cao ${Math.round(f.H * 696)} Mm`]);
+        if (erupt && erupt.cur) {
+          rows.push(['Phun trào: độ cao', `${Math.round(erupt.cur.H * 696).toLocaleString('vi-VN')} Mm (${(erupt.cur.H).toFixed(2)} R☉)`]);
+          rows.push(['Phun trào: vận tốc', `~${Math.round(erupt.cur.v * R_SUN_KM / REAL_PER_WALL)} km/s`]);
+        }
+        rows.push([`Chu kỳ quay ở vĩ độ ${Math.abs(lat / D2R).toFixed(0)}°`, `${P.toFixed(1)} ngày`], ...starHud(ctx, 1, 5772, 1));
+        return rows;
       },
       onClick(info, ctx) {
         const q = hitUnit(info.origin, info.dir); if (!q) return;
@@ -820,7 +1498,14 @@ const sun = {
         ctx.toast(`Vĩ độ <b>${(lat / D2R).toFixed(1)}°</b>: quay một vòng mất <b>${P.toFixed(1)} ngày</b> (vận tốc ${(2 * Math.PI * R_SUN_KM * Math.cos(lat) / (P * 86400)).toFixed(2)} km/s).` +
           (inSpot ? ' Bạn chạm vào một <b>vết đen</b>: từ trường ~0,3 tesla chặn đối lưu, nhiệt độ chỉ ~4 000 K.' : ''));
       },
+      exit(ctx) {
+        // leave the shared camera controls as we found them
+        if (cam.mode !== 0) { cam.mode = 0; cam.i = -1; cam.step = -1; ctx.controls.target.set(0, 0, 0); ctx.camera.up.set(0, 1, 0); }
+        ctx.controls.minDistance = defMin;
+      },
     };
+    sun.__inst = inst;
+    return inst;
   },
 };
 

@@ -454,7 +454,13 @@ const FULL_VERT = FULLSCREEN_VERT;
 
 const DISPLAY_FRAG = /* glsl */`
 uniform sampler2D tBH; varying vec2 vUv;
-void main(){ gl_FragColor = texture2D(tBH, vUv); }`;
+void main(){
+  vec3 c = texture2D(tBH, vUv).rgb;
+  // soft ceiling on HDR radiance: keeps hue, stops a star's core from dominating the bloom chain
+  float m = max(max(c.r, c.g), c.b);
+  c *= m > 24.0 ? (24.0 + 8.0 * log(m / 24.0)) / m : 1.0;
+  gl_FragColor = vec4(c, 1.0);
+}`;
 
 const FINAL_SHADER = {
   uniforms: { tDiffuse: { value: null }, uExposure: { value: 1 }, uTime: { value: 0 }, uGrain: { value: 0.035 }, uVig: { value: 0.55 }, uCA: { value: 0.45 }, uFade: { value: 0 }, uRes: { value: new THREE.Vector2(1, 1) } },
@@ -553,8 +559,15 @@ composer.addPass(new RenderPass(displayScene, ortho));
 const overlayPass = new RenderPass(overlayScene, camera);
 overlayPass.clear = false;
 composer.addPass(overlayPass);
-const bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), P.bloom, 0.42, 1.25);
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), P.bloom, 0.62, 1.25);
 composer.addPass(bloomPass);
+// three's UnrealBloomPass truncates each Gaussian at 1σ (σ = kernel radius), which turns very bright
+// sources into visible squares. Re-weight the same taps with σ = radius / 2.5 so the tail reaches ~0.
+[3, 5, 7, 9, 11].forEach((kr, i) => {
+  const sigma = kr / 2.5, coeff = [];
+  for (let k = 0; k < kr; k++) coeff.push(Math.exp(-0.5 * k * k / (sigma * sigma)));
+  bloomPass.separableBlurMaterials[i].uniforms.gaussianCoefficients.value = coeff;
+});
 const finalPass = new ShaderPass(FINAL_SHADER);
 composer.addPass(finalPass);
 
@@ -1834,6 +1847,13 @@ async function switchScene(id, opts = {}) {
   camera.fov = P.fov; camera.updateProjectionMatrix();
   rebuildScenePanel(); updateSceneChrome(); syncUI();
   try { await renderer.compileAsync(bhScene, ortho); } catch (e) { /* compiled on first render instead */ }
+  // scenes that stream large assets (textures) expose `ready`; hold the transition until they arrive
+  if (sceneState.inst && sceneState.inst.ready) {
+    let slow = setTimeout(() => toast(`Đang tải dữ liệu cho “${def.name}”…`, 2500), 700);
+    try { await Promise.race([sceneState.inst.ready, new Promise(r => setTimeout(r, SNAP ? 60000 : 15000))]); }
+    catch (e) { console.error(`[scene ${id}] assets`, e); sceneState.loadErrors.push(`${id} assets: ${e && e.message || e}`); }
+    clearTimeout(slow);
+  }
   if (!opts.keepHash) history.replaceState(null, '', '#' + def.id);
   state.lastInteract = performance.now();
   if (!instant) {
