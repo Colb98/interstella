@@ -98,6 +98,46 @@ input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;bac
 .btnrow button{flex:1;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:8px;padding:8px;font-size:11.5px;cursor:pointer}
 .btnrow button:hover{background:rgba(255,255,255,.12)}
 
+
+/* scene info card (non black-hole scenes) */
+#infoCard{position:absolute;left:22px;bottom:84px;width:330px;padding:14px 16px 12px;font-size:12px;display:none;max-height:calc(100vh - 200px);overflow-y:auto}
+#ui.scene-other #infoCard{display:block}
+#ui.scene-other #telemetry,#ui.scene-other #probes{display:none !important}
+#ui.scene-other .bh-only{display:none !important}
+#infoCard .trow .k{flex:0 1 auto;min-width:38%;max-width:52%}
+#infoCard .trow .v{white-space:normal;text-align:right}
+#infoCard .cat{font-family:var(--mono);font-size:9.5px;letter-spacing:.3em;color:var(--amber);text-transform:uppercase}
+#infoCard h2{margin:6px 0 2px;font-weight:400;font-size:22px;letter-spacing:.04em}
+#infoCard .subt{color:var(--dim);font-size:11.5px}
+#infoCard .blurb{font-size:12px;line-height:1.55;margin:10px 0 8px;color:rgba(236,230,218,.82)}
+#infoCard .sep{height:1px;background:var(--line);margin:8px 0}
+#infoCard::-webkit-scrollbar{width:5px}#infoCard::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:3px}
+#sceneActions{display:contents}
+
+/* catalog */
+#catalog{position:fixed;inset:0;z-index:25;display:none;background:rgba(0,0,0,.62);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);overflow-y:auto;padding:48px 5vw 60px}
+#catalog.on{display:block;animation:catIn .45s ease}
+@keyframes catIn{from{opacity:0;transform:scale(1.02)}to{opacity:1;transform:none}}
+#catalog .top{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:26px;gap:20px}
+#catalog h3{margin:0;font-weight:300;font-size:clamp(22px,3vw,34px);letter-spacing:.32em}
+#catalog .top p{margin:6px 0 0;color:var(--dim);font-size:12.5px}
+#catalog .close{background:none;border:1px solid var(--faint);border-radius:20px;color:var(--dim);padding:7px 14px;font-size:11px;letter-spacing:.14em;cursor:pointer}
+#catalog .group{margin:0 0 28px}
+#catalog .group h4{margin:0 0 12px;font-size:10.5px;font-weight:500;letter-spacing:.32em;color:var(--dim);text-transform:uppercase}
+#catalog .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}
+.ccard{position:relative;text-align:left;background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:14px;padding:14px;cursor:pointer;transition:transform .25s,border-color .25s,background .25s;overflow:hidden}
+.ccard:hover{transform:translateY(-2px);border-color:rgba(255,181,107,.45);background:rgba(255,255,255,.06)}
+.ccard.cur{border-color:var(--amber)}
+.ccard .orb{width:54px;height:54px;border-radius:50%;margin-bottom:12px;box-shadow:0 0 28px var(--glow,rgba(255,180,100,.35))}
+.ccard .nm{font-size:14px;font-weight:500}
+.ccard .st{font-size:11px;color:var(--dim);margin-top:3px;line-height:1.4}
+.ccard .badge{position:absolute;top:12px;right:12px;font-family:var(--mono);font-size:9px;color:var(--amber);letter-spacing:.15em}
+#warp{position:fixed;inset:0;z-index:15;pointer-events:none;opacity:0;transition:opacity .55s ease;background:radial-gradient(circle at center,transparent 0,transparent 8%,rgba(0,0,0,.0) 9%),repeating-conic-gradient(from 0deg,rgba(255,255,255,.0) 0deg 2.2deg,rgba(190,215,255,.16) 2.4deg 2.6deg,rgba(255,255,255,0) 2.8deg 5deg);mask-image:radial-gradient(circle,transparent 6%,#000 60%);-webkit-mask-image:radial-gradient(circle,transparent 6%,#000 60%)}
+#warp.on{opacity:1;animation:warpSpin 1.2s linear infinite}
+@keyframes warpSpin{from{transform:scale(1) rotate(0)}to{transform:scale(1.6) rotate(4deg)}}
+#snap{position:fixed;left:8px;top:8px;z-index:99;max-width:60vw;white-space:pre-wrap;font:11px var(--mono);color:#ff8080;background:rgba(0,0,0,.75);padding:6px 8px;border-radius:6px;display:none}
+#snap.err{display:block}
+
 /* photon orbital-plane card */
 #rayCard{position:absolute;right:20px;bottom:22px;width:290px;padding:10px 12px 12px;display:none}
 #ui.raycard #rayCard{display:block}
@@ -141,7 +181,7 @@ body.cine #skipTour{display:block}
 /* overlays */
 .overlay{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.55);backdrop-filter:blur(6px)}
 .overlay.on{display:flex}
-#help .card{width:min(640px,92vw);padding:26px 28px}
+#help .card{width:min(640px,92vw);padding:26px 28px;max-height:88vh;overflow-y:auto}
 #help h3{margin:0 0 16px;font-weight:300;letter-spacing:.3em;font-size:14px}
 #help .grid{display:grid;grid-template-columns:auto 1fr;gap:9px 18px;font-size:13px}
 #help kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--faint);border-radius:5px;padding:2px 7px;color:var(--amber);white-space:nowrap}
@@ -201,7 +241,7 @@ body.cine #skipTour{display:block}
 <div id="ui">
   <header id="brand">
     <div class="logo">INTERSTELLA</div>
-    <div class="sub">Hố đen Schwarzschild · ray-tracing trắc địa null trên GPU</div>
+    <div class="sub" id="brandSub">Hố đen Schwarzschild · ray-tracing trắc địa null trên GPU</div>
     <div class="massline"><span id="massName"></span> · <span class="fps" id="fps"></span></div>
   </header>
 
@@ -223,13 +263,18 @@ body.cine #skipTour{display:block}
     <div class="factor" id="cFactor"></div>
   </aside>
 
+  <aside id="infoCard" class="glass"><div class="cat" id="icCat"></div><h2 id="icName"></h2><div class="subt" id="icSub"></div><div class="blurb" id="icBlurb"></div><div id="icFacts"></div><div class="sep"></div><div id="icLive"></div></aside>
+
   <aside id="probes" class="glass"><h4>Tàu thăm dò</h4><div id="probeRows"></div></aside>
 
   <nav id="dock" class="glass">
-    <button id="bTour" title="Hành trình có hướng dẫn"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M10 8.5l6 3.5-6 3.5z"/></svg><span class="lbl">Hành trình</span><kbd>T</kbd></button>
-    <button id="bPlunge" title="Lao vào hố đen"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/></svg><span class="lbl">Lao vào</span><kbd>P</kbd></button>
-    <button id="bProbe" title="Phóng tàu thăm dò"><svg viewBox="0 0 24 24"><path d="M5 19c2-6 6-11 14-14-3 8-8 12-14 14z"/><circle cx="14" cy="10" r="1.5"/></svg><span class="lbl">Phóng tàu</span><kbd>␣</kbd></button>
-    <button id="bSplit" title="So sánh Newton / Einstein"><svg viewBox="0 0 24 24"><path d="M12 3v18M7 8l-4 4 4 4M17 8l4 4-4 4"/></svg><span class="lbl">Newton ⟷ Einstein</span><kbd>N</kbd></button>
+    <button id="bCatalog" title="Danh mục vũ trụ"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="18" r="2.5"/></svg><span class="lbl">Danh mục</span><kbd>U</kbd></button>
+    <div class="sep"></div>
+    <button class="bh-only" id="bTour" title="Hành trình có hướng dẫn"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M10 8.5l6 3.5-6 3.5z"/></svg><span class="lbl">Hành trình</span><kbd>T</kbd></button>
+    <button class="bh-only" id="bPlunge" title="Lao vào hố đen"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/></svg><span class="lbl">Lao vào</span><kbd>P</kbd></button>
+    <button class="bh-only" id="bProbe" title="Phóng tàu thăm dò"><svg viewBox="0 0 24 24"><path d="M5 19c2-6 6-11 14-14-3 8-8 12-14 14z"/><circle cx="14" cy="10" r="1.5"/></svg><span class="lbl">Phóng tàu</span><kbd>␣</kbd></button>
+    <button class="bh-only" id="bSplit" title="So sánh Newton / Einstein"><svg viewBox="0 0 24 24"><path d="M12 3v18M7 8l-4 4 4 4M17 8l4 4-4 4"/></svg><span class="lbl">Newton ⟷ Einstein</span><kbd>N</kbd></button>
+    <span id="sceneActions"></span>
     <div class="sep"></div>
     <button id="bShot" title="Chụp ảnh"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><circle cx="12" cy="13.5" r="3.5"/><path d="M8 7l2-3h4l2 3"/></svg><kbd>S</kbd></button>
     <button id="bMute" title="Âm thanh"><svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path id="muteWave" d="M16.5 8.5a5 5 0 010 7M19 6a8.5 8.5 0 010 12"/></svg><kbd>M</kbd></button>
@@ -260,10 +305,19 @@ body.cine #skipTour{display:block}
   <div><div class="k">Thời gian ngoài t</div><div class="v" id="pT"></div></div>
 </div>
 
+<div id="catalog"><div class="top"><div><h3>DANH MỤC VŨ TRỤ</h3><p>Mỗi thiên thể được dựng lại từ vật lý thật — chọn một nơi để đến.</p></div><button class="close" id="catClose">ĐÓNG · ESC</button></div><div id="catGroups"></div></div>
+<div id="warp"></div>
+<pre id="snap"></pre>
+
 <div id="help" class="overlay"><div class="card glass">
   <h3>ĐIỀU KHIỂN</h3>
   <div class="grid">
-    <kbd>Kéo / cuộn</kbd><span>Xoay quanh hố đen / tiến lại gần (tới 1,1 r<sub>s</sub>)</span>
+    <kbd>U</kbd><span>Mở danh mục vũ trụ · <kbd>[</kbd> <kbd>]</kbd> chuyển thiên thể trước/sau</span>
+    <kbd>Kéo / cuộn</kbd><span>Xoay quanh thiên thể / tiến lại gần</span>
+    <kbd>Phím riêng</kbd><span>Mỗi thiên thể có nút hành động riêng ở thanh dưới, kèm phím tắt</span>
+  </div>
+  <h3 style="margin-top:22px">TRONG CẢNH HỐ ĐEN</h3>
+  <div class="grid">
     <kbd>Click</kbd><span>Bắn một photon ngược từ mắt bạn — xem đường đi thật của tia sáng tạo nên điểm ảnh đó</span>
     <kbd>Shift + Click</kbd><span>Phóng tàu thăm dò từ vị trí của bạn theo hướng đó</span>
     <kbd>Space</kbd><span>Phóng tàu vào quỹ đạo (loại quỹ đạo chọn trong bảng điều khiển)</span>
@@ -272,12 +326,15 @@ body.cine #skipTour{display:block}
     <kbd>N</kbd><span>Chia đôi màn hình Newton ⟷ Einstein</span>
     <kbd>L</kbd><span>Bật/tắt thấu kính hấp dẫn</span>
     <kbd>D</kbd><span>Doppler: tắt / điện ảnh / vật lý</span>
-    <kbd>K</kbd><span>Bầu trời: Ngân Hà / lưới / bàn cờ</span>
     <kbd>G</kbd><span>Lưới mặt cầu photon (1,5 r<sub>s</sub>)</span>
+    <kbd>C</kbd><span>Xóa photon và tàu thăm dò</span>
+  </div>
+  <h3 style="margin-top:22px">MỌI NƠI</h3>
+  <div class="grid">
+    <kbd>K</kbd><span>Bầu trời: Ngân Hà / lưới / bàn cờ</span>
+    <kbd>S · M</kbd><span>Chụp ảnh · tắt tiếng</span>
     <kbd>F</kbd><span>Toàn màn hình</span>
     <kbd>H</kbd><span>Ẩn/hiện giao diện</span>
-    <kbd>C</kbd><span>Xóa photon và tàu thăm dò</span>
-    <kbd>S · M</kbd><span>Chụp ảnh · tắt tiếng</span>
   </div>
   <div class="foot">Mỗi điểm ảnh được tính bằng cách tích phân phương trình trắc địa null của mêtric Schwarzschild: d²u/dφ² + u = (3/2) r<sub>s</sub> u². Đĩa bồi tụ dùng hồ sơ nhiệt độ Novikov–Thorne, màu vật đen tích phân qua hàm khớp màu CIE 1931, dịch tần g = δ·√(1−r<sub>s</sub>/r). Gõ thử một cái tên trong phim…</div>
 </div></div>
@@ -293,7 +350,7 @@ body.cine #skipTour{display:block}
 
 <div id="intro">
   <div class="inner">
-    <div class="eyebrow">Thuyết tương đối rộng · ray-tracing thời gian thực</div>
+    <div class="eyebrow">Danh mục vũ trụ · dựng lại từ vật lý thật · thời gian thực</div>
     <h1>INTERSTELLA</h1>
     <p class="poem">“Nơi ngay cả ánh sáng cũng phải cúi đầu.”</p>
     <button id="enterBtn" disabled>Đang uốn cong không-thời gian…</button>
@@ -308,6 +365,8 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { FULLSCREEN_VERT } from './js/glsl/common.js';
+import { BH_FRAG } from './js/glsl/blackhole.js';
 
 /* =====================================================================
    Units: r_s = 1 (so M = 1/2), c = 1. Time unit = r_s / c.
@@ -391,287 +450,14 @@ function bbJS(T) {
 /* ------------------------------------------------------------------ */
 /* Shaders                                                              */
 /* ------------------------------------------------------------------ */
-const FULL_VERT = /* glsl */`
-varying vec2 vUv;
-void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
-
-const BH_FRAG = /* glsl */`
-precision highp float;
-#define PI 3.14159265359
-uniform vec2 uRes;
-uniform float uTime;
-uniform vec3 uCamPos, uCamRight, uCamUp, uCamFwd;
-uniform float uTanHalfFov;
-uniform vec3 uObsBeta;
-uniform float uSplit, uLensing;
-uniform float uDiskOn, uDiskIn, uDiskOut, uDiskTmax, uDiskBright, uDiskDensity, uDiskTurb, uGlow;
-uniform vec3 uGlowCol;
-uniform float uDoppler;
-uniform float uShowPS, uShowISCO, uSkyMode, uStarBright, uSkyBright;
-uniform sampler2D uBB;
-uniform vec4 uProbe[8];
-uniform vec4 uProbeCol[8];
-uniform int uProbeN;
-varying vec2 vUv;
-
-/* --- Ashima 3D simplex noise --- */
-vec4 permute(vec4 x){ return mod(((x*34.0)+1.0)*x, 289.0); }
-vec4 taylorInvSqrt(vec4 r){ return 1.79284291400159 - 0.85373472095314 * r; }
-float snoise(vec3 v){
-  const vec2 C = vec2(1.0/6.0, 1.0/3.0);
-  const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
-  vec3 i = floor(v + dot(v, C.yyy));
-  vec3 x0 = v - i + dot(i, C.xxx);
-  vec3 g = step(x0.yzx, x0.xyz);
-  vec3 l = 1.0 - g;
-  vec3 i1 = min(g.xyz, l.zxy);
-  vec3 i2 = max(g.xyz, l.zxy);
-  vec3 x1 = x0 - i1 + C.xxx;
-  vec3 x2 = x0 - i2 + C.yyy;
-  vec3 x3 = x0 - D.yyy;
-  i = mod(i, 289.0);
-  vec4 p = permute(permute(permute(i.z + vec4(0.0, i1.z, i2.z, 1.0)) + i.y + vec4(0.0, i1.y, i2.y, 1.0)) + i.x + vec4(0.0, i1.x, i2.x, 1.0));
-  float n_ = 1.0/7.0;
-  vec3 ns = n_ * D.wyz - D.xzx;
-  vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
-  vec4 x_ = floor(j * ns.z);
-  vec4 y_ = floor(j - 7.0 * x_);
-  vec4 x = x_ * ns.x + ns.yyyy;
-  vec4 y = y_ * ns.x + ns.yyyy;
-  vec4 h = 1.0 - abs(x) - abs(y);
-  vec4 b0 = vec4(x.xy, y.xy);
-  vec4 b1 = vec4(x.zw, y.zw);
-  vec4 s0 = floor(b0)*2.0 + 1.0;
-  vec4 s1 = floor(b1)*2.0 + 1.0;
-  vec4 sh = -step(h, vec4(0.0));
-  vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy;
-  vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww;
-  vec3 p0 = vec3(a0.xy, h.x);
-  vec3 p1 = vec3(a0.zw, h.y);
-  vec3 p2 = vec3(a1.xy, h.z);
-  vec3 p3 = vec3(a1.zw, h.w);
-  vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2,p2), dot(p3,p3)));
-  p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w;
-  vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
-  m = m * m;
-  return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
-}
-vec3 hash33(vec3 p){
-  p = fract(p * vec3(0.1031, 0.1030, 0.0973));
-  p += dot(p, p.yxz + 33.33);
-  return fract((p.xxy + p.yxx) * p.zyx);
-}
-vec3 bb(float T){
-  float u = (log(clamp(T, 500.0, 100000.0)) / log(10.0) - 2.69897) / (5.0 - 2.69897);
-  return texture2D(uBB, vec2(u, 0.5)).rgb;
-}
-float erfA(float x){ return tanh(1.2025 * x); }
-
-/* --- celestial sphere --- */
-vec3 starLayer(vec3 dir, float scale, float prob, float sz, float seed, float gs){
-  vec3 a = abs(dir); float face; vec2 uv;
-  if (a.x >= a.y && a.x >= a.z){ face = dir.x > 0.0 ? 0.0 : 1.0; uv = dir.yz / a.x; }
-  else if (a.y >= a.z){ face = dir.y > 0.0 ? 2.0 : 3.0; uv = dir.xz / a.y; }
-  else { face = dir.z > 0.0 ? 4.0 : 5.0; uv = dir.xy / a.z; }
-  vec2 g = uv * scale; vec2 id = floor(g); vec2 f = g - id;
-  vec3 h = hash33(vec3(id, face * 13.1 + seed));
-  if (h.x > prob) return vec3(0.0);
-  vec2 c = 0.25 + 0.5 * h.yz;
-  vec2 dd = f - c;
-  float d2 = dot(dd, dd);
-  vec3 h2 = hash33(vec3(id.yx + seed * 3.7, face + seed * 1.9));
-  float m = 0.025 + pow(h2.x, 14.0) * 7.0;
-  float T = 2700.0 * pow(11.0, pow(h2.y, 1.7));
-  return bb(T * gs) * m * exp(-d2 / (sz * sz));
-}
-vec3 galaxy(vec3 d, out float band){
-  vec3 pole = normalize(vec3(0.22, 1.0, -0.38));
-  vec3 ctr = normalize(cross(pole, vec3(0.0, 0.0, 1.0)));
-  float b = dot(d, pole);
-  float lc = dot(normalize(d - pole * b + 1e-5), ctr);
-  band = exp(-b * b * 20.0);
-  float core = exp(-b * b * 55.0) * pow(max(lc, 0.0), 5.0);
-  float n1 = snoise(d * 2.3) * 0.5 + snoise(d * 5.1) * 0.25 + snoise(d * 11.0) * 0.125;
-  float dust = snoise(d * 4.0 + 7.3) * 0.5 + snoise(d * 9.0 + 3.1) * 0.3 + snoise(d * 21.0) * 0.15;
-  float lane = smoothstep(0.0, 0.5, dust) * exp(-b * b * 85.0);
-  vec3 warm = vec3(1.0, 0.78, 0.55), cool = vec3(0.55, 0.66, 1.0);
-  vec3 col = mix(cool, warm, clamp(core * 2.0 + 0.3 * max(lc, 0.0), 0.0, 1.0)) * (band * (0.35 + 0.6 * (n1 * 0.5 + 0.5)) + core * 1.7);
-  col *= 1.0 - 0.82 * lane;
-  float neb = snoise(d * 1.3 + 11.0) * 0.6 + snoise(d * 3.2 - 4.0) * 0.3;
-  col += vec3(0.42, 0.12, 0.5) * pow(max(neb, 0.0), 2.2) * 0.4 + vec3(0.05, 0.28, 0.4) * pow(max(-neb, 0.0), 2.5) * 0.3;
-  return col * 0.2;
-}
-float gridLine(float x, float w){ return 1.0 - smoothstep(0.0, w, abs(fract(x + 0.5) - 0.5)); }
-vec3 sky(vec3 d, float gs){
-  float gI = clamp(gs * gs * gs * gs, 0.01, 30.0);
-  vec3 col;
-  if (uSkyMode < 0.5){
-    float band;
-    vec3 tint = bb(5800.0 * gs) / bb(5800.0);
-    col = galaxy(d, band) * uSkyBright * tint;
-    vec3 st = starLayer(d, 45.0, 0.07, 0.07, 1.0, gs) * 1.6
-            + starLayer(d, 120.0, 0.10, 0.09, 2.0, gs) * 0.7
-            + starLayer(d, 300.0, 0.06 + 0.5 * band, 0.12, 3.0, gs) * (0.08 + 0.3 * band);
-    col += st * uStarBright;
-  } else {
-    float lon = atan(d.z, d.x), lat = asin(clamp(d.y, -1.0, 1.0));
-    if (uSkyMode < 1.5){
-      float s = PI / 12.0;
-      float gl = max(gridLine(lon / s, 0.05), gridLine(lat / s, 0.05));
-      float eq = 1.0 - smoothstep(0.0, 0.012, abs(lat));
-      float pm = 1.0 - smoothstep(0.0, 0.012, abs(lon));
-      col = vec3(0.012, 0.02, 0.04) + vec3(0.35, 0.65, 1.0) * gl * 0.35 + vec3(1.0, 0.55, 0.2) * max(eq, pm) * 0.9;
-    } else {
-      float s = PI / 8.0;
-      float ch = mod(floor(lon / s) + floor(lat / s), 2.0);
-      vec3 q = lon > 0.0 ? (lat > 0.0 ? vec3(0.95, 0.32, 0.22) : vec3(0.22, 0.5, 0.95))
-                         : (lat > 0.0 ? vec3(0.95, 0.82, 0.28) : vec3(0.3, 0.85, 0.42));
-      col = q * (0.06 + 0.22 * ch);
-    }
-    col *= bb(6500.0 * gs) / bb(6500.0);
-  }
-  return col * gI;
-}
-
-/* --- accretion disk --- */
-float diskNoise(float r, float a, float seed){
-  vec2 q = vec2(cos(a), sin(a));
-  float lr = log(r);
-  float n = 0.5  * snoise(vec3(q * 1.6, lr * 5.0 + seed))
-          + 0.25 * snoise(vec3(q * 3.8, lr * 13.0 + seed * 1.31))
-          + 0.14 * snoise(vec3(q * 9.0, lr * 31.0 + seed * 1.73))
-          + 0.07 * snoise(vec3(q * 20.0, lr * 67.0 - seed));
-  float rings = 0.5 + 0.5 * sin(lr * 55.0 + n * 4.0);
-  return clamp(0.52 + 0.75 * n, 0.0, 1.0) * (0.72 + 0.28 * rings);
-}
-vec4 diskSample(vec3 p, float r, vec3 nPh, bool gr, float gCam){
-  float inner = smoothstep(uDiskIn * 0.985, uDiskIn * 1.08, r);
-  float outer = 1.0 - smoothstep(uDiskOut * 0.55, uDiskOut, r);
-  float phi = atan(p.z, p.x);
-  float om = sqrt(0.5 / (r * r * r));          // Keplerian Ω = sqrt(M/r³), exact in Schwarzschild coordinate time
-  const float PER = 90.0;
-  float t1 = mod(uTime, PER), t2 = mod(uTime + 0.5 * PER, PER);
-  float w = 1.0 - abs(2.0 * t1 / PER - 1.0);
-  float n = mix(diskNoise(r, phi - om * t2, 17.3), diskNoise(r, phi - om * t1, 3.1), w);
-  float dens = inner * outer * mix(1.0, n, uDiskTurb);
-  float alpha = clamp(dens * uDiskDensity, 0.0, 1.0);
-  // Novikov–Thorne-like temperature profile, peak at r = 49/36 r_in
-  float x = r / uDiskIn;
-  float f = max(1.0 - sqrt(1.0 / x), 0.0) / (x * x * x);
-  float T = uDiskTmax * pow(max(f, 1e-7) / 0.0566528, 0.25);
-  float g = 1.0;
-  if (uDoppler > 0.5){
-    float beta = gr ? sqrt(0.5 / max(r - 1.0, 0.02)) : sqrt(0.5 / r);
-    beta = min(beta, 0.995);
-    float gam = inversesqrt(1.0 - beta * beta);
-    vec3 tdir = vec3(-p.z, 0.0, p.x) / r;
-    vec3 nl = nPh;
-    if (gr){ vec3 rh = p / r; float nr = dot(nl, rh); nl = normalize(nl + rh * nr * (inversesqrt(1.0 - 1.0 / r) - 1.0)); }
-    float dop = 1.0 / (gam * (1.0 - beta * dot(tdir, nl)));
-    g = dop * (gr ? sqrt(1.0 - 1.0 / r) : 1.0) * gCam;
-    if (uDoppler < 1.5) g = mix(1.0, g, 0.28);
-  }
-  float To = T * g;
-  float I = pow(To / uDiskTmax, 4.0);
-  // soft-knee only above 4× (keeps the physical g⁴ contrast but stops the beamed side from turning into a white sheet)
-  I = I < 4.0 ? I : 4.0 + 4.0 * log(I / 4.0);
-  vec3 e = bb(To) * I * uDiskBright * (0.45 + 0.95 * n) * 1.15;
-  if (uShowISCO > 0.5){
-    float l = 1.0 - smoothstep(0.0, 0.045, abs(r - 3.0));
-    e += vec3(0.3, 0.9, 1.0) * l * 5.0;
-    alpha = max(alpha, l * 0.7);
-  }
-  return vec4(e, alpha);
-}
-
-void main(){
-  vec2 frag = gl_FragCoord.xy;
-  vec2 ndc = frag / uRes * 2.0 - 1.0;
-  float aspect = uRes.x / uRes.y;
-  vec3 dObs = normalize(uCamFwd + uCamRight * ndc.x * uTanHalfFov * aspect + uCamUp * ndc.y * uTanHalfFov);
-  bool gr = uLensing > 0.5 && frag.x / uRes.x >= uSplit;
-
-  // relativistic aberration: observer frame -> local static frame
-  vec3 d = dObs; float gObs = 1.0;
-  float b2 = dot(uObsBeta, uObsBeta);
-  if (b2 > 1e-10){
-    float b = sqrt(b2); vec3 bh = uObsBeta / b; float gam = inversesqrt(1.0 - b2);
-    vec3 np = -dObs; float npar = dot(np, bh); vec3 nperp = np - npar * bh;
-    float den = 1.0 + b * npar;
-    vec3 n = bh * ((npar + b) / den) + nperp / (gam * den);
-    d = -normalize(n);
-    gObs = 1.0 / (gam * den);
-  }
-  vec3 x = uCamPos; float rc = length(x);
-  float lapse = gr ? sqrt(max(1.0 - 1.0 / rc, 1e-4)) : 1.0;
-  float gCam = gObs / lapse;
-  // local static frame direction -> Schwarzschild coordinate direction
-  vec3 v = d;
-  if (gr){ vec3 rh = x / rc; float vr = dot(v, rh); v += rh * vr * (lapse - 1.0); }
-  vec3 hv = cross(x, v); float h2 = dot(hv, hv);
-
-  vec3 col = vec3(0.0); float trans = 1.0;
-  float rFar = max(rc + 2.0, 60.0);
-  bool captured = false;
-  float r = rc;
-  for (int i = 0; i < MAX_STEPS; i++){
-    if (r > rFar && dot(x, v) > 0.0) break;
-    float dl = clamp(STEP_K * r, 0.012, 6.0);
-    float dt = dl / length(v);
-    vec3 xp = x; float rp = r;
-    if (gr){
-      // null geodesic: x'' = -(3/2) h² x / r⁵  (exact Schwarzschild photon orbits, r_s = 1)
-      vec3 a = -1.5 * h2 * x / (r * r * r * r * r);
-      v += a * (0.5 * dt); x += v * dt; r = length(x);
-      a = -1.5 * h2 * x / (r * r * r * r * r);
-      v += a * (0.5 * dt);
-    } else { x += v * dt; r = length(x); }
-
-    if (uDiskOn > 0.5 && xp.y * x.y < 0.0){
-      vec3 p = mix(xp, x, xp.y / (xp.y - x.y));
-      float rr = length(p.xz);
-      if (rr > uDiskIn * 0.97 && rr < uDiskOut){
-        vec4 e = diskSample(p, rr, -normalize(v), gr, gCam);
-        col += trans * e.rgb * e.a; trans *= 1.0 - e.a;
-      }
-    }
-    if (uGlow > 0.0 && uDiskOn > 0.5){
-      float rr = length(x.xz);
-      float H = 0.06 * rr + 0.05;
-      float gl = exp(-abs(x.y) / H) * smoothstep(uDiskIn * 0.9, uDiskIn * 1.4, rr) * (1.0 - smoothstep(uDiskOut * 0.4, uDiskOut, rr)) * pow(uDiskIn / max(rr, 0.5), 2.5);
-      col += trans * uGlowCol * gl * dl * uGlow * 0.1;
-    }
-    if (uShowPS > 0.5 && (rp - 1.5) * (r - 1.5) < 0.0){
-      vec3 p = mix(xp, x, (rp - 1.5) / (rp - r));
-      vec3 q = p / 1.5; float lon = atan(q.z, q.x), lat = asin(clamp(q.y, -1.0, 1.0));
-      float s = PI / 12.0;
-      float l = max(gridLine(lon / s, 0.07), gridLine(lat / s, 0.07));
-      col += trans * vec3(0.25, 0.75, 1.0) * (0.06 + l * 1.3);
-    }
-    for (int k = 0; k < 8; k++){
-      if (k >= uProbeN) break;
-      vec3 pp = uProbe[k].xyz; float s = uProbe[k].w;
-      vec3 seg = x - xp; float L = length(seg); vec3 sd = seg / L;
-      vec3 w0 = pp - xp; float tca = dot(w0, sd);
-      if (tca < -5.0 * s || tca > L + 5.0 * s) continue;
-      float d2 = dot(w0, w0) - tca * tca;
-      if (d2 > 25.0 * s * s) continue;
-      float e = exp(-d2 / (s * s)) * 0.5 * (erfA((L - tca) / s) + erfA(tca / s));
-      col += trans * uProbeCol[k].rgb * e;
-    }
-    if (r < 1.0005){ captured = true; break; }
-    if (trans < 0.004) break;
-  }
-  if (!captured && trans > 0.004 && r > 3.0) col += trans * sky(normalize(v), gCam);
-  gl_FragColor = vec4(col, 1.0);
-}`;
+const FULL_VERT = FULLSCREEN_VERT;
 
 const DISPLAY_FRAG = /* glsl */`
 uniform sampler2D tBH; varying vec2 vUv;
 void main(){ gl_FragColor = texture2D(tBH, vUv); }`;
 
 const FINAL_SHADER = {
-  uniforms: { tDiffuse: { value: null }, uExposure: { value: 1 }, uTime: { value: 0 }, uGrain: { value: 0.035 }, uVig: { value: 0.55 }, uCA: { value: 1 }, uFade: { value: 0 }, uRes: { value: new THREE.Vector2(1, 1) } },
+  uniforms: { tDiffuse: { value: null }, uExposure: { value: 1 }, uTime: { value: 0 }, uGrain: { value: 0.035 }, uVig: { value: 0.55 }, uCA: { value: 0.45 }, uFade: { value: 0 }, uRes: { value: new THREE.Vector2(1, 1) } },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: /* glsl */`
 uniform sampler2D tDiffuse; uniform float uExposure, uTime, uGrain, uVig, uCA, uFade; uniform vec2 uRes; varying vec2 vUv;
@@ -726,15 +512,21 @@ let quality = QUALITY[P.quality];
 let resScale = quality.scale;
 const rtBH = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false });
 
-const bhUniforms = {
-  uRes: { value: new THREE.Vector2(1, 1) }, uTime: { value: 0 },
+// Uniforms every scene shader shares (declared in js/glsl/common.js); scenes spread these into
+// their own ShaderMaterial uniforms so the host can update them once per frame.
+const shared = {
+  uRes: { value: new THREE.Vector2(1, 1) }, uTime: { value: 0 }, uWall: { value: 0 },
   uCamPos: { value: new V3() }, uCamRight: { value: new V3() }, uCamUp: { value: new V3() }, uCamFwd: { value: new V3() },
-  uTanHalfFov: { value: 0.6 }, uObsBeta: { value: new V3() },
+  uTanHalfFov: { value: 0.6 }, uBB: { value: bbTex },
+  uSkyMode: { value: 0 }, uStarBright: { value: 1 }, uSkyBright: { value: 1 },
+};
+const bhUniforms = {
+  ...shared,
+  uObsBeta: { value: new V3() },
   uSplit: { value: 0 }, uLensing: { value: 1 },
   uDiskOn: { value: 1 }, uDiskIn: { value: 3 }, uDiskOut: { value: 16 }, uDiskTmax: { value: 6500 }, uDiskBright: { value: 1 },
   uDiskDensity: { value: 1.3 }, uDiskTurb: { value: 0.85 }, uGlow: { value: 0.7 }, uGlowCol: { value: new V3(1, 1, 1) }, uDoppler: { value: 2 },
-  uShowPS: { value: 0 }, uShowISCO: { value: 0 }, uSkyMode: { value: 0 }, uStarBright: { value: 1 }, uSkyBright: { value: 1 },
-  uBB: { value: bbTex },
+  uShowPS: { value: 0 }, uShowISCO: { value: 0 },
   uProbe: { value: Array.from({ length: 8 }, () => new THREE.Vector4()) },
   uProbeCol: { value: Array.from({ length: 8 }, () => new THREE.Vector4()) },
   uProbeN: { value: 0 },
@@ -745,7 +537,9 @@ const bhMat = new THREE.ShaderMaterial({
   depthTest: false, depthWrite: false,
 });
 const bhScene = new THREE.Scene();
-bhScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), bhMat));
+const bhMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), bhMat);
+bhMesh.frustumCulled = false;
+bhScene.add(bhMesh);
 
 const displayScene = new THREE.Scene();
 displayScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
@@ -768,6 +562,7 @@ function setQuality(name) {
   P.quality = name; quality = QUALITY[name]; resScale = quality.scale;
   bhMat.defines.MAX_STEPS = quality.steps; bhMat.defines.STEP_K = quality.k.toFixed(4);
   bhMat.needsUpdate = true;
+  for (const inst of Object.values(sceneState.instances)) inst.setQuality?.(quality);
   resize();
 }
 function resize() {
@@ -1309,6 +1104,40 @@ class Soundscape {
       o.connect(g); g.connect(this.revIn); g.connect(this.bus); o.start(t); o.stop(t + 13.2);
     }
   }
+  // short broadband tick, e.g. a pulsar pulse
+  click(gain = 0.1, pan = 0, bright = 1) {
+    if (!this.ctx) return;
+    const ctx = this.ctx, t = ctx.currentTime + 0.005;
+    if (!this.clickBuf) { const n = Math.floor(ctx.sampleRate * 0.03); this.clickBuf = ctx.createBuffer(1, n, ctx.sampleRate); const d = this.clickBuf.getChannelData(0); for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (n * 0.12)); }
+    const src = ctx.createBufferSource(); src.buffer = this.clickBuf;
+    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 900 + 2600 * bright; f.Q.value = 0.8;
+    const g = ctx.createGain(); g.gain.value = gain;
+    const pn = this.pan(Math.max(-1, Math.min(1, pan)));
+    src.connect(f).connect(g).connect(pn); pn.connect(this.bus); pn.connect(this.revIn);
+    src.start(t);
+  }
+  // a single enveloped note
+  tone(freq, dur = 1.5, gain = 0.05, pan = 0, type = 'sine') {
+    if (!this.ctx) return;
+    const ctx = this.ctx, t = ctx.currentTime + 0.01;
+    const o = ctx.createOscillator(); o.type = type; o.frequency.value = Math.max(20, freq);
+    const g = ctx.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(gain, t + Math.min(0.05, dur * 0.2)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    const pn = this.pan(Math.max(-1, Math.min(1, pan)));
+    o.connect(g).connect(pn); pn.connect(this.bus); pn.connect(this.revIn); pn.connect(this.delay);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  whoosh() {
+    if (!this.ctx) return;
+    const ctx = this.ctx, t = ctx.currentTime, n = ctx.sampleRate * 2.2;
+    const buf = ctx.createBuffer(1, n, ctx.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 1.4;
+    f.frequency.setValueAtTime(180, t); f.frequency.exponentialRampToValueAtTime(3200, t + 0.9); f.frequency.exponentialRampToValueAtTime(120, t + 2.1);
+    const g = ctx.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.12, t + 0.7); g.gain.exponentialRampToValueAtTime(0.0001, t + 2.15);
+    src.connect(f).connect(g); g.connect(this.bus); g.connect(this.revIn);
+    src.start(t);
+  }
   setRatio(r) {
     if (!this.ctx) return;
     const cents = Math.max(-1200, Math.min(1200, 1200 * Math.log2(r)));
@@ -1385,45 +1214,53 @@ function massPhys() {
 const $ = id => document.getElementById(id);
 const syncers = [];
 function syncUI() { syncers.forEach(f => f()); }
+// Generic panel controls. `o` is the object holding the value (P for globals, a scene's params).
+function uiSection(parent, title, open, scope) {
+  const d = document.createElement('details'); d.open = !!open; d.innerHTML = `<summary>${title}</summary>`;
+  if (scope) d.dataset.scope = scope;
+  parent.appendChild(d); return d;
+}
+function uiRange(parent, label, key, min, max, step, fmtv, note, on, o = P) {
+  const w = document.createElement('div'); w.className = 'ctl';
+  w.innerHTML = `<div class="top"><span>${label}</span><span class="val"></span></div><input type="range" min="${min}" max="${max}" step="${step}">${note ? `<div class="note">${note}</div>` : ''}`;
+  const inp = w.querySelector('input'), val = w.querySelector('.val');
+  const upd = () => { inp.value = o[key]; val.textContent = fmtv(o[key]); inp.style.setProperty('--p', ((o[key] - min) / (max - min) * 100) + '%'); };
+  inp.addEventListener('input', () => { o[key] = parseFloat(inp.value); upd(); on && on(o[key]); });
+  syncers.push(upd); upd(); parent.appendChild(w);
+}
+function uiToggle(parent, label, key, on, note, o = P) {
+  const w = document.createElement('div');
+  w.innerHTML = `<div class="tog"><span>${label}</span><span class="sw"></span></div>${note ? `<div class="ctl"><div class="note">${note}</div></div>` : ''}`;
+  const t = w.querySelector('.tog');
+  const upd = () => t.classList.toggle('on', !!o[key]);
+  t.addEventListener('click', () => { o[key] = !o[key]; upd(); on && on(o[key]); });
+  syncers.push(upd); upd(); parent.appendChild(w);
+}
+function uiSeg(parent, label, key, opts, on, note, o = P) {
+  const w = document.createElement('div'); w.className = 'ctl';
+  w.innerHTML = `<div class="top"><span>${label}</span></div><div class="seg"></div>${note ? `<div class="note">${note}</div>` : ''}`;
+  const s = w.querySelector('.seg');
+  const btns = opts.map(([v, txt]) => { const b = document.createElement('button'); b.textContent = txt; b.addEventListener('click', () => { o[key] = v; upd(); on && on(v); }); s.appendChild(b); return [v, b]; });
+  const upd = () => btns.forEach(([v, b]) => b.classList.toggle('on', o[key] === v));
+  syncers.push(upd); upd(); parent.appendChild(w);
+}
+function uiButtons(parent, list) { const r = document.createElement('div'); r.className = 'btnrow'; for (const [txt, fn] of list) { const b = document.createElement('button'); b.textContent = txt; b.addEventListener('click', fn); r.appendChild(b); } parent.appendChild(r); }
+
 function buildPanel() {
   const panel = $('panel');
-  const section = (title, open) => { const d = document.createElement('details'); d.open = !!open; d.innerHTML = `<summary>${title}</summary>`; panel.appendChild(d); return d; };
-  const range = (parent, label, key, min, max, step, fmtv, note, on) => {
-    const w = document.createElement('div'); w.className = 'ctl';
-    w.innerHTML = `<div class="top"><span>${label}</span><span class="val"></span></div><input type="range" min="${min}" max="${max}" step="${step}">${note ? `<div class="note">${note}</div>` : ''}`;
-    const inp = w.querySelector('input'), val = w.querySelector('.val');
-    const upd = () => { inp.value = P[key]; val.textContent = fmtv(P[key]); inp.style.setProperty('--p', ((P[key] - min) / (max - min) * 100) + '%'); };
-    inp.addEventListener('input', () => { P[key] = parseFloat(inp.value); upd(); on && on(); });
-    syncers.push(upd); upd(); parent.appendChild(w);
-  };
-  const toggle = (parent, label, key, on, note) => {
-    const w = document.createElement('div');
-    w.innerHTML = `<div class="tog"><span>${label}</span><span class="sw"></span></div>${note ? `<div class="ctl"><div class="note">${note}</div></div>` : ''}`;
-    const t = w.querySelector('.tog');
-    const upd = () => t.classList.toggle('on', !!P[key]);
-    t.addEventListener('click', () => { P[key] = !P[key]; upd(); on && on(); });
-    syncers.push(upd); upd(); parent.appendChild(w);
-  };
-  const seg = (parent, label, key, opts, on, note) => {
-    const w = document.createElement('div'); w.className = 'ctl';
-    w.innerHTML = `<div class="top"><span>${label}</span></div><div class="seg"></div>${note ? `<div class="note">${note}</div>` : ''}`;
-    const s = w.querySelector('.seg');
-    const btns = opts.map(([v, txt]) => { const b = document.createElement('button'); b.textContent = txt; b.addEventListener('click', () => { P[key] = v; upd(); on && on(); }); s.appendChild(b); return [v, b]; });
-    const upd = () => btns.forEach(([v, b]) => b.classList.toggle('on', P[key] === v));
-    syncers.push(upd); upd(); parent.appendChild(w);
-  };
-  const buttons = (parent, list) => { const r = document.createElement('div'); r.className = 'btnrow'; for (const [txt, fn] of list) { const b = document.createElement('button'); b.textContent = txt; b.addEventListener('click', fn); r.appendChild(b); } parent.appendChild(r); };
+  const sceneBox = document.createElement('div'); sceneBox.id = 'sceneSection'; panel.appendChild(sceneBox);
+  const section = (title, open, scope) => uiSection(panel, title, open, scope);
+  const range = uiRange, toggle = uiToggle, seg = uiSeg, buttons = uiButtons;
 
-  let s = section('Vật lý', true);
+  let s = section('Vật lý', true, 'bh');
   toggle(s, 'Thấu kính hấp dẫn', 'lensing', () => toast(P.lensing ? 'Thấu kính hấp dẫn <b>BẬT</b> — ánh sáng đi theo trắc địa cong.' : 'Thấu kính <b>TẮT</b> — ánh sáng đi thẳng như trong không-thời gian phẳng.'));
   seg(s, 'Dịch tần Doppler + hấp dẫn', 'doppler', [[0, 'Tắt'], [1, 'Điện ảnh'], [2, 'Vật lý']], null,
     '“Vật lý”: g = δ·√(1−r<sub>s</sub>/r), cường độ ∝ g⁴. Interstellar đã dùng “tắt” để khán giả không bối rối.');
   toggle(s, 'Chia đôi Newton ⟷ Einstein', 'splitOn', updateSplit);
-  range(s, 'Tốc độ thời gian', 'timeScale', 0, 30, 0.5, v => v.toFixed(1) + ' r<sub>s</sub>/c ·s⁻¹'.replace(/<[^>]+>/g, ''));
-  s = section('Hố đen');
+  s = section('Hố đen', false, 'bh');
   seg(s, 'Khối lượng', 'massIndex', MASSES.map((m, i) => [i, m.short]), () => { $('massName').textContent = MASSES[P.massIndex].name; toast(massFact()); },
     'Hình ảnh bất biến theo tỉ lệ — khối lượng chỉ đổi kích thước thật, thời gian và lực thủy triều trong bảng đo đạc.');
-  s = section('Đĩa bồi tụ', true);
+  s = section('Đĩa bồi tụ', true, 'bh');
   toggle(s, 'Hiện đĩa', 'disk');
   range(s, 'Nhiệt độ cực đại', 'diskTmax', 1500, 30000, 100, v => Math.round(v).toLocaleString('en-US') + ' K', 'Đĩa thật của hố đen sao nóng ~10⁷ K (tia X). Ở đây dải nhiệt được đặt trong vùng mắt nhìn thấy.');
   range(s, 'Bán kính ngoài', 'diskOuter', 6, 30, 0.5, v => v.toFixed(1) + ' rₛ');
@@ -1435,15 +1272,16 @@ function buildPanel() {
   seg(s, 'Nền', 'sky', [[0, 'Ngân Hà'], [1, 'Lưới'], [2, 'Bàn cờ']]);
   range(s, 'Sao', 'starBright', 0, 3, 0.05, v => v.toFixed(2));
   range(s, 'Dải Ngân Hà', 'skyBright', 0, 3, 0.05, v => v.toFixed(2));
-  s = section('Trực quan hóa');
+  s = section('Trực quan hóa', false, 'bh');
   toggle(s, 'Mặt cầu photon (1,5 rₛ)', 'showPS');
   toggle(s, 'ISCO — quỹ đạo bền trong cùng (3 rₛ)', 'showISCO');
   toggle(s, 'Vệt quỹ đạo tàu thăm dò', 'showTrails');
   toggle(s, 'Phễu Flamm (độ cong không gian)', 'showFlamm', null, 'Mặt nhúng z = 2√(rₛ(r−rₛ)) — hình học thật của lát cắt không gian. Vòng đỏ: chân trời; cam: mặt cầu photon; xanh: ISCO.');
-  s = section('Tàu thăm dò');
+  s = section('Tàu thăm dò', false, 'bh');
   seg(s, 'Loại quỹ đạo', 'orbitType', [['precess', 'Elip tiến động'], ['circular', 'Tròn'], ['whirl', 'Zoom-whirl'], ['plunge', 'Rơi']]);
   buttons(s, [['Phóng ␣', () => launchProbe()], ['Xóa tất cả', clearAll]]);
-  s = section('Máy quay & hình ảnh');
+  s = section('Máy quay, thời gian & hình ảnh');
+  range(s, 'Tốc độ thời gian', 'timeScale', 0, 30, 0.5, v => v.toFixed(1) + '×', 'Nhân tốc độ của đồng hồ mô phỏng. Trong cảnh hố đen, 1× = một r<sub>s</sub>/c mỗi giây.');
   range(s, 'Góc nhìn', 'fov', 25, 110, 1, v => v.toFixed(0) + '°');
   toggle(s, 'Tự xoay khi rảnh', 'autoRotate');
   range(s, 'Phơi sáng', 'exposure', 0.2, 3, 0.05, v => v.toFixed(2));
@@ -1684,7 +1522,12 @@ canvas.addEventListener('pointerup', e => {
   if (!down) return;
   const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y), dt = performance.now() - down.t;
   if (moved < 6 && dt < 400 && state.started && !state.tour) {
-    if (down.shift) launchFromCamera(e.clientX, e.clientY); else shootRay(e.clientX, e.clientY);
+    if (sceneState.cur.builtin) { if (down.shift) launchFromCamera(e.clientX, e.clientY); else shootRay(e.clientX, e.clientY); }
+    else if (sceneState.inst && sceneState.inst.onClick) {
+      const ndcX = e.clientX / innerWidth * 2 - 1, ndcY = 1 - e.clientY / innerHeight * 2;
+      const dir = new V3(ndcX, ndcY, 0.5).unproject(camera).sub(camera.position).normalize();
+      try { sceneState.inst.onClick({ x: e.clientX, y: e.clientY, ndcX, ndcY, dir, origin: camera.position.clone(), shift: down.shift }, sceneCtx(sceneState.cur)); } catch (err) { console.error(err); }
+    }
   }
   down = null;
 });
@@ -1698,12 +1541,29 @@ addEventListener('keydown', e => {
   typed = (typed + e.key.toLowerCase()).slice(-12);
   if (typed.endsWith('gargantua')) return gargantua();
   if (e.key === 'Escape') {
-    if ($('help').classList.contains('on')) $('help').classList.remove('on');
+    if ($('catalog').classList.contains('on')) closeCatalog();
+    else if ($('help').classList.contains('on')) $('help').classList.remove('on');
     else if (state.tour) endTour();
     return;
   }
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const k = e.key.toLowerCase();
+  const cur = sceneState.cur;
+  const global = {
+    u: () => $('catalog').classList.contains('on') ? closeCatalog() : openCatalog(),
+    '[': () => stepScene(-1), ']': () => stepScene(1),
+    k: () => { P.sky = (P.sky + 1) % 3; syncUI(); },
+    h: () => { state.hidden = !state.hidden; $('ui').classList.toggle('hidden', state.hidden); },
+    s: () => state.shot = true, m: toggleMute,
+    f: () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(),
+    '?': () => $('help').classList.toggle('on'), '/': () => $('help').classList.toggle('on'),
+  }[k];
+  if (global) { e.preventDefault(); return global(); }
+  if (!cur.builtin) {
+    const a = (cur.actions || []).find(a => a.key && a.key.toLowerCase() === k);
+    if (a) { e.preventDefault(); a.run(sceneCtx(cur)); syncUI(); }
+    return;
+  }
   const act = {
     ' ': () => launchProbe(),
     t: runTour, p: startPlunge,
@@ -1782,6 +1642,215 @@ function updateHUD() {
 }
 
 /* ------------------------------------------------------------------ */
+/* Scene catalog                                                        */
+/* Scenes live in js/scenes/*.js (see js/scenes/CONTRACT.md). The black  */
+/* hole above is the one built-in scene.                                */
+/* ------------------------------------------------------------------ */
+const CATEGORIES = [
+  ['compact', 'Vật thể đặc & dị thường'], ['stars', 'Sao'], ['planets', 'Hành tinh'],
+  ['small', 'Thiên thể nhỏ'], ['galaxies', 'Thiên hà'], ['nebulae', 'Tinh vân'],
+];
+const BLACKHOLE_SCENE = {
+  id: 'blackhole', builtin: true, name: 'Hố đen', category: 'compact', order: 0,
+  subtitle: 'Schwarzschild · ray-tracing trắc địa null', swatch: ['#ffcf8a', '#000000'],
+  orbCss: 'radial-gradient(circle, #000 0 30%, #fff1d6 33%, #ffae5c 40%, #6a2a08 56%, transparent 70%)',
+};
+const scenes = [BLACKHOLE_SCENE];
+const sceneState = { cur: BLACKHOLE_SCENE, inst: null, params: {}, instances: {}, loadErrors: [], switching: false };
+const timeInfo = { sim: 0, wall: 0, dt: 0 };
+const sceneAudio = {
+  ping: (f, g, p) => audio.ping(f, g, p), click: (g, p, b) => audio.click(g, p, b),
+  tone: (f, d, g, p, t) => audio.tone(f, d, g, p, t), ringdown: () => audio.ringdown(),
+  get started() { return !!audio.ctx; },
+};
+function sceneCtx(def) {
+  if (sceneState.ctxFor === def) return sceneState.ctx;
+  sceneState.ctxFor = def;
+  return sceneState.ctx = {
+    THREE, shared, camera, controls, renderer, overlayScene, bbTexture: bbTex, bbColor: bbJS, bhUniforms, bhGlobals: P,
+    quality, params: sceneState.params[def.id], audio: sceneAudio, toast, fmt, time: timeInfo, scene: def, syncUI,
+  };
+}
+async function loadScenes() {
+  let modules = [];
+  try { modules = (await import('./js/scenes/manifest.js')).MODULES; } catch (e) { console.error('manifest', e); }
+  // one retry with a cache-busting query: a busy static server occasionally drops a module request
+  const load = m => import('./js/scenes/' + m).catch(e => /Failed to fetch dynamically imported module/.test(String(e && e.message))
+    ? new Promise(r => setTimeout(r, 400)).then(() => import('./js/scenes/' + m + '?retry=' + Date.now())) : Promise.reject(e));
+  const res = await Promise.allSettled(modules.map(load));
+  res.forEach((r, i) => {
+    if (r.status !== 'fulfilled') {
+      const msg = String(r.reason && r.reason.message || r.reason);
+      console.warn(`[scenes] ${modules[i]} not loaded:`, r.reason);
+      // a module that simply doesn't exist yet is not an error; a broken one is
+      if (!/Failed to fetch dynamically imported module/.test(msg)) sceneState.loadErrors.push(`${modules[i]}: ${msg}`);
+      return;
+    }
+    for (const def of [].concat(r.value.default || [])) {
+      if (!def || !def.id || scenes.some(s => s.id === def.id)) continue;
+      def.order ??= 100 + scenes.length;
+      scenes.push(def);
+      sceneState.params[def.id] = Object.fromEntries((def.params || []).map(p => [p.key, p.default]));
+    }
+  });
+  const ci = id => CATEGORIES.findIndex(c => c[0] === id);
+  scenes.sort((a, b) => ci(a.category) - ci(b.category) || a.order - b.order);
+  buildCatalog();
+}
+
+/* ---------- catalog overlay ---------- */
+function buildCatalog() {
+  const box = $('catGroups'); box.innerHTML = '';
+  for (const [cid, cname] of CATEGORIES) {
+    const list = scenes.filter(s => s.category === cid);
+    if (!list.length) continue;
+    const g = document.createElement('div'); g.className = 'group';
+    g.innerHTML = `<h4>${cname}</h4><div class="cards"></div>`;
+    for (const s of list) {
+      const c = document.createElement('button'); c.className = 'ccard'; c.dataset.id = s.id;
+      const [c0, c1] = s.swatch || ['#ffffff', '#333333'];
+      const bg = s.orbCss || `radial-gradient(circle at 35% 35%, ${c0}, ${c1} 75%)`;
+      c.innerHTML = `<div class="orb" style="background:${bg};--glow:${c0}55"></div><div class="nm">${s.name}</div><div class="st">${s.subtitle || ''}</div>`;
+      c.onclick = () => { closeCatalog(); switchScene(s.id); };
+      g.querySelector('.cards').appendChild(c);
+    }
+    box.appendChild(g);
+  }
+}
+function openCatalog() {
+  document.querySelectorAll('.ccard').forEach(c => c.classList.toggle('cur', c.dataset.id === sceneState.cur.id));
+  $('catalog').classList.add('on');
+}
+function closeCatalog() { $('catalog').classList.remove('on'); }
+$('catClose').onclick = closeCatalog;
+$('bCatalog').onclick = () => $('catalog').classList.contains('on') ? closeCatalog() : openCatalog();
+function stepScene(dir) {
+  const i = scenes.indexOf(sceneState.cur);
+  switchScene(scenes[(i + dir + scenes.length) % scenes.length].id);
+}
+
+/* ---------- per-scene chrome: params panel, info card, dock actions ---------- */
+function rebuildScenePanel() {
+  const def = sceneState.cur, box = $('sceneSection');
+  box.innerHTML = '';
+  syncers.length = 0; syncers.push(...globalSyncers);
+  document.querySelectorAll('#panel details[data-scope="bh"]').forEach(d => d.style.display = (def.builtin || def.usesBH) ? '' : 'none');
+  if (def.builtin || !(def.params || []).length) return;
+  const o = sceneState.params[def.id];
+  const sec = uiSection(box, def.name, true);
+  const call = (p) => (v) => { p.onChange?.(v, sceneCtx(def)); sceneState.inst?.onParam?.(p.key, v, sceneCtx(def)); };
+  for (const p of def.params) {
+    if (p.type === 'toggle') uiToggle(sec, p.label, p.key, call(p), p.note, o);
+    else if (p.type === 'seg') uiSeg(sec, p.label, p.key, p.options, call(p), p.note, o);
+    else uiRange(sec, p.label, p.key, p.min, p.max, p.step ?? (p.max - p.min) / 100, p.fmt || (v => +(+v).toFixed(3) + ''), p.note, call(p), o);
+  }
+}
+// syncers of the global panel controls, registered once at boot and kept across scene rebuilds
+let globalSyncers = [];
+function updateSceneChrome() {
+  const def = sceneState.cur, other = !def.builtin;
+  $('ui').classList.toggle('scene-other', other);
+  $('massName').textContent = other ? `${def.name}` : MASSES[P.massIndex].name;
+  $('brandSub').textContent = other ? 'Danh mục vũ trụ · dựng lại từ vật lý thật · U để chọn nơi khác' : 'Hố đen Schwarzschild · ray-tracing trắc địa null trên GPU';
+  const acts = $('sceneActions'); acts.innerHTML = '';
+  for (const a of (other && def.actions) || []) {
+    const b = document.createElement('button');
+    b.innerHTML = `<span class="lbl">${a.label}</span>${a.key ? `<kbd>${a.key.toUpperCase()}</kbd>` : ''}`;
+    if (!a.key) b.querySelector('.lbl').style.display = 'inline';
+    b.title = a.title || a.label;
+    b.onclick = () => { a.run(sceneCtx(def)); syncUI(); };
+    acts.appendChild(b);
+  }
+  if (!other) return;
+  const catName = (CATEGORIES.find(c => c[0] === def.category) || [, ''])[1];
+  $('icCat').textContent = catName;
+  $('icName').textContent = def.name;
+  $('icSub').innerHTML = def.subtitle || '';
+  $('icBlurb').innerHTML = def.blurb || '';
+  $('icFacts').innerHTML = (def.facts || []).map(([k, v]) => `<div class="trow"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
+}
+function updateInfoLive() {
+  const def = sceneState.cur, inst = sceneState.inst;
+  const tgt = controls.target, d = camera.position.distanceTo(tgt);
+  const rows = def.unitKm ? [['Khoảng cách tới tâm', `${d.toFixed(2)} · ${fmt.dist(d * def.unitKm * 1000)}`]] : [];
+  try { if (inst && inst.hud) rows.push(...inst.hud(sceneCtx(def))); } catch (e) { console.error(e); }
+  $('icLive').innerHTML = rows.map(([k, v]) => `<div class="trow"><span class="k">${k}</span><span class="v hot">${v}</span></div>`).join('');
+}
+
+/* ---------- switching ---------- */
+function placeCamera(def, scale = 1) {
+  const c = def.camera || {};
+  const tgt = new V3().fromArray(c.target || [0, 0, 0]);
+  const off = new V3().setFromSphericalCoords((c.distance ?? 26) * scale, THREE.MathUtils.degToRad(c.polar ?? 80), THREE.MathUtils.degToRad(c.azimuth ?? 25));
+  return { pos: tgt.clone().add(off), tgt };
+}
+function flyCamera(toPos, toTgt, dur) {
+  const fromPos = camera.position.clone(), fromTgt = controls.target.clone(), t0 = performance.now();
+  return new Promise(res => {
+    const step = () => {
+      const k = Math.min(1, (performance.now() - t0) / (dur * 1000)), e = 1 - Math.pow(1 - k, 3);
+      camera.position.lerpVectors(fromPos, toPos, e); controls.target.lerpVectors(fromTgt, toTgt, e);
+      camera.lookAt(controls.target);
+      if (k < 1) requestAnimationFrame(step); else res();
+    };
+    step();
+  });
+}
+async function switchScene(id, opts = {}) {
+  const def = scenes.find(s => s.id === id);
+  if (!def || (def === sceneState.cur && !opts.force) || sceneState.switching) return;
+  if (state.plunge || state.tour) return toast('Hãy kết thúc hành trình / cú rơi hiện tại trước.');
+  sceneState.switching = true; sceneState.switchingError = false;
+  const instant = !!opts.instant;
+  if (!instant) { audio.whoosh(); $('warp').classList.add('on'); await fadeTo(1, 650); }
+  const old = sceneState.cur;
+  if (old.builtin) { clearAll(); P.splitOn = false; updateSplit(); }
+  else if (sceneState.inst) { if (sceneState.inst.overlay) overlayScene.remove(sceneState.inst.overlay); try { sceneState.inst.exit?.(sceneCtx(old)); } catch (e) { console.error(e); } }
+  sceneState.cur = def;
+  let ok = true;
+  if (def.builtin) {
+    sceneState.inst = null; bhMesh.material = bhMat; flamm.visible = P.showFlamm;
+    controls.minDistance = 1.12; controls.maxDistance = 320; P.fov = 62; P.exposure = 1; P.bloom = 0.6;
+  } else {
+    try {
+      let inst = sceneState.instances[id];
+      if (!inst) inst = sceneState.instances[id] = def.create(sceneCtx(def));
+      sceneState.inst = inst; bhMesh.material = inst.material;
+      if (inst.overlay) overlayScene.add(inst.overlay);
+      const c = def.camera || {};
+      controls.minDistance = c.min ?? 1.2; controls.maxDistance = c.max ?? 200;
+      P.fov = c.fov ?? 50; P.exposure = def.exposure ?? 1; P.bloom = def.bloom ?? 0.6;
+      flamm.visible = false;
+      inst.enter?.(sceneCtx(def));
+    } catch (e) {
+      console.error(`[scene ${id}]`, e); ok = false;
+      sceneState.loadErrors.push(`${id}: ${e.message}`);
+    }
+  }
+  if (!ok) { sceneState.switching = false; sceneState.cur = old; toast(`Không mở được “${def.name}”.`); await fadeTo(0, 400); $('warp').classList.remove('on'); return switchScene(old.builtin ? 'blackhole' : old.id, { instant: true, force: true }); }
+  camera.up.set(0, 1, 0);
+  const fin = placeCamera(def), start = instant ? fin : placeCamera(def, 2.4);
+  camera.position.copy(start.pos); controls.target.copy(start.tgt); camera.lookAt(controls.target);
+  camera.fov = P.fov; camera.updateProjectionMatrix();
+  rebuildScenePanel(); updateSceneChrome(); syncUI();
+  try { await renderer.compileAsync(bhScene, ortho); } catch (e) { /* compiled on first render instead */ }
+  if (!opts.keepHash) history.replaceState(null, '', '#' + def.id);
+  state.lastInteract = performance.now();
+  if (!instant) {
+    $('warp').classList.remove('on'); fadeTo(0, 900);
+    controls.enabled = false;
+    await flyCamera(fin.pos, fin.tgt, 2.6);
+  }
+  controls.enabled = state.started;
+  sceneState.switching = false;
+  if (!instant && def.intro) toast(def.intro, 7000);
+}
+function fadeTo(v, ms) {
+  const from = state.fade, t0 = performance.now();
+  return new Promise(res => { const st = () => { const k = Math.min(1, (performance.now() - t0) / ms); state.fade = from + (v - from) * k; if (k < 1) requestAnimationFrame(st); else res(); }; st(); });
+}
+
+/* ------------------------------------------------------------------ */
 /* Main loop                                                            */
 /* ------------------------------------------------------------------ */
 let last = performance.now(), hudTimer = 0, perfAcc = 0, perfN = 0, perfTimer = 0, fpsShown = 0;
@@ -1790,6 +1859,8 @@ function frame(now) {
   requestAnimationFrame(frame);
   const rawDt = (now - last) / 1000, dt = Math.min(0.05, rawDt); last = now;
   state.simTime += dt * P.timeScale;
+  const def = sceneState.cur, isBH = !!def.builtin;
+  timeInfo.sim = state.simTime; timeInfo.wall = now / 1000; timeInfo.dt = dt;
 
   // camera
   if (state.plunge) updatePlunge(dt);
@@ -1809,7 +1880,10 @@ function frame(now) {
   const rc = camera.position.length();
 
   // clocks & signal ratio
-  if (state.plunge) {
+  if (!isBH) {
+    state.dil = 1; state.signal = 1;
+    audio.setRatio(1); audio.setProximity(60);
+  } else if (state.plunge) {
     const pl = state.plunge, ut = pl.E / Math.max(1 - 1 / rc, 1e-6);
     state.dil = 1 / ut;
     const b = pl.vLocal || 0, gam = 1 / Math.sqrt(1 - b * b);
@@ -1818,9 +1892,11 @@ function frame(now) {
     state.dil = Math.sqrt(Math.max(1 - 1 / rc, 1e-9));
     state.signal = 1 / state.dil;
   }
-  if (state.started) { state.youClock += dt; state.earthClock += dt / Math.max(state.dil, 1e-9); }
-  audio.setRatio(P.relAudio ? state.signal : 1);
-  audio.setProximity(rc);
+  if (isBH) {
+    if (state.started) { state.youClock += dt; state.earthClock += dt / Math.max(state.dil, 1e-9); }
+    audio.setRatio(P.relAudio ? state.signal : 1);
+    audio.setProximity(rc);
+  }
 
   // probes
   const dtCoord = dt * P.timeScale;
@@ -1848,7 +1924,7 @@ function frame(now) {
   U.uCamRight.value.set(e[0], e[1], e[2]); U.uCamUp.value.set(e[4], e[5], e[6]); U.uCamFwd.value.set(-e[8], -e[9], -e[10]);
   U.uTanHalfFov.value = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
   U.uObsBeta.value.copy(state.obsBeta);
-  U.uTime.value = state.simTime;
+  U.uTime.value = state.simTime; U.uWall.value = now / 1000;
   U.uSplit.value = P.splitOn ? P.split : 0;
   U.uLensing.value = P.lensing ? 1 : 0;
   U.uDiskOn.value = P.disk ? 1 : 0; U.uDiskOut.value = P.diskOuter; U.uDiskTmax.value = P.diskTmax;
@@ -1872,6 +1948,11 @@ function frame(now) {
     const away = THREE.MathUtils.smoothstep(camera.position.distanceTo(ry.origin), 0.3, 0.6 + 0.25 * ry.origin.length());
     ry.mesh.material.uniforms.uOpacity.value = away * (age < 40 ? 1 : Math.max(0, 1 - (age - 40) / 5));
     if (age > 45) { overlayScene.remove(ry.mesh); ry.mesh.geometry.dispose(); ry.mesh.material.dispose(); rays.splice(i, 1); }
+  }
+
+  if (!isBH && sceneState.inst && !sceneState.switchingError) {
+    try { sceneState.inst.update?.(dt, sceneCtx(def)); }
+    catch (err) { sceneState.switchingError = true; console.error(`[scene ${def.id}] update`, err); sceneState.loadErrors.push(`${def.id} update: ${err.message}`); }
   }
 
   finalPass.uniforms.uExposure.value = P.exposure;
@@ -1903,7 +1984,7 @@ function frame(now) {
   }
   hudTimer += dt;
   if (hudTimer > 0.1 && state.started) {
-    hudTimer = 0; updateHUD();
+    hudTimer = 0; if (isBH) updateHUD(); else { updateInfoLive(); syncUI(); }
     $('fps').textContent = `${Math.round(fpsShown)} fps · ${Math.round(resScale * 100)}% res`;
   }
 }
@@ -1911,11 +1992,27 @@ function frame(now) {
 /* ------------------------------------------------------------------ */
 /* Boot                                                                 */
 /* ------------------------------------------------------------------ */
+// Shader compile errors are collected so scene authors (and the snapshot tool) can see them.
+const shaderErrors = [];
+renderer.debug.onShaderError = (gl, program, vs, fs) => {
+  const log = [gl.getProgramInfoLog(program), gl.getShaderInfoLog(vs), gl.getShaderInfoLog(fs)].filter(Boolean).join('\n').trim();
+  const src = (gl.getShaderSource(fs) || '').split('\n');
+  // attach the offending source lines so the error can be located
+  const ctxLines = [];
+  for (const m of log.matchAll(/ERROR: \d+:(\d+)/g)) { const n = +m[1]; ctxLines.push(`${n}: ${src[n - 1] || ''}`); }
+  shaderErrors.push(log + (ctxLines.length ? '\n--- source ---\n' + ctxLines.join('\n') : ''));
+  console.error('[shader]', log);
+};
+const query = new URLSearchParams(location.search);
+const SNAP = query.has('snap');
+
 buildPanel();
+globalSyncers = syncers.slice();
 $('massName').textContent = MASSES[P.massIndex].name;
 resize();
 camera.lookAt(0, 0, 0);
 requestAnimationFrame(frame);
+const scenesReady = loadScenes();
 requestAnimationFrame(() => requestAnimationFrame(() => {
   const b = $('enterBtn'); b.disabled = false; b.textContent = 'Bước vào chân trời';
 }));
@@ -1923,13 +2020,90 @@ $('enterBtn').addEventListener('click', async () => {
   audio.start();
   $('intro').classList.add('gone');
   state.started = true; state.lastInteract = performance.now();
+  await scenesReady;
+  const deep = (location.hash || '').slice(1);
+  if (deep && deep !== 'blackhole' && scenes.some(s => s.id === deep)) {
+    $('ui').classList.add('on');
+    return switchScene(deep, { keepHash: true });
+  }
   await tweenCamera({ r: 26, pol: 83.5, az: 25 }, 10);
   controls.enabled = true;
   $('ui').classList.add('on');
   toast('Kéo để xoay · cuộn để lại gần · <b>click</b> vào bất kỳ đâu để xem đường đi của photon tạo nên điểm ảnh đó. Nhấn <b>T</b> để bắt đầu hành trình.', 8000);
-  setTimeout(() => toast(massFact(), 6000), 8800);
+  setTimeout(() => toast(`Còn cả một vũ trụ ngoài kia — nhấn <b>U</b> để mở <b>Danh mục vũ trụ</b>.`, 7000), 9000);
 });
-window.__bh = { P, state, camera, probes, launchProbe, shootRay, startPlunge, runTour };
+
+/* ---------- snapshot mode for the headless checker (tools/snap.sh) ----------
+   ?snap=1&scene=<id>[&cam=dist,polar,azimuth][&t=simTime][&params=k:v,k:v][&ui=0][&q=low|med|high] */
+if (SNAP) (async () => {
+  window.addEventListener('error', e => sceneState.loadErrors.push('js: ' + e.message));
+  window.addEventListener('unhandledrejection', e => sceneState.loadErrors.push('promise: ' + (e.reason && e.reason.message || e.reason)));
+  $('intro').style.display = 'none';
+  P.autoQuality = false; P.autoRotate = false;
+  if (query.get('q')) setQuality(query.get('q'));
+  state.started = true;
+  $('ui').style.transition = 'none';
+  $('ui').classList.add('on');
+  if (query.get('ui') === '0') $('ui').style.display = 'none';
+  $('toasts').style.display = 'none';
+  await scenesReady;
+  const id = query.get('scene') || 'blackhole';
+  const params = sceneState.params[id];
+  for (const kv of (query.get('params') || '').split(',').filter(Boolean)) {
+    const [k, v] = kv.split(':');
+    if (params && k in params) params[k] = v === 'true' ? true : v === 'false' ? false : isNaN(+v) ? v : +v;
+    else if (k in P) P[k] = isNaN(+v) ? v : +v;
+  }
+  if (query.get('t')) state.simTime = +query.get('t');
+  if (id !== 'blackhole') await switchScene(id, { instant: true, force: true });
+  if (!scenes.some(s => s.id === id)) sceneState.loadErrors.push(`scene "${id}" not found (loaded: ${scenes.map(s => s.id).join(', ')})`);
+  if (query.get('cam')) {
+    const [d, pol, az] = query.get('cam').split(',').map(Number);
+    camera.position.copy(controls.target).add(new V3().setFromSphericalCoords(d, THREE.MathUtils.degToRad(pol), THREE.MathUtils.degToRad(az)));
+    camera.lookAt(controls.target);
+  }
+  syncUI();
+  controls.enabled = true; controls.update();
+  renderer.compile(bhScene, ortho); renderer.compile(overlayScene, camera);  // surfaces shader errors now
+  for (let i = 0; i < 4; i++) await new Promise(r => setTimeout(r, 250));
+  // ?cycle=1: visit every scene in one page load (catches enter/exit/update errors between scenes)
+  let visited = null;
+  if (query.get('cycle')) {
+    visited = [];
+    for (const s of [...scenes, scenes[0]]) {
+      await switchScene(s.id, { instant: true, force: true });
+      for (let i = 0; i < 3; i++) { timeInfo.dt = 0.016; try { sceneState.inst?.update?.(0.016, sceneCtx(s)); } catch (e) { sceneState.loadErrors.push(`${s.id} update: ${e.message}`); } renderer.setRenderTarget(rtBH); renderer.render(bhScene, ortho); renderer.setRenderTarget(null); composer.render(); }
+      visited.push(s.id);
+    }
+  }
+  // ?bench=N: render N frames back to back, synchronising with the GPU, and report ms per frame
+  let benchMs = null;
+  if (query.get('bench')) {
+    const n = +query.get('bench') || 30, gl = renderer.getContext(), px = new Uint8Array(4);
+    const one = () => { renderer.setRenderTarget(rtBH); renderer.render(bhScene, ortho); renderer.setRenderTarget(null); composer.render(); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); };
+    for (let i = 0; i < 3; i++) one();
+    // GPU timer query: independent of the (possibly virtualised) JS clock
+    const ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
+    if (ext) {
+      const q = gl.createQuery();
+      gl.beginQuery(ext.TIME_ELAPSED_EXT, q);
+      for (let i = 0; i < n; i++) one();
+      gl.endQuery(ext.TIME_ELAPSED_EXT);
+      for (let i = 0; i < 200 && !gl.getQueryParameter(q, gl.QUERY_RESULT_AVAILABLE); i++) await new Promise(r => setTimeout(r, 50));
+      benchMs = gl.getParameter(ext.GPU_DISJOINT_EXT) ? -1 : +(gl.getQueryParameter(q, gl.QUERY_RESULT) / 1e6 / n).toFixed(2);
+    } else {
+      const t0 = performance.now();
+      for (let i = 0; i < n; i++) one();
+      benchMs = +((performance.now() - t0) / n).toFixed(2);
+    }
+  }
+  const errs = [...sceneState.loadErrors, ...shaderErrors];
+  const out = $('snap');
+  out.textContent = JSON.stringify({ ok: errs.length === 0, scene: sceneState.cur.id, errors: errs, visited, benchMs, res: [rtBH.width, rtBH.height], hud: (sceneState.inst && sceneState.inst.hud) ? sceneState.inst.hud(sceneCtx(sceneState.cur)) : null });
+  out.classList.toggle('err', errs.length > 0);
+  window.__snapDone = true;
+})();
+window.__bh = { P, state, camera, probes, launchProbe, shootRay, startPlunge, runTour, switchScene, scenes, sceneState };
 </script>
 </body>
 </html>
