@@ -98,6 +98,19 @@ input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;bac
 .btnrow button{flex:1;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:8px;padding:8px;font-size:11.5px;cursor:pointer}
 .btnrow button:hover{background:rgba(255,255,255,.12)}
 
+/* photon orbital-plane card */
+#rayCard{position:absolute;right:20px;bottom:22px;width:290px;padding:10px 12px 12px;display:none}
+#ui.raycard #rayCard{display:block}
+#ui.raycard #panel{max-height:max(180px,calc(100vh - 560px))}
+#rayCard .hd{display:flex;justify-content:space-between;align-items:center;font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--dim)}
+#rayCard .hd button{background:none;border:0;font-size:18px;line-height:1;cursor:pointer;color:var(--dim);padding:0 2px}
+#rayCv{display:block;width:100%;aspect-ratio:1;margin-top:8px;border-radius:10px;background:radial-gradient(circle,rgba(255,255,255,.03),transparent 70%)}
+#rayCard .legend{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:10px;color:var(--dim);margin-top:8px}
+#rayCard .legend i{display:inline-block;width:8px;height:2px;margin-right:5px;vertical-align:middle}
+#rayInfo{font-size:11.5px;line-height:1.5;margin-top:8px}
+#rayInfo b{color:var(--amber);font-weight:500}
+#rayCard .hint3d{font-size:10.5px;color:var(--dim);margin-top:6px;font-style:italic}
+
 /* caption + letterbox */
 .lb{position:fixed;left:0;right:0;height:0;background:#000;z-index:5;transition:height 1.4s cubic-bezier(.6,0,.2,1);pointer-events:none}
 .lb.top{top:0}.lb.bot{bottom:0}
@@ -170,6 +183,8 @@ body.cine #skipTour{display:block}
   #panel{top:58px;right:12px;left:12px;width:auto;max-height:calc(100vh - 330px)}
   #brand{left:16px;top:16px}
   #brand .sub{display:none}
+  #rayCard{top:58px;bottom:auto;right:12px;width:200px}
+  #rayCard .legend{display:none}
 }
 </style>
 <script type="importmap">
@@ -223,6 +238,14 @@ body.cine #skipTour{display:block}
 
   <button id="panelToggle" class="glass">⚙ Điều khiển</button>
   <aside id="panel" class="glass panel"></aside>
+
+  <aside id="rayCard" class="glass">
+    <div class="hd"><span>Mặt phẳng quỹ đạo photon</span><button id="rayClose" title="Đóng">×</button></div>
+    <canvas id="rayCv" width="520" height="520"></canvas>
+    <div class="legend"><span><i style="background:#ff5a3c"></i>chân trời</span><span><i style="background:#ffb56b"></i>mặt cầu photon</span><span><i style="background:#7fd8ff"></i>ISCO</span><span><i style="background:rgba(255,255,255,.4)"></i>đường thẳng Newton</span></div>
+    <div id="rayInfo"></div>
+    <div class="hint3d">Xoay camera ra chỗ khác để thấy đường đi này trong không gian 3D.</div>
+  </aside>
 </div>
 
 <div id="caption"></div>
@@ -674,7 +697,9 @@ bool occluded(vec3 wp){
   vec3 tp = wp - uCam; vec3 tb = -uCam; float db = length(tb);
   if (db < 1.6) return false;
   return dot(normalize(tp), tb / db) > uShadowCos && length(tp) > db - 1.0;
-}`;
+}
+// geometry behind the shadow stays faintly visible instead of vanishing
+float occlFade(vec3 wp){ return occluded(wp) ? 0.2 : 1.0; }`;
 const occl = { uCam: { value: new V3() }, uShadowCos: { value: 1 } };
 
 /* ------------------------------------------------------------------ */
@@ -788,10 +813,10 @@ const TUBE_FRAG = /* glsl */`
 ${OCCL_GLSL}
 uniform float uProg, uOpacity; uniform vec3 uColA, uColB; varying vec2 vUv; varying vec3 vW;
 void main(){
-  if (vUv.x > uProg || occluded(vW)) discard;
+  if (vUv.x > uProg) discard;
   float head = exp(-pow((uProg - vUv.x) * 60.0, 2.0));
-  vec3 c = mix(uColA, uColB, vUv.x) * (0.55 + head * 7.0);
-  gl_FragColor = vec4(c * uOpacity, 1.0);
+  vec3 c = mix(uColA, uColB, vUv.x) * (0.45 + head * 4.0);
+  gl_FragColor = vec4(c * uOpacity * occlFade(vW), 1.0);
 }`;
 
 function buildFlamm() {
@@ -879,10 +904,17 @@ const rays = [];
 function shootRay(cx, cy) {
   const { d, gr } = pixelRay(cx, cy);
   const res = tracePhoton(d, gr);
-  if (res.pts.length < 3) return;
-  const curve = new THREE.CatmullRomCurve3(res.pts, false, 'centripetal');
-  const geo = new THREE.TubeGeometry(curve, Math.min(res.pts.length * 3, 2400), 0.022 + 0.004 * Math.log(camera.position.length()), 6, false);
   const cap = res.fate === 'captured';
+  showRayDiagram(res, d, gr);
+  audio.photon(cap);
+  // Seen from its own origin the whole path collapses onto the clicked pixel, and the part next to the
+  // eye smears across the screen. Start the 3D tube some way out; orbit the camera to see it in 3D.
+  const rc = camera.position.length(), skip = Math.max(1.5, 0.12 * rc);
+  const start = res.pts.findIndex(p => p.distanceTo(res.pts[0]) > skip);
+  const pts3 = start < 0 ? [] : res.pts.slice(start);
+  if (pts3.length < 3) return;
+  const curve = new THREE.CatmullRomCurve3(pts3, false, 'centripetal');
+  const geo = new THREE.TubeGeometry(curve, Math.min(pts3.length * 3, 2400), 0.018 + 0.003 * Math.log(rc), 6, false);
   const mat = new THREE.ShaderMaterial({
     uniforms: {
       uProg: { value: 0 }, uOpacity: { value: 1 },
@@ -895,19 +927,83 @@ function shootRay(cx, cy) {
   });
   const mesh = new THREE.Mesh(geo, mat); mesh.frustumCulled = false;
   overlayScene.add(mesh);
-  rays.push({ mesh, born: performance.now() / 1000, dur: Math.min(3.2, 0.8 + res.pts.length / 260) });
+  rays.push({ mesh, origin: res.pts[0].clone(), born: performance.now() / 1000, dur: Math.min(3.2, 0.8 + pts3.length / 260) });
   if (rays.length > 10) { const o = rays.shift(); overlayScene.remove(o.mesh); o.mesh.geometry.dispose(); o.mesh.material.dispose(); }
-  audio.photon(cap);
-
-  const bTxt = res.b.toFixed(3);
-  let msg;
-  if (!gr) msg = `<b>Photon (không-thời gian phẳng)</b> — đi thẳng, ${cap ? 'chạm chân trời' : 'không bị lệch'}.`;
-  else if (cap) msg = `<b>Photon bị nuốt</b> — tham số va chạm b = ${bTxt} r<sub>s</sub> &lt; b<sub>c</sub> = 2,598 r<sub>s</sub>. Quấn ${res.orbits.toFixed(2)} vòng trước khi rơi qua chân trời.`;
-  else msg = `<b>Photon thoát ra</b> — b = ${bTxt} r<sub>s</sub>, tiếp cận gần nhất ${res.rMin.toFixed(3)} r<sub>s</sub>, bị bẻ cong ${res.defl.toFixed(1)}°, quấn ${res.orbits.toFixed(2)} vòng.`;
-  if (gr && res.crossings > 0) msg += ` Đi xuyên mặt phẳng đĩa ${res.crossings} lần${res.crossings > 1 ? ' — đây là ảnh bậc cao của đĩa' : ''}.`;
-  if (gr && Math.abs(res.b - B_CRIT) < 0.02) msg += ' <b>Sát ngưỡng tới hạn — photon gần như bị giam trên mặt cầu photon!</b>';
-  toast(msg + `<div class="mono">đường đi được tích phân lại bằng cùng phương trình với shader</div>`, 7000);
 }
+
+/* ---------- exact 2D diagram of the photon's orbital plane ---------- */
+// Schwarzschild geodesics are planar, so projecting onto the plane spanned by (x₀, d) loses nothing.
+const rayDiag = { res: null, t0: 0, dur: 1 };
+function showRayDiagram(res, d, gr) {
+  const x0 = res.pts[0], e1 = x0.clone().normalize();
+  let e2 = d.clone().addScaledVector(e1, -d.dot(e1));
+  if (e2.lengthSq() < 1e-8) e2 = new V3(0, 1, 0).cross(e1);
+  if (e2.lengthSq() < 1e-8) e2 = new V3(1, 0, 0);
+  e2.normalize();
+  const rc = x0.length();
+  const R = Math.min(Math.max(4, res.rMin * 3.2, gr ? 0 : 4), rc * 1.12);
+  Object.assign(rayDiag, { res, d: d.clone(), gr, e1, e2, R, rc, t0: performance.now(), dur: 1400 + Math.min(1600, res.pts.length * 2) });
+  const cap = res.fate === 'captured', bTxt = res.b.toFixed(3);
+  let msg;
+  if (!gr) msg = `<b>Không-thời gian phẳng</b> — photon đi thẳng, ${cap ? 'chạm chân trời' : 'không bị lệch'}.`;
+  else if (cap) msg = `<b>Bị nuốt</b> · b = ${bTxt} r<sub>s</sub> &lt; b<sub>c</sub> = 2,598 · quấn ${res.orbits.toFixed(2)} vòng rồi rơi qua chân trời.`;
+  else msg = `<b>Thoát ra</b> · b = ${bTxt} r<sub>s</sub> · gần nhất ${res.rMin.toFixed(3)} r<sub>s</sub> · lệch ${res.defl.toFixed(1)}° · quấn ${res.orbits.toFixed(2)} vòng.`;
+  if (gr && res.crossings > 0) msg += ` Xuyên mặt phẳng đĩa ${res.crossings} lần${res.crossings > 1 ? ' (ảnh bậc cao của đĩa)' : ''}.`;
+  if (gr && Math.abs(res.b - B_CRIT) < 0.02) msg += ' <b>Sát ngưỡng tới hạn — gần như bị giam trên mặt cầu photon!</b>';
+  $('rayInfo').innerHTML = msg;
+  $('ui').classList.add('raycard');
+  if (!rayDiag.anim) { rayDiag.anim = true; requestAnimationFrame(drawRayDiagram); }
+}
+function drawRayDiagram() {
+  const D = rayDiag, cv = $('rayCv'), c = cv.getContext('2d');
+  if (!D.res || !$('ui').classList.contains('raycard')) { D.anim = false; return; }
+  const W = cv.width, H = cv.height, S = W / 2 / D.R, cx = W / 2, cy = H / 2;
+  const P2 = p => [cx + p.dot(D.e1) * S, cy - p.dot(D.e2) * S];
+  const prog = Math.min(1, (performance.now() - D.t0) / D.dur);
+  c.clearRect(0, 0, W, H);
+  c.save(); c.beginPath(); c.rect(0, 0, W, H); c.clip();
+  c.lineWidth = 1;
+  for (let r = 1; r <= D.R * 1.5; r += r < 4 ? 1 : 2) { c.strokeStyle = 'rgba(255,255,255,.05)'; c.beginPath(); c.arc(cx, cy, r * S, 0, Math.PI * 2); c.stroke(); }
+  // accretion disk: where the disk plane (y = 0) cuts the orbital plane
+  if (P.disk) {
+    const nrm = new V3().crossVectors(D.e1, D.e2), u = new V3().crossVectors(nrm, new V3(0, 1, 0));
+    c.strokeStyle = 'rgba(255,170,90,.55)';
+    if (u.lengthSq() < 1e-6) {
+      c.lineWidth = (P.diskOuter - 3) * S; c.beginPath(); c.arc(cx, cy, (3 + P.diskOuter) / 2 * S, 0, Math.PI * 2); c.globalAlpha = 0.18; c.stroke(); c.globalAlpha = 1;
+    } else {
+      u.normalize(); c.lineWidth = 5; c.lineCap = 'round';
+      for (const sgn of [1, -1]) { const a = P2(u.clone().multiplyScalar(3 * sgn)), b = P2(u.clone().multiplyScalar(P.diskOuter * sgn)); c.beginPath(); c.moveTo(...a); c.lineTo(...b); c.stroke(); }
+    }
+  }
+  c.lineWidth = 1.2; c.setLineDash([4, 4]);
+  c.strokeStyle = 'rgba(127,216,255,.45)'; c.beginPath(); c.arc(cx, cy, 3 * S, 0, Math.PI * 2); c.stroke();
+  c.strokeStyle = 'rgba(255,181,107,.8)'; c.beginPath(); c.arc(cx, cy, 1.5 * S, 0, Math.PI * 2); c.stroke();
+  c.setLineDash([]);
+  c.fillStyle = '#000'; c.strokeStyle = 'rgba(255,90,60,.9)'; c.lineWidth = 1.5; c.beginPath(); c.arc(cx, cy, S, 0, Math.PI * 2); c.fill(); c.stroke();
+  // straight line a photon would follow in flat space, for comparison
+  const x0 = D.res.pts[0];
+  if (D.gr) {
+    const a = P2(x0), b = P2(x0.clone().addScaledVector(D.d, D.rc + D.R * 2));
+    c.strokeStyle = 'rgba(255,255,255,.28)'; c.setLineDash([2, 5]); c.lineWidth = 1; c.beginPath(); c.moveTo(...a); c.lineTo(...b); c.stroke(); c.setLineDash([]);
+  }
+  // photon path, revealed progressively
+  const pts = D.res.pts, n = Math.max(2, Math.floor(pts.length * prog));
+  const cap = D.res.fate === 'captured';
+  const grd = c.createLinearGradient(...P2(pts[0]), ...P2(pts[n - 1]));
+  grd.addColorStop(0, cap ? '#fff3dc' : '#eaf6ff'); grd.addColorStop(1, cap ? '#ff6a2a' : '#5aa8ff');
+  c.strokeStyle = grd; c.lineWidth = 2; c.shadowColor = cap ? '#ff8a40' : '#6ab8ff'; c.shadowBlur = 8;
+  c.beginPath(); c.moveTo(...P2(pts[0])); for (let i = 1; i < n; i++) c.lineTo(...P2(pts[i])); c.stroke();
+  c.shadowBlur = 0;
+  const hp = P2(pts[n - 1]); c.fillStyle = '#fff'; c.beginPath(); c.arc(hp[0], hp[1], 3, 0, Math.PI * 2); c.fill();
+  // observer, or an arrow pointing to them when off-scale
+  const [ex, ey] = P2(x0);
+  c.font = '500 18px "JetBrains Mono", monospace'; c.fillStyle = 'rgba(236,230,218,.85)';
+  if (ex < W - 12) { c.beginPath(); c.arc(ex, ey, 5, 0, Math.PI * 2); c.fill(); c.fillText('bạn', ex - 18, ey - 12); }
+  else { c.beginPath(); c.moveTo(W - 6, cy); c.lineTo(W - 22, cy - 9); c.lineTo(W - 22, cy + 9); c.fill(); c.textAlign = 'right'; c.fillText(`bạn · ${D.rc.toFixed(1)} rₛ`, W - 28, cy - 14); c.textAlign = 'left'; }
+  c.restore();
+  if (prog < 1) requestAnimationFrame(drawRayDiagram); else D.anim = false;
+}
+document.getElementById('rayClose').onclick = () => document.getElementById('ui').classList.remove('raycard');
 
 /* ---------- timelike geodesics (probes & you) ---------- */
 // d²x/dτ² = −M x/r³ − 3 M L² x/r⁵ with M = 1/2  (exact Schwarzschild orbits in proper time)
@@ -1772,8 +1868,10 @@ function frame(now) {
   for (let i = rays.length - 1; i >= 0; i--) {
     const ry = rays[i], age = tNow - ry.born;
     ry.mesh.material.uniforms.uProg.value = Math.min(1.02, age / ry.dur);
-    ry.mesh.material.uniforms.uOpacity.value = age < 12 ? 1 : Math.max(0, 1 - (age - 12) / 4);
-    if (age > 16) { overlayScene.remove(ry.mesh); ry.mesh.geometry.dispose(); ry.mesh.material.dispose(); rays.splice(i, 1); }
+    // the 3D path is only readable from somewhere other than where it was fired: fade it in as the camera moves away
+    const away = THREE.MathUtils.smoothstep(camera.position.distanceTo(ry.origin), 0.3, 0.6 + 0.25 * ry.origin.length());
+    ry.mesh.material.uniforms.uOpacity.value = away * (age < 40 ? 1 : Math.max(0, 1 - (age - 40) / 5));
+    if (age > 45) { overlayScene.remove(ry.mesh); ry.mesh.geometry.dispose(); ry.mesh.material.dispose(); rays.splice(i, 1); }
   }
 
   finalPass.uniforms.uExposure.value = P.exposure;
