@@ -21,6 +21,7 @@
 // photograph; orbiting reveals the cage (parallax between near and far filaments, limb brightening).
 import * as THREE from 'three';
 import { COMMON_GLSL, FULLSCREEN_VERT } from '../../glsl/common.js';
+import { t, dec, locale } from '../../i18n.js';
 
 const ASSET = f => new URL(`../../../assets/crab/${f}`, import.meta.url).href;
 const LY_PER_AS = 6500 * Math.PI / 648000;      // ly per arcsec at 6 500 ly (1″ = 0.0315 ly)
@@ -314,8 +315,8 @@ void main(){
 // helpers
 // ------------------------------------------------------------------------------------------
 const stepsFor = q => (q.steps <= 200 ? 56 : q.steps <= 320 ? 72 : q.steps <= 480 ? 88 : 104);
-const vi = (x, d = 1) => x.toFixed(d).replace('.', ',');
-const ly = (x, d = 1) => vi(x, d) + ' năm ánh sáng';
+const vi = (x, d = 1) => dec(x, d);
+const ly = (x, d = 1) => vi(x, d) + t(' năm ánh sáng', ' light-years');
 
 function loadTex(url, { mip = true } = {}) {
   return new Promise((resolve, reject) => new THREE.TextureLoader().load(url, tex => {
@@ -326,7 +327,7 @@ function loadTex(url, { mip = true } = {}) {
     tex.generateMipmaps = mip;
     tex.needsUpdate = true;
     resolve(tex);
-  }, undefined, () => reject(new Error('không tải được ' + url))));
+  }, undefined, () => reject(new Error(t('không tải được ', 'could not load ') + url))));
 }
 const retry = (fn, ...a) => fn(...a).catch(() => new Promise(r => setTimeout(r, 400)).then(() => fn(...a)));
 
@@ -421,9 +422,12 @@ function makeFlyer() {
 
 const MODES = [['hst', 'Hubble (2005)'], ['jwst', 'JWST (2023)'], ['xray', 'Tia X Chandra']];
 const MODE_TOAST = {
-  hst: 'Hubble 2005 (24 ảnh WFPC2 ghép): cam = hydro, đỏ = nitơ, hồng = lưu huỳnh, lục = oxy; quầng lam = synchrotron.',
-  jwst: 'Webb 2023 (NIRCam + MIRI, 1,6–21 µm): sợi cam-đỏ là [S III] và bụi ấm; màn sữa lam-trắng là synchrotron với các thớ từ trường.',
-  xray: 'Chandra (tia X): chỉ thấy tinh vân gió pulsar — vành xuyến, các gợn sóng và hai tia phản lực dọc trục quay.',
+  hst: () => t('Hubble 2005 (24 ảnh WFPC2 ghép): cam = hydro, đỏ = nitơ, hồng = lưu huỳnh, lục = oxy; quầng lam = synchrotron.',
+    'Hubble 2005 (mosaic of 24 WFPC2 frames): orange = hydrogen, red = nitrogen, pink = sulfur, green = oxygen; blue haze = synchrotron.'),
+  jwst: () => t('Webb 2023 (NIRCam + MIRI, 1,6–21 µm): sợi cam-đỏ là [S III] và bụi ấm; màn sữa lam-trắng là synchrotron với các thớ từ trường.',
+    'Webb 2023 (NIRCam + MIRI, 1.6–21 µm): the orange-red filaments are [S III] and warm dust; the milky blue-white haze is synchrotron, streaked along the magnetic field.'),
+  xray: () => t('Chandra (tia X): chỉ thấy tinh vân gió pulsar — vành xuyến, các gợn sóng và hai tia phản lực dọc trục quay.',
+    'Chandra (X-rays): only the pulsar wind nebula shows — the torus, the wisps and the two jets along the spin axis.'),
 };
 
 const crab = {
@@ -444,35 +448,58 @@ const crab = {
     ['Ảnh gốc', 'Hubble 2005: NASA, ESA, J. Hester & A. Loll · Webb 2023: NASA, ESA, CSA, STScI, T. Temim (CC BY 4.0) · Chandra: NASA/CXC/SAO/F. Seward et al. · sao nền: ESA/Gaia DR3'],
     ['Mô hình 3D', 'Martin, Milisavljevic & Drissen 2021, MNRAS 502, 1864'],
   ],
+  en: {
+    name: 'Supernova remnant',
+    subtitle: 'Crab Nebula (M1) · remnant of SN 1054',
+    blurb: 'In 1054, Chinese astronomers recorded a “guest star” bright enough to see in broad daylight for 23 days. Today the debris is a <b>cage of filaments</b> glowing in Hα / [S II] / [O III], expanding at ~1,500 km/s and filled with blue-white light — <b>synchrotron radiation</b> from ultra-relativistic electrons blown out by the <b>Crab Pulsar</b>, which spins 30 times a second. The view is rebuilt from real Hubble, Webb and Chandra images on the 3D model of Martin et al. (2021).',
+    intro: 'This is the view from Earth — orbit the camera to see the 3D filament cage. Switch the <b>image</b> between Hubble / Webb / X-ray, and press <b>R</b> to replay it from 1054.',
+    facts: [
+      ['Distance', '≈ 6,500 light-years (2.0 kpc)'], ['Constellation', 'Taurus'],
+      ['Size', '≈ 12 × 8 light-years (6.5′ × 4.2′ on the sky)'], ['Expansion speed', '≈ 1,500 km/s; traced back, it converges on ~1130 — the pulsar wind is accelerating the shell'],
+      ['Explosion', 'July 4, 1054'], ['Naked-eye visibility', 'by day: 23 days · by night: 653 days'],
+      ['Pulsar', 'PSR B0531+21 · period 33.7 ms (29.6 Hz)'], ['Spin-down power', '≈ 4.5×10³¹ W (~10⁵ L☉)'],
+      ['Filament mass', '≈ 7 M☉ (gas + ~0.03 M☉ of dust)'],
+      ['Source images', 'Hubble 2005: NASA, ESA, J. Hester & A. Loll · Webb 2023: NASA, ESA, CSA, STScI, T. Temim (CC BY 4.0) · Chandra: NASA/CXC/SAO/F. Seward et al. · background stars: ESA/Gaia DR3'],
+      ['3D model', 'Martin, Milisavljevic & Drissen 2021, MNRAS 502, 1864'],
+    ],
+  },
   camera: { distance: D0, polar: 90, azimuth: 0, min: 0.4, max: 90, fov: 19, target: [0, 0, 0] },
   exposure: 1.0,
   bloom: 0.15,
   params: [
     { key: 'mode', label: 'Ảnh', type: 'seg', options: MODES, default: 'hst',
       note: 'Hubble: ánh sáng khả kiến · Webb: hồng ngoại · Chandra: tia X của tinh vân gió pulsar.',
-      onChange: (v, ctx) => ctx.toast(MODE_TOAST[v], 6000) },
+      onChange: (v, ctx) => ctx.toast(MODE_TOAST[v](), 6000),
+      en: { label: 'Image', note: 'Hubble: visible light · Webb: infrared · Chandra: X-rays from the pulsar wind nebula.', options: ['Hubble (2005)', 'JWST (2023)', 'Chandra X-ray'] } },
     { key: 'year', label: 'Năm quan sát', type: 'range', min: 1060, max: 3000, step: 1, default: 2026, fmt: v => String(Math.round(v)),
-      note: 'Kích thước ∝ tuổi (giãn nở gần như tự do). Pulsar chậm dần 4,2×10⁻¹³ s mỗi giây.' },
+      note: 'Kích thước ∝ tuổi (giãn nở gần như tự do). Pulsar chậm dần 4,2×10⁻¹³ s mỗi giây.',
+      en: { label: 'Year observed', note: 'Size ∝ age (nearly free expansion). The pulsar slows by 4.2×10⁻¹³ s every second.' } },
     { key: 'fil', label: 'Sợi khí', type: 'range', min: 0, max: 2, step: 0.01, default: 1, fmt: v => '×' + v.toFixed(2),
-      note: 'Khí từ lõi ngôi sao, bị gió pulsar đẩy thành ngón Rayleigh–Taylor.' },
+      note: 'Khí từ lõi ngôi sao, bị gió pulsar đẩy thành ngón Rayleigh–Taylor.',
+      en: { label: 'Filaments', note: 'Gas from the star’s core, pushed by the pulsar wind into Rayleigh–Taylor fingers.' } },
     { key: 'synch', label: 'Synchrotron', type: 'range', min: 0, max: 2, step: 0.01, default: 1, fmt: v => '×' + v.toFixed(2),
-      note: 'Electron siêu tương đối tính xoắn quanh từ trường của pulsar.' },
+      note: 'Electron siêu tương đối tính xoắn quanh từ trường của pulsar.',
+      en: { label: 'Synchrotron', note: 'Ultra-relativistic electrons spiralling around the pulsar’s magnetic field.' } },
     { key: 'rate', label: 'Nhịp pulsar (hiển thị)', type: 'range', min: 0.25, max: 30, step: 0.25, default: 1, fmt: v => vi(v, 2) + ' Hz',
-      note: 'Thực tế 29,6 Hz — mỗi vòng quay có xung chính và xung phụ (cách 0,4 chu kỳ).' },
-    { key: 'click', label: 'Âm thanh pulsar', type: 'toggle', default: false, note: 'Mỗi xung chính một tiếng tách.' },
+      note: 'Thực tế 29,6 Hz — mỗi vòng quay có xung chính và xung phụ (cách 0,4 chu kỳ).',
+      en: { label: 'Pulsar rate (display)', note: 'Really 29.6 Hz — each rotation gives a main pulse and an interpulse (0.4 of a period later).' } },
+    { key: 'click', label: 'Âm thanh pulsar', type: 'toggle', default: false, note: 'Mỗi xung chính một tiếng tách.',
+      en: { label: 'Pulsar sound', note: 'One click per main pulse.' } },
   ],
   actions: [
-    { label: 'Tua lại từ 1054', key: 'r', run: ctx => { ctx.scene._replay = { t: 0 }; ctx.toast('Năm 1054 → nay: mảnh vỡ bay ~1 500 km/s, mỗi thế kỷ rộng thêm ~1 năm ánh sáng.'); } },
+    { label: 'Tua lại từ 1054', key: 'r', run: ctx => { ctx.scene._replay = { t: 0 }; ctx.toast(t('Năm 1054 → nay: mảnh vỡ bay ~1 500 km/s, mỗi thế kỷ rộng thêm ~1 năm ánh sáng.', '1054 → today: the debris flies out at ~1,500 km/s, growing ~1 light-year wider every century.')); },
+      en: { label: 'Replay from 1054' } },
     { label: 'Nhịp thật 30 Hz', key: 'j', run: ctx => {
       ctx.params.rate = ctx.params.rate >= 29 ? 1 : 29.6;
-      ctx.toast(ctx.params.rate > 29 ? 'Tốc độ thật: 29,6 vòng/giây. Sao neutron nặng ~1,4 M☉, đường kính ~20 km.' : 'Đã làm chậm lại để dễ quan sát.');
-    } },
-    { label: 'Nhìn từ Trái Đất', key: 'e', run: ctx => { ctx.scene._go = 'earth'; } },
+      ctx.toast(ctx.params.rate > 29 ? t('Tốc độ thật: 29,6 vòng/giây. Sao neutron nặng ~1,4 M☉, đường kính ~20 km.', 'Real speed: 29.6 rotations per second. The neutron star holds ~1.4 M☉ in a ball ~20 km across.') : t('Đã làm chậm lại để dễ quan sát.', 'Slowed down so it is easier to follow.'));
+    }, en: { label: 'Real 30 Hz rate' } },
+    { label: 'Nhìn từ Trái Đất', key: 'e', run: ctx => { ctx.scene._go = 'earth'; }, en: { label: 'View from Earth' } },
     { label: 'Cận cảnh sợi khí', key: 'c', run: ctx => {
       ctx.scene._go = 'close';
-      ctx.toast('Cận cảnh rìa phía đông: mỗi sợi dày ~0,1–0,3 năm ánh sáng, là ngón Rayleigh–Taylor khi bong bóng gió pulsar nhẹ đẩy vào lớp vỏ nặng hơn.', 7000);
-    } },
-    { label: 'Nhìn ngang', key: 'n', run: ctx => { ctx.scene._fly = [D0, 80, 90]; ctx.toast('Nhìn vuông góc với hướng Trái Đất: lồng sợi là một vỏ dày, sợi gần và xa tách nhau.'); } },
+      ctx.toast(t('Cận cảnh rìa phía đông: mỗi sợi dày ~0,1–0,3 năm ánh sáng, là ngón Rayleigh–Taylor khi bong bóng gió pulsar nhẹ đẩy vào lớp vỏ nặng hơn.', 'Close-up of the eastern edge: each filament is ~0.1–0.3 light-years thick, a Rayleigh–Taylor finger formed where the light pulsar-wind bubble pushes into the heavier shell.'), 7000);
+    }, en: { label: 'Filament close-up' } },
+    { label: 'Nhìn ngang', key: 'n', run: ctx => { ctx.scene._fly = [D0, 80, 90]; ctx.toast(t('Nhìn vuông góc với hướng Trái Đất: lồng sợi là một vỏ dày, sợi gần và xa tách nhau.', 'Seen at right angles to our line of sight: the filament cage is a thick shell, with near and far filaments pulled apart.')); },
+      en: { label: 'Side view' } },
   ],
   create(ctx) {
     const lut = makeLut(), geo = makeGeo();
@@ -603,11 +630,11 @@ const crab = {
         const P = 33.7 + 4.21e-13 * (p.year - 2026) * 3.156e7 * 1e3;          // ms
         const Edot = 4 * Math.PI ** 2 * 1e38 * 4.21e-13 / (P * 1e-3) ** 3;     // W, I = 10³⁸ kg m²
         return [
-          ['Camera cách pulsar', ly(d)],
-          ['Tuổi tàn dư', Math.round(age).toLocaleString('vi-VN') + ' năm'],
-          ['Kích thước (dài × ngắn)', vi(12.2 * age / 972) + ' × ' + ly(7.9 * age / 972)],
-          ['Chu kỳ pulsar năm ' + Math.round(p.year), vi(P, 2) + ' ms (' + vi(1000 / P, 1) + ' Hz)'],
-          ['Công suất hãm quay', vi(Edot / 1e31, 1) + '×10³¹ W'],
+          [t('Camera cách pulsar', 'Camera to pulsar'), ly(d)],
+          [t('Tuổi tàn dư', 'Remnant age'), Math.round(age).toLocaleString(locale()) + t(' năm', ' years')],
+          [t('Kích thước (dài × ngắn)', 'Size (long × short)'), vi(12.2 * age / 972) + ' × ' + ly(7.9 * age / 972)],
+          [t('Chu kỳ pulsar năm ', 'Pulsar period in ') + Math.round(p.year), vi(P, 2) + ' ms (' + vi(1000 / P, 1) + ' Hz)'],
+          [t('Công suất hãm quay', 'Spin-down power'), vi(Edot / 1e31, 1) + '×10³¹ W'],
         ];
       },
     };

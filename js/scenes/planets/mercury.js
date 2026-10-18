@@ -19,6 +19,7 @@
 // β = W − ψ, east longitude = atan2(x, z) in the body frame (as in the NASA/USGS maps).
 import * as THREE from 'three';
 import { COMMON_GLSL, FULLSCREEN_VERT } from '../../glsl/common.js';
+import { t, dec, locale } from '../../i18n.js';
 
 const D2R = Math.PI / 180;
 const RKM = 2439.4;
@@ -453,7 +454,7 @@ function decodeImage(url) {
       g.drawImage(img, 0, 0);
       resolve({ W, H, px: g.getImageData(0, 0, W, H).data });
     };
-    img.onerror = () => reject(new Error(`không tải được ${url}`));
+    img.onerror = () => reject(new Error(t(`không tải được ${url}`, `failed to load ${url}`)));
     img.src = url;
   });
 }
@@ -513,7 +514,7 @@ function loadImageTex(url, { srgb = false, red = false, aniso = 1 }) {
     tex.generateMipmaps = true; tex.anisotropy = aniso;
     tex.needsUpdate = true;
     resolve(tex);
-  }, undefined, () => reject(new Error(`không tải được ${url}`))));
+  }, undefined, () => reject(new Error(t(`không tải được ${url}`, `failed to load ${url}`)))));
 }
 const retry = (fn, url, ...a) => fn(url, ...a).catch(() => new Promise(r => setTimeout(r, 500)).then(() => fn(url + '?r=' + Date.now(), ...a)));
 function solidTex(data, format) { const t = new THREE.DataTexture(data, 1, 1, format, THREE.UnsignedByteType); t.needsUpdate = true; return t; }
@@ -528,9 +529,9 @@ function sampleDEM(cpu, lat, lon) {
 /* ================================================================================================
    UI helpers
    ================================================================================================ */
-const latStr = v => `${Math.abs(v).toFixed(1).replace('.', ',')}°${v >= 0 ? 'B' : 'N'}`;
-const lonStr = v => `${Math.abs(v).toFixed(1).replace('.', ',')}°${v >= 0 ? 'Đ' : 'T'}`;
-const num = (v, d = 1) => v.toFixed(d).replace('.', ',');
+const latStr = v => `${dec(Math.abs(v), 1)}°${v >= 0 ? t('B', 'N') : t('N', 'S')}`;
+const lonStr = v => `${dec(Math.abs(v), 1)}°${v >= 0 ? t('Đ', 'E') : t('T', 'W')}`;
+const num = (v, d = 1) => dec(v, d);
 const hhmm = h => `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')}`;
 function dateStr(jd) {
   const d = new Date((jd - 2440587.5) * 86400000);
@@ -572,22 +573,51 @@ export default [{
     ['Ngoại quyển', 'Na, K, Ca, Mg, O, H, He — áp suất < 10⁻¹⁰ Pa; đuôi natri dài > 2 triệu km'],
     ['Dữ liệu', 'NASA/JHUAPL/Carnegie MESSENGER MDIS (bản đồ 3 màu & màu tăng cường 665 m/px), USGS DEM toàn cầu 665 m (2016); quỹ đạo JPL, mô hình quay IAU 2015'],
   ],
+  en: {
+    name: 'Mercury',
+    subtitle: 'Innermost rocky planet · 3:2 spin–orbit resonance',
+    blurb: 'The smallest planet and the closest to the Sun, with no atmosphere — the surface here is <b>real imagery from the MESSENGER spacecraft</b> (NASA) and a USGS elevation map. Mercury spins exactly <b>3 times every 2 of its years</b> (a 3:2 resonance), so one solar day lasts 176 Earth days; its eccentric orbit makes the Sun in the sky swell and shrink by a factor of 1.5, and near perihelion the Sun even <b>stops and moves backwards</b> for a few days.',
+    intro: 'Time follows the real calendar: the Sun and the rotation are computed from the orbit and the IAU rotation model. Press <b>R</b> to stand on the ground and watch the <b>Sun rise twice</b>; <b>C</b> to fly to the Caloris basin at dawn; switch <b>Colour</b> to “Enhanced” to see the mineral composition.',
+    facts: [
+      ['Mean radius', '2,439.4 km'], ['Mass', '3.301×10²³ kg (density 5.43 g/cm³)'],
+      ['Surface gravity', '3.70 m/s²'],
+      ['Semi-major axis · eccentricity', '0.3871 AU (57.9 million km) · 0.2056'],
+      ['Perihelion / aphelion', '46.0 / 69.8 million km'],
+      ['Orbital period', '87.969 days'],
+      ['Sidereal day · solar day', '58.646 days · 175.94 days (3:2 resonance)'],
+      ['Axial tilt', '0.034°'],
+      ['Surface temperature', '≈ −180 °C (night) … 430 °C (noon at perihelion)'],
+      ['Geometric / Bond albedo', '0.142 / 0.088'],
+      ['Caloris basin', 'Ø ≈ 1,550 km, 31.5°N 162.7°E, ~3.8 billion years old'],
+      ['Exosphere', 'Na, K, Ca, Mg, O, H, He — pressure < 10⁻¹⁰ Pa; sodium tail > 2 million km long'],
+      ['Data', 'NASA/JHUAPL/Carnegie MESSENGER MDIS (3-colour & enhanced-colour maps, 665 m/px), USGS global DEM 665 m (2016); JPL orbit, IAU 2015 rotation model'],
+    ],
+  },
   unitKm: RKM,
   camera: { distance: 3.4, polar: 80, azimuth: 20, min: 1.01, max: 60, fov: 45 },
   exposure: 1.0,
   bloom: 0.3,
   params: [
-    { key: 'color', label: 'Màu sắc', type: 'seg', options: [['nat', 'Tự nhiên'], ['enh', 'Tăng cường'], ['temp', 'Nhiệt độ']], default: 'nat', note: 'Tự nhiên: độ sáng MDIS với màu thật đã giảm bão hoà. Tăng cường: ảnh màu MESSENGER (thành phần chính + tỉ số 430/1000 nm) — xanh lam = vật chất phản xạ thấp, cam = đồng bằng núi lửa, xanh nhạt sáng = hố trẻ và “hollows”. Nhiệt độ: mô hình cân bằng bức xạ, 90 K (tím sẫm) … 720 K (vàng).' },
-    { key: 'speed', label: 'Tốc độ thời gian', type: 'range', min: 0, max: 3, step: 0.01, default: 0.3, fmt: v => num(v, 2) + ' ngày/giây', note: 'Số ngày Trái Đất trôi qua mỗi giây mô phỏng (nhân với thanh tốc độ thời gian chung). Một ngày Mặt Trời trên Sao Thủy kéo dài 175,94 ngày.' },
-    { key: 'frame', label: 'Giữ cố định', type: 'seg', options: [['sun', 'Mặt Trời'], ['stars', 'Các sao'], ['ground', 'Mặt đất']], default: 'sun', note: 'Mặt Trời: hành tinh quay chậm dưới đường phân chia ngày–đêm. Các sao: hệ quán tính — thấy cả Mặt Trời di chuyển. Mặt đất: camera bay cùng bề mặt.' },
-    { key: 'exag', label: 'Phóng đại địa hình', type: 'range', min: 1, max: 12, step: 0.5, default: 2.5, fmt: v => '×' + num(v), note: 'Biên độ địa hình ~ 10 km = 0,4 % bán kính. ×1 = tỉ lệ thật.' },
-    { key: 'exo', label: 'Đuôi natri', type: 'toggle', default: false, note: 'Nguyên tử natri bật khỏi bề mặt bị áp suất bức xạ Mặt Trời thổi thành đuôi dài hàng triệu km, phát sáng vàng 589 nm. Độ sáng phóng đại ~10⁵ lần. Đuôi mạnh nhất khi Sao Thủy chuyển động nhanh ra/vào Mặt Trời (hiệu ứng Swings), yếu ở cận nhật và viễn nhật.' },
-    { key: 'track', label: 'Vết điểm dưới Mặt Trời', type: 'toggle', default: false, note: 'Vòng vàng: điểm có Mặt Trời ở thiên đỉnh; chấm xanh: vị trí của nó mỗi ngày trong 24 ngày qua.' },
+    { key: 'color', label: 'Màu sắc', type: 'seg', options: [['nat', 'Tự nhiên'], ['enh', 'Tăng cường'], ['temp', 'Nhiệt độ']], default: 'nat', note: 'Tự nhiên: độ sáng MDIS với màu thật đã giảm bão hoà. Tăng cường: ảnh màu MESSENGER (thành phần chính + tỉ số 430/1000 nm) — xanh lam = vật chất phản xạ thấp, cam = đồng bằng núi lửa, xanh nhạt sáng = hố trẻ và “hollows”. Nhiệt độ: mô hình cân bằng bức xạ, 90 K (tím sẫm) … 720 K (vàng).',
+      en: { label: 'Colour', options: ['Natural', 'Enhanced', 'Temperature'], note: 'Natural: MDIS brightness with desaturated true colour. Enhanced: MESSENGER colour mosaic (principal components + 430/1000 nm ratio) — blue = low-reflectance material, orange = volcanic plains, bright light blue = young craters and hollows. Temperature: radiative-equilibrium model, 90 K (dark purple) … 720 K (yellow).' } },
+    { key: 'speed', label: 'Tốc độ thời gian', type: 'range', min: 0, max: 3, step: 0.01, default: 0.3, fmt: v => num(v, 2) + t(' ngày/giây', ' days/s'), note: 'Số ngày Trái Đất trôi qua mỗi giây mô phỏng (nhân với thanh tốc độ thời gian chung). Một ngày Mặt Trời trên Sao Thủy kéo dài 175,94 ngày.',
+      en: { label: 'Time speed', note: 'Earth days elapsed per simulated second (multiplied by the global time-speed slider). A solar day on Mercury lasts 175.94 days.' } },
+    { key: 'frame', label: 'Giữ cố định', type: 'seg', options: [['sun', 'Mặt Trời'], ['stars', 'Các sao'], ['ground', 'Mặt đất']], default: 'sun', note: 'Mặt Trời: hành tinh quay chậm dưới đường phân chia ngày–đêm. Các sao: hệ quán tính — thấy cả Mặt Trời di chuyển. Mặt đất: camera bay cùng bề mặt.',
+      en: { label: 'Keep fixed', options: ['Sun', 'Stars', 'Ground'], note: 'Sun: the planet turns slowly beneath the day–night terminator. Stars: inertial frame — the Sun is seen moving too. Ground: the camera flies with the surface.' } },
+    { key: 'exag', label: 'Phóng đại địa hình', type: 'range', min: 1, max: 12, step: 0.5, default: 2.5, fmt: v => '×' + num(v), note: 'Biên độ địa hình ~ 10 km = 0,4 % bán kính. ×1 = tỉ lệ thật.',
+      en: { label: 'Terrain exaggeration', note: 'Relief spans ~10 km = 0.4 % of the radius. ×1 = true scale.' } },
+    { key: 'exo', label: 'Đuôi natri', type: 'toggle', default: false, note: 'Nguyên tử natri bật khỏi bề mặt bị áp suất bức xạ Mặt Trời thổi thành đuôi dài hàng triệu km, phát sáng vàng 589 nm. Độ sáng phóng đại ~10⁵ lần. Đuôi mạnh nhất khi Sao Thủy chuyển động nhanh ra/vào Mặt Trời (hiệu ứng Swings), yếu ở cận nhật và viễn nhật.',
+      en: { label: 'Sodium tail', note: 'Sodium atoms knocked off the surface are blown by solar radiation pressure into a tail millions of km long, glowing yellow at 589 nm. Brightness exaggerated ~10⁵×. The tail is strongest when Mercury moves quickly towards or away from the Sun (the Swings effect), weak at perihelion and aphelion.' } },
+    { key: 'track', label: 'Vết điểm dưới Mặt Trời', type: 'toggle', default: false, note: 'Vòng vàng: điểm có Mặt Trời ở thiên đỉnh; chấm xanh: vị trí của nó mỗi ngày trong 24 ngày qua.',
+      en: { label: 'Subsolar point track', note: 'Yellow ring: the point with the Sun at the zenith; blue dots: its position each day over the last 24 days.' } },
   ],
   actions: [
-    { label: 'Mặt Trời quay ngược', key: 'r', title: 'Đứng trên mặt đất ở “cực ấm”, xem Mặt Trời mọc, lặn rồi mọc lại (bấm lần nữa để quay lại)', run: ctx => ctx.scene._mercury?.reverse(ctx) },
-    { label: 'Caloris', key: 'c', title: 'Bay tới lòng chảo Caloris lúc bình minh (bấm lần nữa để quay lại)', run: ctx => ctx.scene._mercury?.caloris(ctx) },
-    { label: 'Cận nhật', key: 'p', title: 'Nhảy tới điểm cận nhật kế tiếp', run: ctx => ctx.scene._mercury?.perihelion(ctx) },
+    { label: 'Mặt Trời quay ngược', key: 'r', title: 'Đứng trên mặt đất ở “cực ấm”, xem Mặt Trời mọc, lặn rồi mọc lại (bấm lần nữa để quay lại)', run: ctx => ctx.scene._mercury?.reverse(ctx),
+      en: { label: 'Sun goes backwards', title: 'Stand on the ground at a “warm pole” and watch the Sun rise, set and rise again (press again to go back)' } },
+    { label: 'Caloris', key: 'c', title: 'Bay tới lòng chảo Caloris lúc bình minh (bấm lần nữa để quay lại)', run: ctx => ctx.scene._mercury?.caloris(ctx),
+      en: { label: 'Caloris', title: 'Fly to the Caloris basin at dawn (press again to go back)' } },
+    { label: 'Cận nhật', key: 'p', title: 'Nhảy tới điểm cận nhật kế tiếp', run: ctx => ctx.scene._mercury?.perihelion(ctx),
+      en: { label: 'Perihelion', title: 'Jump to the next perihelion' } },
   ],
   create(ctx) {
     const Rr = ctx.renderer, caps = Rr.capabilities, aniso = Math.min(8, caps.getMaxAnisotropy());
@@ -699,7 +729,8 @@ export default [{
       const pos = toWorld(llB(CALORIS.lat - 14, CALORIS.lon + 2).multiplyScalar(1 + 2400 / RKM));
       const up = pos.clone().normalize();
       if (instant) applyCam(c, pos, tgt, up); else tweenTo(c, pos, tgt, up, 4.5);
-      c.toast?.(`Bình minh trên <b>lòng chảo Caloris</b> (Ø ≈ 1 550 km), nhìn từ độ cao ~2 400 km phía nam. Mặt Trời thấp ở phía đông nên vành núi và các nếp gãy đổ bóng dài về phía tây. Ở đây buổi sáng kéo dài ~44 ngày Trái Đất. Caloris là di tích của một va chạm khổng lồ ~3,8 tỉ năm trước; nền lòng chảo là dung nham núi lửa sau đó (màu cam ở chế độ <b>Tăng cường</b>). Địa hình phóng đại ×3.`, 11000);
+      c.toast?.(t(`Bình minh trên <b>lòng chảo Caloris</b> (Ø ≈ 1 550 km), nhìn từ độ cao ~2 400 km phía nam. Mặt Trời thấp ở phía đông nên vành núi và các nếp gãy đổ bóng dài về phía tây. Ở đây buổi sáng kéo dài ~44 ngày Trái Đất. Caloris là di tích của một va chạm khổng lồ ~3,8 tỉ năm trước; nền lòng chảo là dung nham núi lửa sau đó (màu cam ở chế độ <b>Tăng cường</b>). Địa hình phóng đại ×3.`,
+        `Dawn over the <b>Caloris basin</b> (Ø ≈ 1,550 km), seen from ~2,400 km up to the south. The Sun is low in the east, so the rim mountains and wrinkle ridges cast long shadows to the west. Morning here lasts ~44 Earth days. Caloris is the scar of a giant impact ~3.8 billion years ago; the basin floor is later volcanic lava (orange in <b>Enhanced</b> mode). Terrain exaggerated ×3.`), 11000);
     }
     function goReverse(c, instant) {
       const p = c.params;
@@ -743,7 +774,8 @@ export default [{
       const look = east.clone().multiplyScalar(Math.cos(2 * D2R)).addScaledVector(eye.clone().normalize(), Math.sin(2 * D2R));
       const pos = toWorld(eye), tgt = toWorld(eye.clone().addScaledVector(look, 0.004)), up = toWorld(eye.clone().normalize());
       if (instant) applyCam(c, pos, tgt, up); else tweenTo(c, pos, tgt, up, 4.5);
-      c.toast?.(`Bạn đang đứng ở <b>${latStr(obsLat)} ${lonStr(obs)}</b> (gần “cực ấm”), nhìn về phía đông, vài ngày trước cận nhật. Gần cận nhật, Sao Thủy chạy trên quỹ đạo nhanh hơn nó tự quay (6,35°/ngày so với 6,14°/ngày), nên trong ~8 ngày Mặt Trời <b>đi ngược</b> trên bầu trời: nó ló lên khỏi chân trời, lặn xuống lại, rồi mới mọc hẳn — <b>bình minh kép</b>. Đĩa Mặt Trời ở đây rộng 1,7°, gấp 3,2 lần nhìn từ Trái Đất.`, 13000);
+      c.toast?.(t(`Bạn đang đứng ở <b>${latStr(obsLat)} ${lonStr(obs)}</b> (gần “cực ấm”), nhìn về phía đông, vài ngày trước cận nhật. Gần cận nhật, Sao Thủy chạy trên quỹ đạo nhanh hơn nó tự quay (6,35°/ngày so với 6,14°/ngày), nên trong ~8 ngày Mặt Trời <b>đi ngược</b> trên bầu trời: nó ló lên khỏi chân trời, lặn xuống lại, rồi mới mọc hẳn — <b>bình minh kép</b>. Đĩa Mặt Trời ở đây rộng 1,7°, gấp 3,2 lần nhìn từ Trái Đất.`,
+        `You are standing at <b>${latStr(obsLat)} ${lonStr(obs)}</b> (near a “warm pole”), looking east, a few days before perihelion. Near perihelion Mercury moves along its orbit faster than it spins (6.35°/day vs 6.14°/day), so for ~8 days the Sun <b>moves backwards</b> across the sky: it peeks above the horizon, sets again, and only then rises for good — a <b>double sunrise</b>. The Sun's disc here is 1.7° wide, 3.2 times its size seen from Earth.`), 13000);
     }
     def._mercury = {
       caloris: c => { if (shot.tw) return; if (shot.on) leave(c); else goCaloris(c, false); },
@@ -753,7 +785,8 @@ export default [{
         jumpTo(c, nextPerihelion(T.jd + 1));
         setFrame(c, 'sun'); c.params.speed = 0.3;
         const g = T.geo;
-        c.toast?.(`Cận nhật: Sao Thủy chỉ cách Mặt Trời <b>46,0 triệu km</b>; ánh nắng mạnh gấp <b>2,3 lần</b> so với ở viễn nhật. Mặt Trời đứng trên đỉnh đầu ở kinh độ <b>${Math.abs(wrap180(g.lon)) < 90 ? '0°' : '180°'}</b> — một trong hai “cực nóng”; cộng hưởng 3:2 đưa đúng hai kinh độ này về phía Mặt Trời ở mọi lần cận nhật. Trưa ở đây đạt ~430 °C.`, 10000);
+        c.toast?.(t(`Cận nhật: Sao Thủy chỉ cách Mặt Trời <b>46,0 triệu km</b>; ánh nắng mạnh gấp <b>2,3 lần</b> so với ở viễn nhật. Mặt Trời đứng trên đỉnh đầu ở kinh độ <b>${Math.abs(wrap180(g.lon)) < 90 ? '0°' : '180°'}</b> — một trong hai “cực nóng”; cộng hưởng 3:2 đưa đúng hai kinh độ này về phía Mặt Trời ở mọi lần cận nhật. Trưa ở đây đạt ~430 °C.`,
+          `Perihelion: Mercury is only <b>46.0 million km</b> from the Sun; sunlight is <b>2.3 times</b> stronger than at aphelion. The Sun stands overhead at longitude <b>${Math.abs(wrap180(g.lon)) < 90 ? '0°' : '180°'}</b> — one of the two “hot poles”; the 3:2 resonance brings exactly these two longitudes to face the Sun at every perihelion. Noon here reaches ~430 °C.`), 10000);
       },
     };
 
@@ -857,7 +890,7 @@ export default [{
         const g = T.geo;
         const g2 = mercuryGeom(T.jd + 0.05);
         const rate = wrap180(g2.lon - g.lon) / 0.05;                 // °/day, negative = westward (normal)
-        const motion = Math.abs(rate) < 0.04 ? '<b>gần như đứng yên</b>' : rate < 0 ? `đi về phía tây ${num(-rate, 2)}°/ngày` : `<b style="color:#ffb347">ĐI NGƯỢC về phía đông</b> ${num(rate, 2)}°/ngày`;
+        const motion = Math.abs(rate) < 0.04 ? t('<b>gần như đứng yên</b>', '<b>almost stationary</b>') : rate < 0 ? t(`đi về phía tây ${num(-rate, 2)}°/ngày`, `moving west ${num(-rate, 2)}°/day`) : t(`<b style="color:#ffb347">ĐI NGƯỢC về phía đông</b> ${num(rate, 2)}°/ngày`, `<b style="color:#ffb347">MOVING BACKWARDS (east)</b> ${num(rate, 2)}°/day`);
         const u = underCamera(c), s = localSun(u.n, g);
         const lat = u.lat, lon = u.lon;
         const T_K = surfTempK(s.mu0, s.H, lat, g.r);
@@ -868,27 +901,28 @@ export default [{
         const dayInYear = g.M / (2 * Math.PI) * PERIOD;
         const wall = (c.bhGlobals?.timeScale ?? 6) * c.params.speed;
         return [
-          ['Ngày mô phỏng', dateStr(T.jd)],
-          ['Khoảng cách tới Mặt Trời', `${num(g.r, 4)} AU · ${num(g.r * AU_KM / 1e6, 1)} triệu km`],
-          ['Vị trí trên quỹ đạo', `ngày ${num(dayInYear, 1)} / 87,97 sau cận nhật`],
-          ['Đường kính biểu kiến Mặt Trời', `${num(sunDiam, 2)}° (gấp ${num(sunDiam / 0.533, 1)} lần nhìn từ Trái Đất)`],
-          ['Điểm dưới Mặt Trời', `${lonStr(g.lon)} · ${motion}`],
-          ['Điểm dưới camera', `${latStr(lat)} ${lonStr(lon)}` + (dem ? ` · cao ${Math.round(elevKm(lat, lon) * 1000).toLocaleString('vi-VN')} m` : '')],
-          ['Giờ Mặt Trời tại đó', `${hhmm(((hour % 24) + 24) % 24)} · Mặt Trời cao ${num(s.elev, 1)}°` + (toSet !== null ? ` · lặn sau ~${num(toSet, 0)} ngày` : '')],
-          ['Nhiệt độ bề mặt', `${Math.round(T_K - 273.15)} °C (${Math.round(T_K)} K)`],
-          ['Độ cao camera', c.fmt.dist(Math.max(alt, 0) * 1000)],
-          ['Nhịp thời gian', `1 giây thực = ${num(wall, 2)} ngày Trái Đất`],
+          [t('Ngày mô phỏng', 'Simulated date'), dateStr(T.jd)],
+          [t('Khoảng cách tới Mặt Trời', 'Distance from the Sun'), t(`${num(g.r, 4)} AU · ${num(g.r * AU_KM / 1e6, 1)} triệu km`, `${num(g.r, 4)} AU · ${num(g.r * AU_KM / 1e6, 1)} million km`)],
+          [t('Vị trí trên quỹ đạo', 'Orbital position'), t(`ngày ${num(dayInYear, 1)} / 87,97 sau cận nhật`, `day ${num(dayInYear, 1)} / 87.97 after perihelion`)],
+          [t('Đường kính biểu kiến Mặt Trời', 'Apparent diameter of the Sun'), t(`${num(sunDiam, 2)}° (gấp ${num(sunDiam / 0.533, 1)} lần nhìn từ Trái Đất)`, `${num(sunDiam, 2)}° (${num(sunDiam / 0.533, 1)}× its size from Earth)`)],
+          [t('Điểm dưới Mặt Trời', 'Subsolar point'), `${lonStr(g.lon)} · ${motion}`],
+          [t('Điểm dưới camera', 'Point below camera'), `${latStr(lat)} ${lonStr(lon)}` + (dem ? t(' · cao ', ' · elevation ') + `${Math.round(elevKm(lat, lon) * 1000).toLocaleString(locale())} m` : '')],
+          [t('Giờ Mặt Trời tại đó', 'Local solar time there'), `${hhmm(((hour % 24) + 24) % 24)} · ` + t(`Mặt Trời cao ${num(s.elev, 1)}°`, `Sun elevation ${num(s.elev, 1)}°`) + (toSet !== null ? t(` · lặn sau ~${num(toSet, 0)} ngày`, ` · sets in ~${num(toSet, 0)} days`) : '')],
+          [t('Nhiệt độ bề mặt', 'Surface temperature'), `${Math.round(T_K - 273.15)} °C (${Math.round(T_K)} K)`],
+          [t('Độ cao camera', 'Camera altitude'), c.fmt.dist(Math.max(alt, 0) * 1000)],
+          [t('Nhịp thời gian', 'Time rate'), t(`1 giây thực = ${num(wall, 2)} ngày Trái Đất`, `1 real second = ${num(wall, 2)} Earth days`)],
         ];
       },
       onClick(info, c) {
-        const t = hitSphere(info.origin, info.dir);
-        if (t === null) return;
-        const pw = info.origin.clone().addScaledVector(info.dir, t);
+        const th = hitSphere(info.origin, info.dir);
+        if (th === null) return;
+        const pw = info.origin.clone().addScaledVector(info.dir, th);
         const n = toBody(pw).normalize();
         const lat = Math.asin(n.y) / D2R, lon = Math.atan2(n.x, n.z) / D2R;
         const s = localSun(n, T.geo), TK = surfTempK(s.mu0, s.H, lat, T.geo.r);
-        const e = dem ? ` · độ cao <b>${Math.round(elevKm(lat, lon) * 1000).toLocaleString('vi-VN')} m</b>` : '';
-        c.toast(`Vĩ độ <b>${latStr(lat)}</b>, kinh độ <b>${lonStr(lon)}</b>${e} · giờ Mặt Trời <b>${hhmm((((12 + s.H / 15) % 24) + 24) % 24)}</b> · Mặt Trời cao <b>${num(s.elev, 1)}°</b> · nhiệt độ ≈ <b>${Math.round(TK - 273.15)} °C</b>.`);
+        const e = dem ? t(' · độ cao <b>', ' · elevation <b>') + `${Math.round(elevKm(lat, lon) * 1000).toLocaleString(locale())} m</b>` : '';
+        c.toast(t(`Vĩ độ <b>${latStr(lat)}</b>, kinh độ <b>${lonStr(lon)}</b>${e} · giờ Mặt Trời <b>${hhmm((((12 + s.H / 15) % 24) + 24) % 24)}</b> · Mặt Trời cao <b>${num(s.elev, 1)}°</b> · nhiệt độ ≈ <b>${Math.round(TK - 273.15)} °C</b>.`,
+          `Latitude <b>${latStr(lat)}</b>, longitude <b>${lonStr(lon)}</b>${e} · local solar time <b>${hhmm((((12 + s.H / 15) % 24) + 24) % 24)}</b> · Sun elevation <b>${num(s.elev, 1)}°</b> · temperature ≈ <b>${Math.round(TK - 273.15)} °C</b>.`));
       },
       onParam(key, v, c) {
         if (key === 'frame') T.frame = v;

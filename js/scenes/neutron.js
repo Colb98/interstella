@@ -9,6 +9,7 @@
 // trapped fireball) is evaluated inside the geodesic march.
 import * as THREE from 'three';
 import { COMMON_GLSL, FULLSCREEN_VERT } from '../glsl/common.js';
+import { t, dec, locale } from '../i18n.js';
 
 const M_SUN = 1.989e30, G_N = 6.674e-11, C_L = 2.998e8;
 const MASS = 1.4;
@@ -228,7 +229,7 @@ void main(){
 // ---------------------------------------------------------------------------------------------
 // CPU physics helpers
 
-const vn = (x, d = 2) => x.toFixed(d).replace('.', ',');
+const vn = (x, d = 2) => dec(x, d);
 
 // Largest angle ψ (seen from the star's centre) between the camera direction and a surface point
 // whose light still reaches a camera at distance D. GR: the limiting photon leaves the surface
@@ -295,12 +296,21 @@ const COMMON_FACTS = [
   ['Một thìa cà phê', 'nặng ~2 tỉ tấn'],
   ['Dịch đỏ bề mặt', 'z ≈ 0,24'],
 ];
+const COMMON_FACTS_EN = [
+  ['Mass', '≈ 1.4 M☉ (typical)'],
+  ['Radius', '≈ 12 km = 2.9 r_s'],
+  ['Surface gravity', '≈ 1.6×10¹¹ g'],
+  ['Escape velocity', '≈ 0.59 c'],
+  ['Density', '≈ 4×10¹⁷ kg/m³'],
+  ['One teaspoon', 'weighs ~2 billion tonnes'],
+  ['Surface redshift', 'z ≈ 0.24'],
+];
 
 function makeScene(cfg) {
   return {
     id: cfg.id, name: cfg.name, category: 'compact', order: cfg.order,
     subtitle: cfg.subtitle, swatch: cfg.swatch, blurb: cfg.blurb, intro: cfg.intro,
-    facts: cfg.facts,
+    facts: cfg.facts, en: cfg.en,
     unitKm: RS_KM,
     camera: { distance: 16, polar: cfg.camPolar, azimuth: 30, min: 3.25, max: 80, fov: 45 },
     exposure: cfg.exposure ?? 1.0,
@@ -448,7 +458,7 @@ function createInstance(ctx, cfg) {
       const cosM = mag.dot(camDir);
       const angN = Math.acos(THREE.MathUtils.clamp(cosM, -1, 1)), angS = Math.PI - angN;
       const nVis = psi => (angN < psi ? 1 : 0) + (angS < psi ? 1 : 0);
-      const poleTxt = n => ['không cực nào', 'một cực', 'cả hai cực'][n];
+      const poleTxt = n => [t('không cực nào', 'neither pole'), t('một cực', 'one pole'), t('cả hai cực', 'both poles')][n];
       const grNow = p.gr && !p.split;
       const b = bulk(p.radius ?? 12);
       const half = beamHalf(p);
@@ -456,17 +466,17 @@ function createInstance(ctx, cfg) {
       const sweeps = (Math.abs(zeta - al) < half ? 1 : 0) + (Math.abs(zeta - (Math.PI - al)) < half ? 1 : 0);
       const slow = (1 / cfg.period) / Math.max(p.spin * timeScale() / 6, 1e-6);
       const rows = [
-        ['Bề mặt nhìn thấy', p.split ? `GR ${vn(fG * 100, 0)} % · phẳng ${vn(fF * 100, 0)} %`
-          : grNow ? `${vn(fG * 100, 0)} % (không gian phẳng: ${vn(fF * 100, 0)} %)` : `${vn(fF * 100, 0)} % (với GR: ${vn(fG * 100, 0)} %)`],
-        ['Cực từ trong tầm nhìn', `${poleTxt(nVis(grNow || p.split ? psiG : psiF))}${(grNow || p.split) && nVis(psiG) !== nVis(psiF) ? ` (phẳng: ${poleTxt(nVis(psiF))})` : ''}`],
-        ['Chùm tia quét qua bạn', sweeps ? (sweeps === 2 ? 'có — 2 xung mỗi vòng' : 'có — 1 xung mỗi vòng') : 'không (ngoài đường quét)'],
-        ['Tốc độ quay hiển thị', p.spin <= 0 ? 'đứng yên' : (Math.abs(slow - 1) < 0.03 ? 'đúng thời gian thực' : slow > 1 ? `chậm hơn thật ×${fmtSlow(slow)}` : `nhanh hơn thật ×${fmtSlow(1 / slow)}`)],
-        ['Bán kính · độ đặc', `${vn(p.radius ?? 12, 1)} km = ${vn(R, 2)} r_s · z = ${vn(b.z, 2)}`],
-        ['Độ cao trên bề mặt', ctx.fmt.dist(Math.max(D - R, 0) * RS_KM * 1e3)],
+        [t('Bề mặt nhìn thấy', 'Visible surface'), p.split ? `GR ${vn(fG * 100, 0)} % · ${t('phẳng', 'flat')} ${vn(fF * 100, 0)} %`
+          : grNow ? `${vn(fG * 100, 0)} % (${t('không gian phẳng', 'flat space')}: ${vn(fF * 100, 0)} %)` : `${vn(fF * 100, 0)} % (${t('với GR', 'with GR')}: ${vn(fG * 100, 0)} %)`],
+        [t('Cực từ trong tầm nhìn', 'Magnetic poles in view'), `${poleTxt(nVis(grNow || p.split ? psiG : psiF))}${(grNow || p.split) && nVis(psiG) !== nVis(psiF) ? ` (${t('phẳng', 'flat')}: ${poleTxt(nVis(psiF))})` : ''}`],
+        [t('Chùm tia quét qua bạn', 'Beam sweeps over you'), sweeps ? (sweeps === 2 ? t('có — 2 xung mỗi vòng', 'yes — 2 pulses per turn') : t('có — 1 xung mỗi vòng', 'yes — 1 pulse per turn')) : t('không (ngoài đường quét)', 'no (outside the beam path)')],
+        [t('Tốc độ quay hiển thị', 'Displayed spin rate'), p.spin <= 0 ? t('đứng yên', 'stopped') : (Math.abs(slow - 1) < 0.03 ? t('đúng thời gian thực', 'real time') : slow > 1 ? t(`chậm hơn thật ×${fmtSlow(slow)}`, `slower than real ×${fmtSlow(slow)}`) : t(`nhanh hơn thật ×${fmtSlow(1 / slow)}`, `faster than real ×${fmtSlow(1 / slow)}`))],
+        [t('Bán kính · độ đặc', 'Radius · compactness'), `${vn(p.radius ?? 12, 1)} km = ${vn(R, 2)} r_s · z = ${vn(b.z, 2)}`],
+        [t('Độ cao trên bề mặt', 'Altitude above the surface'), ctx.fmt.dist(Math.max(D - R, 0) * RS_KM * 1e3)],
       ];
       if (cfg.magnetar) {
         const age = ctx.time.wall - st.flareT;
-        rows.push(['Siêu bùng nổ', age >= 0 && age < 90 ? (age < 1 ? 'ĐỈNH — 10³⁹ J trong 0,2 s' : `đuôi dao động theo chu kỳ quay · ${vn(age, 0)} s`) : 'yên tĩnh — nhấn Q']);
+        rows.push([t('Siêu bùng nổ', 'Giant flare'), age >= 0 && age < 90 ? (age < 1 ? t('ĐỈNH — 10³⁹ J trong 0,2 s', 'PEAK — 10³⁹ J in 0.2 s') : t(`đuôi dao động theo chu kỳ quay · ${vn(age, 0)} s`, `tail pulsing at the spin period · ${vn(age, 0)} s`)) : t('yên tĩnh — nhấn Q', 'quiet — press Q')]);
       }
       return rows;
     },
@@ -482,8 +492,10 @@ function createInstance(ctx, cfg) {
       const cos2 = 4 * c * c / (1 + 3 * c * c);
       const Tinf = cfg.Tinf * Math.pow(cos2 + cfg.chi * (1 - cos2), 0.25);
       const D = ctx.camera.position.length(), horizon = THREE.MathUtils.radToDeg(Math.acos(Math.min(1, R / D)));
-      let msg = `Vĩ độ từ <b>${vn(magLat, 0)}°</b> · nhiệt độ quan sát ≈ <b>${ctx.fmt.sci(Tinf, 1)} K</b>. Điểm này cách hướng nhìn của bạn <b>${vn(behind, 0)}°</b> quanh tâm sao.`;
-      if (behind > horizon + 0.5) msg += ` Trong không gian phẳng, mọi điểm quá ${vn(horizon, 0)}° đều bị khuất — bạn thấy được nó chỉ vì <b>ánh sáng bị bẻ cong</b> quanh sao.`;
+      let msg = t(`Vĩ độ từ <b>${vn(magLat, 0)}°</b> · nhiệt độ quan sát ≈ <b>${ctx.fmt.sci(Tinf, 1)} K</b>. Điểm này cách hướng nhìn của bạn <b>${vn(behind, 0)}°</b> quanh tâm sao.`,
+        `Magnetic latitude <b>${vn(magLat, 0)}°</b> · observed temperature ≈ <b>${ctx.fmt.sci(Tinf, 1)} K</b>. This point is <b>${vn(behind, 0)}°</b> from your line of sight, measured around the star's centre.`);
+      if (behind > horizon + 0.5) msg += t(` Trong không gian phẳng, mọi điểm quá ${vn(horizon, 0)}° đều bị khuất — bạn thấy được nó chỉ vì <b>ánh sáng bị bẻ cong</b> quanh sao.`,
+        ` In flat space every point beyond ${vn(horizon, 0)}° would be hidden — you can see it only because <b>light bends</b> around the star.`);
       ctx.toast(msg, 7000);
     },
     enter(ctx) { st.lastSim = ctx.time.sim; st.inBeam = [false, false]; if (cfg.magnetar) st.burstNext = ctx.time.wall + 8; },
@@ -494,20 +506,25 @@ function createInstance(ctx, cfg) {
   return inst;
 }
 
-function fmtSlow(x) { return x >= 100 ? Math.round(x).toLocaleString('vi-VN') : vn(x, x >= 10 ? 0 : 1); }
+function fmtSlow(x) { return x >= 100 ? Math.round(x).toLocaleString(locale()) : vn(x, x >= 10 ? 0 : 1); }
 
 function beamPathAction(ctx) {
   const c = ctx.camera.position, d = c.length();
   const az = Math.atan2(c.x, c.z);
   const pol = THREE.MathUtils.degToRad(ctx.params.alpha + 1.5);
   c.setFromSphericalCoords(d, pol, az); ctx.camera.lookAt(0, 0, 0); ctx.controls.update();
-  ctx.toast(`Bạn đang đứng trên đường quét của cực từ (cách trục quay ${vn(ctx.params.alpha, 0)}°): mỗi vòng quay, chùm tia lướt qua bạn một lần — đó là một <b>xung</b>. ${ctx.scene && ctx.scene.id === 'magnetar' ? 'Với magnetar, xung tia X từ điểm nóng đến mỗi 7,56 s.' : 'Với kính thiên văn vô tuyến thật, xung Vela đến đều đặn mỗi 89,3 ms — ổn định ngang đồng hồ nguyên tử.'}`, 8000);
+  const mg = ctx.scene && ctx.scene.id === 'magnetar';
+  ctx.toast(t(`Bạn đang đứng trên đường quét của cực từ (cách trục quay ${vn(ctx.params.alpha, 0)}°): mỗi vòng quay, chùm tia lướt qua bạn một lần — đó là một <b>xung</b>. ${mg ? 'Với magnetar, xung tia X từ điểm nóng đến mỗi 7,56 s.' : 'Với kính thiên văn vô tuyến thật, xung Vela đến đều đặn mỗi 89,3 ms — ổn định ngang đồng hồ nguyên tử.'}`,
+    `You are now on the path swept by the magnetic pole (${vn(ctx.params.alpha, 0)}° from the spin axis): once per rotation the beam sweeps across you — that is a <b>pulse</b>. ${mg ? 'For a magnetar, X-ray pulses from the hot spot arrive every 7.56 s.' : 'With a real radio telescope, Vela’s pulses arrive every 89.3 ms like clockwork — rivalling an atomic clock for stability.'}`), 8000);
 }
 
 const GR_PARAMS = [
-  { key: 'gr', label: 'Bẻ cong ánh sáng (GR)', type: 'toggle', default: true, note: 'Tắt = tia sáng thẳng (vẫn giữ dịch đỏ) để so sánh: bạn chỉ còn thấy dưới một nửa sao.' },
-  { key: 'split', label: 'So sánh chia đôi', type: 'toggle', default: false, note: 'Trái: không gian phẳng · Phải: Schwarzschild.' },
-  { key: 'grid', label: 'Lưới & nửa sau', type: 'toggle', default: false, note: 'Lưới kinh–vĩ độ. Phần tô cam là vùng bề mặt mà trong không gian phẳng bạn không thể thấy — chỉ hiện ra nhờ ánh sáng bị bẻ cong. Vòng hồng bao quanh hai cực từ.' },
+  { key: 'gr', label: 'Bẻ cong ánh sáng (GR)', type: 'toggle', default: true, note: 'Tắt = tia sáng thẳng (vẫn giữ dịch đỏ) để so sánh: bạn chỉ còn thấy dưới một nửa sao.',
+    en: { label: 'Light bending (GR)', note: 'Off = straight light rays (redshift kept) for comparison: you then see less than half the star.' } },
+  { key: 'split', label: 'So sánh chia đôi', type: 'toggle', default: false, note: 'Trái: không gian phẳng · Phải: Schwarzschild.',
+    en: { label: 'Split-screen comparison', note: 'Left: flat space · Right: Schwarzschild.' } },
+  { key: 'grid', label: 'Lưới & nửa sau', type: 'toggle', default: false, note: 'Lưới kinh–vĩ độ. Phần tô cam là vùng bề mặt mà trong không gian phẳng bạn không thể thấy — chỉ hiện ra nhờ ánh sáng bị bẻ cong. Vòng hồng bao quanh hai cực từ.',
+    en: { label: 'Grid & far side', note: 'Latitude–longitude grid. The orange-shaded region is surface you could not see in flat space — it appears only because light bends. Pink rings circle the two magnetic poles.' } },
 ];
 
 const pulsar = makeScene({
@@ -532,17 +549,41 @@ const pulsar = makeScene({
     ...COMMON_FACTS,
     ['Glitch', 'ΔΩ/Ω ~ 10⁻⁶, ~3 năm/lần'],
   ],
+  en: {
+    name: 'Pulsar',
+    subtitle: 'Rotating neutron star · PSR J0835−4510 (Vela)',
+    blurb: 'The leftover core of a supernova: 1.4 solar masses crushed into a 12 km ball, spinning 11 times a second and sweeping two radio beams around like a lighthouse. Gravity is so strong that light bends around the star — you see <b>more than half</b> of its surface, sometimes both magnetic poles at once.',
+    intro: 'Turn on <b>Grid & far side</b>, then turn off <b>Light bending</b>: the orange-shaded area — the far half of the star — disappears. Press <b>B</b> to step into the beam’s path and hear the “tick” of each pulse.',
+    facts: [
+      ['Object', 'PSR J0835−4510 (Vela)'],
+      ['Distance', '≈ 940 light-years'],
+      ['Rotation period', '89.3 ms (11.2 turns/s)'],
+      ['Characteristic age', '~11,000 years'],
+      ['Surface magnetic field', '≈ 3.4×10¹² G'],
+      ['Surface temperature', '≈ 6.8×10⁵ K'],
+      ['Actual polar cap', 'r ~ 0.6 km (enlarged here)'],
+      ['Light cylinder', 'cP/2π ≈ 4,260 km'],
+      ...COMMON_FACTS_EN,
+      ['Glitches', 'ΔΩ/Ω ~ 10⁻⁶, about every 3 years'],
+    ],
+  },
   params: [
     ...GR_PARAMS,
-    { key: 'spin', label: 'Tốc độ quay hiển thị', type: 'range', min: 0, max: 2, step: 0.01, default: 0.3, fmt: v => vn(v, 2) + ' vòng/s', note: 'Đã làm chậm rất nhiều: Vela thật quay 11,2 vòng mỗi giây.' },
-    { key: 'alpha', label: 'Góc trục từ – trục quay', type: 'range', min: 0, max: 90, step: 1, default: 55, fmt: v => v.toFixed(0) + '°' },
-    { key: 'beam', label: 'Chùm tia vô tuyến', type: 'range', min: 0, max: 2, step: 0.01, default: 1, note: 'Sóng vô tuyến vô hình với mắt — vẽ bằng màu giả. Chùm chỉ chói khi chĩa thẳng vào bạn.' },
-    { key: 'lines', label: 'Đường sức từ lưỡng cực', type: 'range', min: 0, max: 2, step: 0.01, default: 0.6, note: 'r = L·sin²θ, cũng bị thấu kính hấp dẫn bẻ cong.' },
-    { key: 'radius', label: 'Bán kính sao', type: 'range', min: 6.5, max: 16, step: 0.1, default: 12, fmt: v => vn(v, 1) + ' km', note: 'Cùng 1,4 M☉. Sao càng đặc, ánh sáng càng bị bẻ cong; dưới 6,2 km (mặt cầu photon) bạn sẽ thấy toàn bộ bề mặt. Sao neutron thật: ~10–14 km.' },
-    { key: 'rtAudio', label: 'Âm thanh thời gian thực', type: 'toggle', default: false, note: 'Tiếng “tích” ở đúng tốc độ thật 11,2 Hz — nghe như tiếng rè. Chỉ khi bạn nằm trên đường quét.' },
+    { key: 'spin', label: 'Tốc độ quay hiển thị', type: 'range', min: 0, max: 2, step: 0.01, default: 0.3, fmt: v => vn(v, 2) + t(' vòng/s', ' turns/s'), note: 'Đã làm chậm rất nhiều: Vela thật quay 11,2 vòng mỗi giây.',
+      en: { label: 'Displayed spin rate', note: 'Slowed down enormously: the real Vela turns 11.2 times per second.' } },
+    { key: 'alpha', label: 'Góc trục từ – trục quay', type: 'range', min: 0, max: 90, step: 1, default: 55, fmt: v => v.toFixed(0) + '°', en: { label: 'Magnetic–spin axis angle' } },
+    { key: 'beam', label: 'Chùm tia vô tuyến', type: 'range', min: 0, max: 2, step: 0.01, default: 1, note: 'Sóng vô tuyến vô hình với mắt — vẽ bằng màu giả. Chùm chỉ chói khi chĩa thẳng vào bạn.',
+      en: { label: 'Radio beams', note: 'Radio waves are invisible to the eye — drawn in false colour. A beam is only dazzling when it points straight at you.' } },
+    { key: 'lines', label: 'Đường sức từ lưỡng cực', type: 'range', min: 0, max: 2, step: 0.01, default: 0.6, note: 'r = L·sin²θ, cũng bị thấu kính hấp dẫn bẻ cong.',
+      en: { label: 'Dipole field lines', note: 'r = L·sin²θ, also bent by gravitational lensing.' } },
+    { key: 'radius', label: 'Bán kính sao', type: 'range', min: 6.5, max: 16, step: 0.1, default: 12, fmt: v => vn(v, 1) + ' km', note: 'Cùng 1,4 M☉. Sao càng đặc, ánh sáng càng bị bẻ cong; dưới 6,2 km (mặt cầu photon) bạn sẽ thấy toàn bộ bề mặt. Sao neutron thật: ~10–14 km.',
+      en: { label: 'Star radius', note: 'Same 1.4 M☉. The more compact the star, the more light bends; below 6.2 km (the photon sphere) you would see the entire surface. Real neutron stars: ~10–14 km.' } },
+    { key: 'rtAudio', label: 'Âm thanh thời gian thực', type: 'toggle', default: false, note: 'Tiếng “tích” ở đúng tốc độ thật 11,2 Hz — nghe như tiếng rè. Chỉ khi bạn nằm trên đường quét.',
+      en: { label: 'Real-time audio', note: 'Ticks at the true rate of 11.2 Hz — it sounds like a buzz. Only when you are on the beam path.' } },
   ],
   actions: [
-    { label: 'Vào đường quét chùm tia', key: 'b', title: 'Đặt camera lên vĩ độ mà cực từ quét qua', run: beamPathAction },
+    { label: 'Vào đường quét chùm tia', key: 'b', title: 'Đặt camera lên vĩ độ mà cực từ quét qua', run: beamPathAction,
+      en: { label: 'Step into the beam path', title: 'Put the camera at the latitude swept by the magnetic pole' } },
   ],
 });
 
@@ -568,19 +609,43 @@ const magnetar = makeScene({
     ['QPO vỏ sao', '18 → 1 840 Hz'],
     ...COMMON_FACTS,
   ],
+  en: {
+    name: 'Magnetar',
+    subtitle: 'Neutron star with an extreme magnetic field · SGR 1806−20',
+    blurb: 'The neutron stars with the strongest magnetic fields known, ~10¹⁵ G — a thousand times a normal pulsar’s and beyond the point where the vacuum itself becomes birefringent. The twisted field strains the iron crust until it cracks: a “starquake” that unleashes a gamma-ray giant flare strong enough to disturb Earth’s ionosphere from tens of thousands of light-years away.',
+    intro: 'Press <b>Q</b> to trigger a <b>starquake</b> and watch the 2004 giant flare of SGR 1806−20. The plasma fireball is trapped by the magnetic field and co-rotates with the star — and thanks to GR it stays visible even after it has rotated behind the star.',
+    facts: [
+      ['Object', 'SGR 1806−20'],
+      ['Distance', '≈ 28,000 light-years'],
+      ['Rotation period', '7.56 s'],
+      ['Magnetic field', '≈ 2×10¹⁵ G'],
+      ['Relative to the QED limit', '≈ 45 × 4.4×10¹³ G'],
+      ['Surface temperature', '≈ 7×10⁶ K (0.6 keV)'],
+      ['Giant flare', '27 Dec 2004 · ~2×10³⁹ J'],
+      ['Time profile', '0.2 s spike + ~380 s tail'],
+      ['Crustal QPOs', '18 → 1,840 Hz'],
+      ...COMMON_FACTS_EN,
+    ],
+  },
   params: [
     ...GR_PARAMS,
-    { key: 'spin', label: 'Tốc độ quay hiển thị', type: 'range', min: 0, max: 1, step: 0.002, default: 0.132, fmt: v => vn(v, 3) + ' vòng/s', note: 'Mặc định ≈ thời gian thực (7,56 s mỗi vòng ở tốc độ thời gian 6×).' },
-    { key: 'alpha', label: 'Góc trục từ – trục quay', type: 'range', min: 0, max: 90, step: 1, default: 35, fmt: v => v.toFixed(0) + '°' },
-    { key: 'twist', label: 'Độ xoắn từ trường', type: 'range', min: 0, max: 2, step: 0.01, default: 0.9, fmt: v => vn(v, 2) + ' rad', note: 'Dòng điện chảy dọc đường sức làm từ trường xoắn lại; ứng suất này làm vỏ sao nứt.' },
-    { key: 'lines', label: 'Đường sức từ', type: 'range', min: 0, max: 2, step: 0.01, default: 1, note: 'Màu giả: vầng phát xạ từ plasma tán xạ cộng hưởng trong từ quyển xoắn.' },
-    { key: 'beam', label: 'Chùm tia', type: 'range', min: 0, max: 2, step: 0.01, default: 0.35, note: 'Phần lớn magnetar không phát xung vô tuyến; xung tia X của chúng đến từ điểm nóng trên bề mặt.' },
-    { key: 'radius', label: 'Bán kính sao', type: 'range', min: 6.5, max: 16, step: 0.1, default: 12, fmt: v => vn(v, 1) + ' km' },
-    { key: 'rtAudio', label: 'Âm thanh thời gian thực', type: 'toggle', default: false, note: 'Một xung mỗi 7,56 s, như nhịp tim chậm.' },
+    { key: 'spin', label: 'Tốc độ quay hiển thị', type: 'range', min: 0, max: 1, step: 0.002, default: 0.132, fmt: v => vn(v, 3) + t(' vòng/s', ' turns/s'), note: 'Mặc định ≈ thời gian thực (7,56 s mỗi vòng ở tốc độ thời gian 6×).',
+      en: { label: 'Displayed spin rate', note: 'Default ≈ real time (7.56 s per turn at the 6× time speed).' } },
+    { key: 'alpha', label: 'Góc trục từ – trục quay', type: 'range', min: 0, max: 90, step: 1, default: 35, fmt: v => v.toFixed(0) + '°', en: { label: 'Magnetic–spin axis angle' } },
+    { key: 'twist', label: 'Độ xoắn từ trường', type: 'range', min: 0, max: 2, step: 0.01, default: 0.9, fmt: v => vn(v, 2) + ' rad', note: 'Dòng điện chảy dọc đường sức làm từ trường xoắn lại; ứng suất này làm vỏ sao nứt.',
+      en: { label: 'Magnetic twist', note: 'Currents flowing along the field lines twist the field; that stress cracks the crust.' } },
+    { key: 'lines', label: 'Đường sức từ', type: 'range', min: 0, max: 2, step: 0.01, default: 1, note: 'Màu giả: vầng phát xạ từ plasma tán xạ cộng hưởng trong từ quyển xoắn.',
+      en: { label: 'Field lines', note: 'False colour: glow from resonant scattering by plasma in the twisted magnetosphere.' } },
+    { key: 'beam', label: 'Chùm tia', type: 'range', min: 0, max: 2, step: 0.01, default: 0.35, note: 'Phần lớn magnetar không phát xung vô tuyến; xung tia X của chúng đến từ điểm nóng trên bề mặt.',
+      en: { label: 'Beams', note: 'Most magnetars emit no radio pulses; their X-ray pulses come from hot spots on the surface.' } },
+    { key: 'radius', label: 'Bán kính sao', type: 'range', min: 6.5, max: 16, step: 0.1, default: 12, fmt: v => vn(v, 1) + ' km', en: { label: 'Star radius' } },
+    { key: 'rtAudio', label: 'Âm thanh thời gian thực', type: 'toggle', default: false, note: 'Một xung mỗi 7,56 s, như nhịp tim chậm.',
+      en: { label: 'Real-time audio', note: 'One pulse every 7.56 s, like a slow heartbeat.' } },
   ],
   actions: [
     {
       label: 'Động đất sao', key: 'q', title: 'Vỏ sao nứt vỡ → siêu bùng nổ tia gamma',
+      en: { label: 'Starquake', title: 'The crust cracks → gamma-ray giant flare' },
       run(ctx) {
         const inst = ctx.scene && ctx.scene.id === 'magnetar' ? currentMagnetar : null;
         if (!inst) return;
@@ -590,10 +655,12 @@ const magnetar = makeScene({
         A.tone(41, 5, 0.12, 0, 'sawtooth');
         A.tone(92.5, 7, 0.06, -0.3, 'sine'); A.tone(150, 6, 0.045, 0.3, 'sine'); A.tone(625, 3.5, 0.02, 0, 'sine');
         for (let i = 0; i < 9; i++) setTimeout(() => A.click(0.3 * Math.exp(-i / 4), (Math.random() - 0.5) * 1.4, 0.4 + 0.6 * Math.random()), 30 + i * (40 + Math.random() * 90));
-        ctx.toast('<b>Động đất sao!</b> Ứng suất của từ trường 10¹⁵ G làm vỡ lớp vỏ sắt. Ngày 27/12/2004, SGR 1806−20 phóng ra ~10³⁹ J chỉ trong 0,2 giây; dù ở cách hàng chục nghìn năm ánh sáng (ước tính lúc đó ~50 000), tia gamma vẫn ion hóa tầng điện ly của Trái Đất. Quả cầu plasma bị từ trường giam lại, quay cùng sao, nên “đuôi” bùng nổ nhấp nháy theo chu kỳ 7,56 s suốt ~6 phút. Âm thanh: dao động xoắn của vỏ sao ở 92,5 · 150 · 625 Hz — các tần số đã đo được thật.', 12000);
+        ctx.toast(t('<b>Động đất sao!</b> Ứng suất của từ trường 10¹⁵ G làm vỡ lớp vỏ sắt. Ngày 27/12/2004, SGR 1806−20 phóng ra ~10³⁹ J chỉ trong 0,2 giây; dù ở cách hàng chục nghìn năm ánh sáng (ước tính lúc đó ~50 000), tia gamma vẫn ion hóa tầng điện ly của Trái Đất. Quả cầu plasma bị từ trường giam lại, quay cùng sao, nên “đuôi” bùng nổ nhấp nháy theo chu kỳ 7,56 s suốt ~6 phút. Âm thanh: dao động xoắn của vỏ sao ở 92,5 · 150 · 625 Hz — các tần số đã đo được thật.',
+          '<b>Starquake!</b> Stress from the 10¹⁵ G field shatters the iron crust. On 27 December 2004, SGR 1806−20 released ~10³⁹ J in just 0.2 seconds; although it lies tens of thousands of light-years away (estimated at ~50,000 at the time), its gamma rays still ionised Earth’s ionosphere. The plasma fireball is trapped by the magnetic field and co-rotates with the star, so the flare’s “tail” pulsed with the 7.56 s period for ~6 minutes. Sound: torsional oscillations of the crust at 92.5 · 150 · 625 Hz — frequencies that were actually measured.'), 12000);
       },
     },
-    { label: 'Vào đường quét chùm tia', key: 'b', title: 'Đặt camera lên vĩ độ mà cực từ quét qua', run: beamPathAction },
+    { label: 'Vào đường quét chùm tia', key: 'b', title: 'Đặt camera lên vĩ độ mà cực từ quét qua', run: beamPathAction,
+      en: { label: 'Step into the beam path', title: 'Put the camera at the latitude swept by the magnetic pole' } },
   ],
 });
 

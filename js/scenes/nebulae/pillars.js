@@ -31,6 +31,7 @@
 // Assets and licences: assets/pillars/CREDITS.txt (ESA/Hubble, ESA/Webb — CC BY 4.0).
 import * as THREE from 'three';
 import { COMMON_GLSL, FULLSCREEN_VERT } from '../../glsl/common.js';
+import { t, dec } from '../../i18n.js';
 
 const ASSET = f => new URL(`../../../assets/pillars/${f}`, import.meta.url).href;
 
@@ -461,7 +462,7 @@ void main(){
 // helpers
 // ------------------------------------------------------------------------------------------
 const stepsFor = q => (q.steps <= 200 ? 64 : q.steps <= 320 ? 80 : q.steps <= 480 ? 96 : 112);
-const vi = (x, d = 1) => x.toFixed(d).replace('.', ',');
+const vi = (x, d = 1) => dec(x, d);
 // Colours for the reconstructed (off-axis) surfaces, measured in the photos (linear, luminance 1): median dust
 // away from the fronts; the ionisation fringe — Hubble/JWST: the pale blue-white / teal haze off the lit
 // tips; natural colour: the same narrow-band fluxes through natural(). cap = 1.6 × median dust brightness.
@@ -476,9 +477,9 @@ const PAL_SURF = [
   { dust: norm3([0.128, 0.0789, 0.0822]), fringe: norm3([0.7, 0.85, 1.4]), cap: 1.6 * 0.0896 },
 ];
 const PAL = [
-  { name: 'Hubble 2014 (màu tổng hợp)', short: 'Hubble · [S II] đỏ, Hα lục, [O III] lam', kap: 1, spk: 0 },
-  { name: 'Màu tự nhiên', short: 'Hα đỏ thẫm · [O III] lục lam · Hβ lam', kap: 1, spk: 0 },
-  { name: 'JWST NIRCam (hồng ngoại gần)', short: 'JWST 0,9–4,4 µm · bụi ấm và PAH', kap: 0.3, spk: 1 },
+  { name: 'Hubble 2014 (màu tổng hợp)', short: 'Hubble · [S II] đỏ, Hα lục, [O III] lam', shortEn: 'Hubble · [S II] red, Hα green, [O III] blue', kap: 1, spk: 0 },
+  { name: 'Màu tự nhiên', short: 'Hα đỏ thẫm · [O III] lục lam · Hβ lam', shortEn: 'Hα deep red · [O III] teal · Hβ blue', kap: 1, spk: 0 },
+  { name: 'JWST NIRCam (hồng ngoại gần)', short: 'JWST 0,9–4,4 µm · bụi ấm và PAH', shortEn: 'JWST 0.9–4.4 µm · warm dust and PAHs', kap: 0.3, spk: 1 },
 ];
 // tip of the left pillar (P1) — where Hester et al. (1996) found the EGGs — and a viewpoint in the gap
 const P1_TIP = new THREE.Vector3(-0.785, 2.89, -1.0);
@@ -498,7 +499,7 @@ function loadTex(url) {
     tex.generateMipmaps = true; tex.anisotropy = 4;
     tex.needsUpdate = true;
     resolve(tex);
-  }, undefined, () => reject(new Error(`không tải được ${url}`))));
+  }, undefined, () => reject(new Error(t(`không tải được ${url}`, `could not load ${url}`)))));
 }
 // slab geometry: 512 × 534 × (h, zc, zlo, zhi) as little-endian uint16 over [0,2.5], [−4,4], [−9,9], [−9,9] ly
 async function loadGeo(url) {
@@ -611,31 +612,53 @@ const def = {
     ['Tuổi thọ ước tính', '≈ 3 triệu năm (McLeod et al. 2015, MUSE)'],
     ['Ảnh gốc', 'NASA, ESA/Hubble & Hubble Heritage Team (2014); NASA, ESA, CSA, STScI — J. DePasquale, A. Koekemoer, A. Pagan (JWST 2022) · CC BY 4.0'],
   ],
+  en: {
+    name: 'Pillars of Creation',
+    subtitle: 'H II region · M16, the Eagle Nebula — 3D rebuilt from Hubble & JWST images',
+    blurb: 'Three columns of cold gas and dust, several light-years tall, in the Eagle Nebula, slowly sculpted by the ultraviolet light of the O stars in the cluster NGC 6611. On the side facing the stars the gas is ionized and <b>photoevaporates</b> into a thin bright rim; at the pillar tips remain “fingers” and <b>EGGs</b> — dense knots of gas collapsing into stars. The scene builds the 3D volume directly from real Hubble and JWST images.',
+    intro: 'The default view is the real photograph. Drag to orbit — the pillars separate in depth (P3 is closest to us, the tip of P1 lies behind the cluster). Switch the <b>palette</b> to <b>JWST</b> to see the dust turn transparent and reveal newborn stars.',
+    facts: [
+      ['Distance', '≈ 5,700 light-years (1.74 kpc, Gaia)'], ['Constellation', 'Serpens (Serpens Cauda)'],
+      ['Height of left pillar (P1)', '≈ 4–5 light-years (projected)'], ['Ionizing cluster', 'NGC 6611 · ~1–2 million years old'],
+      ['Hottest star', 'HD 168076 · O3.5 V, ~45,000 K'], ['Photoevaporation flow', '≈ 8 km/s · ~70 M☉ per million years'],
+      ['Estimated lifetime', '≈ 3 million years (McLeod et al. 2015, MUSE)'],
+      ['Source images', 'NASA, ESA/Hubble & Hubble Heritage Team (2014); NASA, ESA, CSA, STScI — J. DePasquale, A. Koekemoer, A. Pagan (JWST 2022) · CC BY 4.0'],
+    ],
+  },
   camera: { distance: D0, polar: 90, azimuth: 0, min: 0.25, max: 60, fov: 35, target: [0, 0, 0] },
   exposure: 1.0,
   bloom: 0.15,
   params: [
     { key: 'palette', label: 'Bảng màu', type: 'seg', options: [[0, 'Hubble 2014'], [1, 'Màu tự nhiên'], [2, 'JWST NIRCam']], default: 0,
-      note: 'Hubble: [S II] → đỏ, Hα → lục, [O III] → lam (màu tổng hợp). Tự nhiên: Hα đỏ thẫm, [O III] lục lam. JWST: bụi chỉ tắt sáng ~10 % so với ánh sáng nhìn thấy (A<sub>K</sub>/A<sub>V</sub> ≈ 0,1).' },
+      note: 'Hubble: [S II] → đỏ, Hα → lục, [O III] → lam (màu tổng hợp). Tự nhiên: Hα đỏ thẫm, [O III] lục lam. JWST: bụi chỉ tắt sáng ~10 % so với ánh sáng nhìn thấy (A<sub>K</sub>/A<sub>V</sub> ≈ 0,1).',
+      en: { label: 'Palette', note: 'Hubble: [S II] → red, Hα → green, [O III] → blue (false colour). Natural: Hα deep red, [O III] teal. JWST: dust dims the light only ~10 % as much as in visible light (A<sub>K</sub>/A<sub>V</sub> ≈ 0.1).', options: ['Hubble 2014', 'Natural colour', 'JWST NIRCam'] } },
     { key: 'dust', label: 'Mật độ bụi', type: 'range', min: 0, max: 2.5, step: 0.01, default: 1, fmt: v => '×' + v.toFixed(2),
-      note: '×1 khớp đúng ảnh thật. Bụi dày hơn che khuất cả các sao phía sau; mỏng đi thì lộ ra thành phía xa của khoang H II.' },
+      note: '×1 khớp đúng ảnh thật. Bụi dày hơn che khuất cả các sao phía sau; mỏng đi thì lộ ra thành phía xa của khoang H II.',
+      en: { label: 'Dust density', note: '×1 matches the real image. Thicker dust hides even the stars behind; thinner dust reveals the far wall of the H II cavity.' } },
     { key: 'ion', label: 'Cường độ cụm sao ion hóa', type: 'range', min: 0, max: 2.5, step: 0.01, default: 1, fmt: v => '×' + v.toFixed(2),
-      note: 'Thông lượng photon ion hóa (λ < 91,2 nm) từ NGC 6611. Viền mặt ion hóa sáng ∝ Φ, tốc độ mất khối ∝ Φ<sup>1/2</sup>.' },
+      note: 'Thông lượng photon ion hóa (λ < 91,2 nm) từ NGC 6611. Viền mặt ion hóa sáng ∝ Φ, tốc độ mất khối ∝ Φ<sup>1/2</sup>.',
+      en: { label: 'Ionizing cluster strength', note: 'Ionizing photon flux (λ < 91.2 nm) from NGC 6611. The ionization-front rim brightens ∝ Φ, the mass-loss rate ∝ Φ<sup>1/2</sup>.' } },
   ],
   actions: [
     { label: 'Đổi bảng màu', key: 'p', run: ctx => {
       ctx.params.palette = (ctx.params.palette + 1) % 3;
-      ctx.toast(['<b>Hubble 2014</b>: ba vạch hẹp gán vào ba kênh màu — màu “tổng hợp” giúp tách các nguyên tố.',
-        '<b>Màu tự nhiên</b>: mắt người sẽ thấy Hα đỏ thẫm pha Hβ và [O III] — tinh vân hồng đỏ, các cột tối nâu.',
-        '<b>JWST NIRCam</b>: hồng ngoại gần xuyên qua bụi — cột trở nên trong mờ, lộ ra hàng nghìn sao và các sao mới sinh đỏ rực.'][ctx.params.palette]);
-    } },
-    { label: 'Bay vào khe', key: 'g', title: 'Bay vào khoảng trống giữa các cột', run: ctx => ctx.scene._go?.(ctx, 'gap') },
-    { label: 'Đỉnh cột & EGG', key: 'e', title: 'Đến đỉnh cột trái, nơi có các khối EGG', run: ctx => ctx.scene._go?.(ctx, 'tip') },
-    { label: 'Góc ảnh gốc', key: 'r', title: 'Về đúng góc nhìn của kính thiên văn', run: ctx => ctx.scene._go?.(ctx, 'home') },
+      ctx.toast([t('<b>Hubble 2014</b>: ba vạch hẹp gán vào ba kênh màu — màu “tổng hợp” giúp tách các nguyên tố.',
+          '<b>Hubble 2014</b>: three narrow emission lines mapped to three colour channels — this “false colour” separates the elements.'),
+        t('<b>Màu tự nhiên</b>: mắt người sẽ thấy Hα đỏ thẫm pha Hβ và [O III] — tinh vân hồng đỏ, các cột tối nâu.',
+          '<b>Natural colour</b>: the human eye would see deep-red Hα mixed with Hβ and [O III] — a pinkish-red nebula with dark brown pillars.'),
+        t('<b>JWST NIRCam</b>: hồng ngoại gần xuyên qua bụi — cột trở nên trong mờ, lộ ra hàng nghìn sao và các sao mới sinh đỏ rực.',
+          '<b>JWST NIRCam</b>: near-infrared light passes through the dust — the pillars turn translucent, revealing thousands of stars and glowing red newborn stars.')][ctx.params.palette]);
+    }, en: { label: 'Change palette' } },
+    { label: 'Bay vào khe', key: 'g', title: 'Bay vào khoảng trống giữa các cột', run: ctx => ctx.scene._go?.(ctx, 'gap'),
+      en: { label: 'Fly into the gap', title: 'Fly into the space between the pillars' } },
+    { label: 'Đỉnh cột & EGG', key: 'e', title: 'Đến đỉnh cột trái, nơi có các khối EGG', run: ctx => ctx.scene._go?.(ctx, 'tip'),
+      en: { label: 'Pillar tip & EGGs', title: 'Go to the tip of the left pillar, where the EGGs are' } },
+    { label: 'Góc ảnh gốc', key: 'r', title: 'Về đúng góc nhìn của kính thiên văn', run: ctx => ctx.scene._go?.(ctx, 'home'),
+      en: { label: 'Original view', title: 'Return to the telescope’s exact viewpoint' } },
     { label: 'Tắt cụm sao', key: 'o', title: 'Tắt / bật nguồn UV của NGC 6611', run: ctx => {
       ctx.params.ion = ctx.params.ion > 0.05 ? 0 : 1;
-      ctx.toast(ctx.params.ion ? 'NGC 6611 sáng trở lại: khí bị ion hóa, các viền bốc hơi bừng sáng.' : 'Không còn tia UV: khí H II tái hợp và tối dần (~10⁵ năm) — chỉ còn bóng bụi trước nền sao.');
-    } },
+      ctx.toast(ctx.params.ion ? t('NGC 6611 sáng trở lại: khí bị ion hóa, các viền bốc hơi bừng sáng.', 'NGC 6611 shines again: the gas is ionized and the evaporating rims light up.') : t('Không còn tia UV: khí H II tái hợp và tối dần (~10⁵ năm) — chỉ còn bóng bụi trước nền sao.', 'No more UV: the H II gas recombines and fades (~10⁵ years) — only dust silhouettes against the stars remain.'));
+    }, en: { label: 'Switch off cluster', title: 'Switch the UV source NGC 6611 off / on' } },
   ],
   create(ctx) {
     const U = {
@@ -679,9 +702,12 @@ const def = {
       const v = VIEWS[which];
       if (instant) { c.camera.position.copy(v.pos); c.controls.target.copy(v.tgt); c.camera.lookAt(v.tgt); fly = null; return; }
       fly = { p0: c.camera.position.clone(), t0: c.controls.target.clone(), p1: v.pos, t1: v.tgt, k: 0, dur: which === 'home' ? 2.5 : 4 };
-      c.toast({ gap: 'Giữa các cột: P3 và P2 ở phía trước cụm sao, đỉnh P1 lùi về phía sau — điều chỉ thấy được khi đổi góc nhìn.',
-        tip: 'Đỉnh cột trái: những “ngón tay” khí đặc (EGG) còn sót lại khi khí xung quanh đã bốc hơi — bên trong có thể có sao đang hình thành.',
-        home: 'Góc nhìn của Hubble/JWST: dựng khối 3D khớp đúng từng điểm ảnh của ảnh thật.' }[which], 7000);
+      c.toast({ gap: () => t('Giữa các cột: P3 và P2 ở phía trước cụm sao, đỉnh P1 lùi về phía sau — điều chỉ thấy được khi đổi góc nhìn.',
+          'Between the pillars: P3 and P2 lie in front of the cluster, while the tip of P1 sits farther back — something you only see from a different angle.'),
+        tip: () => t('Đỉnh cột trái: những “ngón tay” khí đặc (EGG) còn sót lại khi khí xung quanh đã bốc hơi — bên trong có thể có sao đang hình thành.',
+          'Tip of the left pillar: dense “fingers” of gas (EGGs) left behind after the surrounding gas evaporated — stars may be forming inside.'),
+        home: () => t('Góc nhìn của Hubble/JWST: dựng khối 3D khớp đúng từng điểm ảnh của ảnh thật.',
+          'The Hubble/JWST viewpoint: the 3D volume matches the real image pixel for pixel.') }[which](), 7000);
     };
     def._go = go;
     const sm = { ion: 1, dust: 1 };
@@ -735,11 +761,11 @@ const def = {
         const ion = Math.max(p.ion, 0);
         const mdot = 70 * Math.sqrt(ion);
         return [
-          ['Bảng màu', (PAL[p.palette] || PAL[0]).short],
-          ['Camera cách đỉnh cột trái', vi(dTip, dTip < 2 ? 2 : 1) + ' năm ánh sáng'],
-          ['A<sub>V</sub> qua lõi cột', '≈ ' + vi(5.4 * p.dust) + ' mag' + (p.palette === 2 ? ' (ở 2 µm chỉ ≈ ' + vi(0.55 * p.dust) + ')' : '')],
-          ['Dòng bốc hơi', ion > 0.02 ? '≈ 8 km/s · ' + Math.round(mdot) + ' M☉/triệu năm' : 'ngừng (không còn UV)'],
-          ['Tuổi thọ còn lại', ion > 0.02 ? '≈ ' + vi(200 / mdot, 1) + ' triệu năm' : 'không bị bào mòn'],
+          [t('Bảng màu', 'Palette'), t((PAL[p.palette] || PAL[0]).short, (PAL[p.palette] || PAL[0]).shortEn)],
+          [t('Camera cách đỉnh cột trái', 'Camera to left pillar tip'), vi(dTip, dTip < 2 ? 2 : 1) + t(' năm ánh sáng', ' light-years')],
+          [t('A<sub>V</sub> qua lõi cột', 'A<sub>V</sub> through pillar core'), '≈ ' + vi(5.4 * p.dust) + ' mag' + (p.palette === 2 ? t(' (ở 2 µm chỉ ≈ ', ' (only ≈ ') + vi(0.55 * p.dust) + t(')', ' at 2 µm)') : '')],
+          [t('Dòng bốc hơi', 'Evaporation flow'), ion > 0.02 ? '≈ 8 km/s · ' + Math.round(mdot) + t(' M☉/triệu năm', ' M☉/Myr') : t('ngừng (không còn UV)', 'stopped (no UV)')],
+          [t('Tuổi thọ còn lại', 'Remaining lifetime'), ion > 0.02 ? '≈ ' + vi(200 / mdot, 1) + t(' triệu năm', ' Myr') : t('không bị bào mòn', 'not eroding')],
         ];
       },
     };

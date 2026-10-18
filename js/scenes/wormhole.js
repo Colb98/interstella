@@ -22,6 +22,7 @@
 import * as THREE from 'three';
 import { COMMON_GLSL, FULLSCREEN_VERT } from '../glsl/common.js';
 import { BH_GLSL } from '../glsl/blackhole.js';
+import { t } from '../i18n.js';
 
 const V3 = THREE.Vector3;
 const W_TO_M = 1 / 1.42953;            // lensing width W = 1.42953 M (James et al. 2015, eq. 7)
@@ -361,7 +362,7 @@ function refreshPanel(def, params) {
     if (!box) return;
     box.querySelectorAll('.ctl').forEach(c => {
       const lab = c.querySelector('.top span');
-      const p = lab && def.params.find(q => q.label === lab.textContent);
+      const p = lab && def.params.find(q => q.label === lab.textContent || (q.en && q.en.label === lab.textContent));
       if (!p) return;
       if (p.type === 'range') {
         const inp = c.querySelector('input'), val = c.querySelector('.val');
@@ -394,6 +395,21 @@ const DEF = {
     ['Vật chất ngoại lai', 'Bắt buộc (năng lượng âm)'],
     ['Vành Sao Thổ', '1,24–2,27 bán kính'],
   ],
+  en: {
+    name: 'Wormhole',
+    subtitle: 'Traversable wormhole · the “Dneg” metric from Interstellar',
+    blurb: 'A “crystal ball” hanging beside Saturn: look into it and you see the sky of another galaxy, home to the black hole Gargantua. The image is rendered by solving the null geodesic equations in the “Dneg” metric that Kip Thorne and the Double Negative team built for the film <i>Interstellar</i> (James, von Tunzelmann, Franklin & Thorne 2015). To hold the throat open, general relativity demands “exotic matter” with negative energy — something no one has ever seen on macroscopic scales.',
+    intro: 'Press <b>X</b> to fly through the wormhole to Gargantua (press again to come home). Try a larger <b>Lensing width W</b> to watch the Einstein ring swell.',
+    facts: [
+      ['Model', '“Dneg” metric'],
+      ['Paper', '<i>Am. J. Phys.</i> 83, 486 (2015)'],
+      ['Parameters (film)', 'a = 0.01ρ · W = 0.05ρ'],
+      ['Location (film)', 'Orbit near Saturn'],
+      ['Gargantua (film)', '≈ 10⁸ M☉'],
+      ['Exotic matter', 'Required (negative energy)'],
+      ['Saturn’s rings', '1.24–2.27 radii'],
+    ],
+  },
   camera: { distance: 27.63, polar: 84.8, azimuth: 19.1, min: 1.3, max: 200, fov: 45 },
   exposure: 1.0,
   bloom: 0.5,
@@ -402,18 +418,23 @@ const DEF = {
     { key: 'preset', label: 'Cấu hình', type: 'seg', default: 'film',
       options: [['film', 'Phim'], ['lens', 'Thấu kính rộng'], ['long', 'Hố dài'], ['custom', 'Tùy chỉnh']],
       note: 'Phim: a = 0,01ρ, W = 0,05ρ — lựa chọn của Christopher Nolan trong bài báo của Thorne.',
+      en: { label: 'Configuration', options: ['Film', 'Wide lens', 'Long throat', 'Custom'], note: 'Film: a = 0.01ρ, W = 0.05ρ — Christopher Nolan’s choice in Thorne’s paper.' },
       onChange: (v, ctx) => { const pr = PRESETS[v]; if (pr) { ctx.params.length = pr[0]; ctx.params.width = pr[1]; refreshPanel(DEF, ctx.params); } } },
     { key: 'width', label: 'Độ rộng thấu kính W/ρ', type: 'range', min: 0.01, max: 1.5, step: 0.01, default: 0.05, fmt: v => v.toFixed(2),
       note: 'W = 1,43 M: vùng không gian cong quanh miệng hố. W lớn → vành Einstein rộng, ảnh vũ trụ bên kia bị bóp nhỏ.',
+      en: { label: 'Lensing width W/ρ', note: 'W = 1.43 M: the region of curved space around the mouth. Larger W → a wider Einstein ring and a smaller image of the other universe.' },
       onChange: (v, ctx) => { ctx.params.preset = 'custom'; refreshPanel(DEF, ctx.params); } },
     { key: 'length', label: 'Nửa chiều dài cổ a/ρ', type: 'range', min: 0, max: 3, step: 0.01, default: 0.01, fmt: v => v.toFixed(2),
       note: 'Cổ hố là một hình trụ chu vi 2πρ dài 2a. Cổ càng dài, tia sáng càng quấn nhiều vòng → nhiều ảnh lặp của bầu trời.',
+      en: { label: 'Throat half-length a/ρ', note: 'The throat is a cylinder of circumference 2πρ and length 2a. The longer the throat, the more times light rays wrap around it → more repeated images of the sky.' },
       onChange: (v, ctx) => { ctx.params.preset = 'custom'; refreshPanel(DEF, ctx.params); } },
-    { key: 'saturn', label: 'Sao Thổ', type: 'toggle', default: true },
+    { key: 'saturn', label: 'Sao Thổ', type: 'toggle', default: true, en: { label: 'Saturn' } },
   ],
   actions: [
-    { label: 'Xuyên qua', key: 'x', title: 'Bay xuyên qua hố sâu sang vũ trụ bên kia (và quay về)', run: ctx => ctx.scene._inst?.travel(ctx) },
-    { label: 'Nhìn về miệng hố', key: 'g', title: 'Bay tới gần miệng hố sâu trong vũ trụ hiện tại', run: ctx => ctx.scene._inst?.mouthView(ctx) },
+    { label: 'Xuyên qua', key: 'x', title: 'Bay xuyên qua hố sâu sang vũ trụ bên kia (và quay về)', run: ctx => ctx.scene._inst?.travel(ctx),
+      en: { label: 'Go through', title: 'Fly through the wormhole to the other universe (and back)' } },
+    { label: 'Nhìn về miệng hố', key: 'g', title: 'Bay tới gần miệng hố sâu trong vũ trụ hiện tại', run: ctx => ctx.scene._inst?.mouthView(ctx),
+      en: { label: 'View the mouth', title: 'Fly up close to the wormhole mouth in the current universe' } },
   ],
   create(ctx) {
     const uniforms = {
@@ -490,14 +511,14 @@ const DEF = {
         const p1 = new V3(0, 0, from * (g.RW + 10));
         // step 1: line up on the z axis, looking at the mouth
         flyJob(ctx, p1, new V3(0, 0, 0), THREE.MathUtils.clamp(ctx.camera.position.distanceTo(p1) / 14, 2.5, 7), { next: 'through', from }, true);
-        ctx.toast(from > 0 ? 'Căn thẳng hàng với miệng hố sâu…' : 'Quay về: hướng về miệng hố sâu…', 3000);
+        ctx.toast(from > 0 ? t('Căn thẳng hàng với miệng hố sâu…', 'Lining up with the wormhole mouth…') : t('Quay về: hướng về miệng hố sâu…', 'Heading home: turning toward the wormhole mouth…'), 3000);
       },
       mouthView(ctx) {
         if (st.job) return;
         if (st.uni > 0) flyJob(ctx, START.clone(), new V3(), 4, { target: new V3(), min: 1.3, max: 200 }, false);
         else {
           flyJob(ctx, MOUTH_VIEW_B.clone(), new V3(), 6, { target: new V3(), min: 1.3, max: 115 }, true);
-          ctx.toast('Nhìn ngược qua miệng hố: bên trong là Sao Thổ và Ngân Hà của chúng ta.', 6000);
+          ctx.toast(t('Nhìn ngược qua miệng hố: bên trong là Sao Thổ và Ngân Hà của chúng ta.', 'Looking back through the mouth: inside are Saturn and our Milky Way.'), 6000);
         }
       },
       update(dt, ctx) {
@@ -560,7 +581,7 @@ const DEF = {
             if (finished) job.s = sEnd;
             if (!job.inThroat && Math.abs(job.s) < g.a + 0.6) {
               job.inThroat = true;
-              ctx.toast('Cổ hố sâu: mặt cầu có chu vi nhỏ nhất, 2πρ. Mọi hướng xung quanh bạn đều là “phía trước” lẫn “phía sau”.', 5000);
+              ctx.toast(t('Cổ hố sâu: mặt cầu có chu vi nhỏ nhất, 2πρ. Mọi hướng xung quanh bạn đều là “phía trước” lẫn “phía sau”.', 'The wormhole throat: the sphere of smallest circumference, 2πρ. Every direction around you is both “ahead” and “behind”.'), 5000);
               ctx.audio.tone(73.4, 4, 0.12, 0, 'sine');
             }
             axisPos(job.s, g, cam.position);
@@ -569,11 +590,11 @@ const DEF = {
             moved = true;
             if (finished) {
               if (job.from > 0) {
-                ctx.toast('Chào mừng tới vũ trụ bên kia. Phía trước là <b>Gargantua</b>.', 5000);
+                ctx.toast(t('Chào mừng tới vũ trụ bên kia. Phía trước là <b>Gargantua</b>.', 'Welcome to the other universe. Ahead lies <b>Gargantua</b>.'), 5000);
                 st.job = { kind: 'fly', t: 0, dur: 7, p0: cam.position.clone(), mid: cam.position.clone().lerp(CB.clone().add(ARRIVE), 0.5).add(new V3(0, 3, 0)),
                   p1: CB.clone().add(ARRIVE), q0: cam.quaternion.clone(), q1: lookQuat(CB.clone().add(ARRIVE), CB), end: { target: CB.clone(), min: 1.6 * RSB, max: 115 } };
               } else {
-                ctx.toast('Đã về nhà — Sao Thổ và Ngân Hà của chúng ta.', 4000);
+                ctx.toast(t('Đã về nhà — Sao Thổ và Ngân Hà của chúng ta.', 'Home again — Saturn and our Milky Way.'), 4000);
                 st.job = { kind: 'fly', t: 0, dur: 4.5, p0: cam.position.clone(), mid: cam.position.clone().lerp(START, 0.5).add(new V3(4, 2, 0)),
                   p1: START.clone(), q0: cam.quaternion.clone(), q1: lookQuat(START, new V3()), end: { target: new V3(), min: 1.3, max: 200 } };
               }
@@ -612,12 +633,12 @@ const DEF = {
       hud(ctx) {
         const g = geom(ctx.params), L = st.L;
         const rows = [
-          ['Vũ trụ', st.uni > 0 ? 'A · của chúng ta' : 'B · Gargantua'],
-          ['Tọa độ riêng ℓ', `${L >= 0 ? '+' : '−'}${Math.abs(L).toFixed(2)} ρ${st.mode === 2 ? '' : ' (≈)'}`],
-          ['Tới cổ hố sâu', `${Math.max(0, Math.abs(L) - g.a).toFixed(2)} ρ`],
-          ['Bán kính chu vi r(ℓ)', `${(Math.abs(L) <= g.LW ? rOf(L, g) : ctx.camera.position.length()).toFixed(2)} ρ`],
+          [t('Vũ trụ', 'Universe'), st.uni > 0 ? t('A · của chúng ta', 'A · ours') : 'B · Gargantua'],
+          [t('Tọa độ riêng ℓ', 'Proper distance ℓ'), `${L >= 0 ? '+' : '−'}${Math.abs(L).toFixed(2)} ρ${st.mode === 2 ? '' : ' (≈)'}`],
+          [t('Tới cổ hố sâu', 'To the throat'), `${Math.max(0, Math.abs(L) - g.a).toFixed(2)} ρ`],
+          [t('Bán kính chu vi r(ℓ)', 'Circumferential radius r(ℓ)'), `${(Math.abs(L) <= g.LW ? rOf(L, g) : ctx.camera.position.length()).toFixed(2)} ρ`],
         ];
-        if (st.uni < 0) rows.push(['Tới Gargantua', `${(ctx.camera.position.distanceTo(CB) / RSB).toFixed(1)} r_s`]);
+        if (st.uni < 0) rows.push([t('Tới Gargantua', 'To Gargantua'), `${(ctx.camera.position.distanceTo(CB) / RSB).toFixed(1)} r_s`]);
         return rows;
       },
     };

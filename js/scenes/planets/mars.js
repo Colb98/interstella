@@ -16,6 +16,7 @@
 // lighting you ask for holds while you orbit.
 import * as THREE from 'three';
 import { COMMON_GLSL, FULLSCREEN_VERT } from '../../glsl/common.js';
+import { t, dec, locale } from '../../i18n.js';
 
 const D2R = Math.PI / 180;
 const RKM = 3389.5;
@@ -732,7 +733,7 @@ function decodeImage(url) {
       g.drawImage(img, 0, 0);
       resolve({ W, H, px: g.getImageData(0, 0, W, H).data });
     };
-    img.onerror = () => reject(new Error(`không tải được ${url}`));
+    img.onerror = () => reject(new Error(t(`không tải được ${url}`, `could not load ${url}`)));
     img.src = url;
   });
 }
@@ -789,7 +790,7 @@ function loadImageTex(url, { srgb = false, aniso = 1, maxSize = 16384, repeat = 
     tex.generateMipmaps = true; tex.anisotropy = aniso;
     tex.needsUpdate = true;
     resolve(tex);
-  }, undefined, () => reject(new Error(`không tải được ${url}`))));
+  }, undefined, () => reject(new Error(t(`không tải được ${url}`, `could not load ${url}`)))));
 }
 const retry = (fn, url, ...a) => fn(url, ...a).catch(() => new Promise(r => setTimeout(r, 500)).then(() => fn(url + '?r=' + Date.now(), ...a)));
 function solidTex(data, format, type) {
@@ -806,10 +807,10 @@ function sampleElev(cpu, lat, lon, lon0 = -180, lat0 = -90, spanLon = 360, spanL
 /* ================================================================================================
    Scene
    ================================================================================================ */
-const vn = (x, d) => x.toFixed(d).replace('.', ',');
+const vn = (x, d) => dec(x, d);
 const hhmm = h => { h = ((h % 24) + 24) % 24; return `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')}`; };
-const latStr = v => `${vn(Math.abs(v), 1)}°${v >= 0 ? 'B' : 'N'}`;
-const lonStr = v => `${vn(Math.abs(v), 1)}°${v >= 0 ? 'Đ' : 'T'}`;
+const latStr = v => `${vn(Math.abs(v), 1)}°${v >= 0 ? t('B', 'N') : t('N', 'S')}`;
+const lonStr = v => `${vn(Math.abs(v), 1)}°${v >= 0 ? t('Đ', 'E') : t('T', 'W')}`;
 function sunFromHourE(cam, hour, declDeg, out) {
   const az = Math.atan2(cam.x, cam.z) - (hour - 12) * Math.PI / 12, d = declDeg * D2R;
   return out.set(Math.cos(d) * Math.sin(az), Math.sin(d), Math.cos(d) * Math.cos(az));
@@ -823,14 +824,15 @@ function hitSphere(o, d, R = 1) {
   return t > 0 ? t : null;
 }
 function seasonName(Ls) {
-  const n = ['xuân', 'hạ', 'thu', 'đông'], s = ['thu', 'đông', 'xuân', 'hạ'];
+  const n = t(['xuân', 'hạ', 'thu', 'đông'], ['spring', 'summer', 'autumn', 'winter']);
+  const s = t(['thu', 'đông', 'xuân', 'hạ'], ['autumn', 'winter', 'spring', 'summer']);
   const i = Math.floor(wrap360(Ls) / 90);
-  return `Bắc bán cầu: ${n[i]} · Nam bán cầu: ${s[i]}`;
+  return t(`Bắc bán cầu: ${n[i]} · Nam bán cầu: ${s[i]}`, `northern ${n[i]} · southern ${s[i]}`);
 }
 function sunElevStr(n, L) {
   const e = Math.asin(Math.max(-1, Math.min(1, n.dot(L)))) / D2R;
-  const tag = e > 6 ? 'ban ngày' : e > -0.8 ? 'bình minh/hoàng hôn' : e > -18 ? 'chạng vạng' : 'ban đêm';
-  return `Mặt Trời cao <b>${e.toFixed(1)}°</b> (${tag})`;
+  const tag = e > 6 ? t('ban ngày', 'daytime') : e > -0.8 ? t('bình minh/hoàng hôn', 'sunrise/sunset') : e > -18 ? t('chạng vạng', 'twilight') : t('ban đêm', 'night');
+  return t(`Mặt Trời cao <b>${e.toFixed(1)}°</b> (${tag})`, `Sun elevation <b>${e.toFixed(1)}°</b> (${tag})`);
 }
 const PHOBOS = { a: 9376 / RKM, P: 0.31891 * 86400 / 88775.244, r: 11.1 };   // orbital period in sols
 const DEIMOS = { a: 23463.2 / RKM, P: 1.26244 * 86400 / 88775.244, r: 6.2 };
@@ -857,38 +859,67 @@ export default [{
     ['Deimos', '15×12×11 km · cách tâm 23 463 km · chu kỳ 30 h 18 min'],
     ['Dữ liệu', 'Ảnh ghép màu Viking (NASA/JPL, USGS Astrogeology), địa hình MGS MOLA MEGDR (NASA GSFC, PDS)'],
   ],
+  en: {
+    name: 'Mars',
+    subtitle: 'Terrestrial planet · the Red Planet',
+    blurb: 'The surface here is <b>real data</b>: the Viking colour mosaic and MOLA laser altimetry — Olympus Mons, Valles Marineris, Hellas, Syrtis Major. Iron-oxide dust tints both the ground and the sky orange; the CO₂ atmosphere is only ~6 mbar, yet every season ~25% of it <b>freezes out onto the polar caps</b> and then sublimates back. Water-ice clouds cling to the volcanoes every afternoon, dust storms can engulf the whole planet, and sunsets here are <b>blue</b>.',
+    intro: 'Press <b>O</b> to fly to Olympus Mons, <b>V</b> to Valles Marineris at dawn, <b>B</b> for the 2018 global dust storm, <b>X</b> for a blue sunset. Drag <b>Ls</b> to change the season: the polar caps shrink and grow.',
+    facts: [
+      ['Mean radius', '3,389.5 km'], ['Mass', '6.417×10²³ kg'], ['Surface gravity', '3.72 m/s²'],
+      ['Sidereal day / sol (solar day)', '24 h 37 min 22.7 s / 24 h 39 min 35 s'], ['Axial tilt', '25.19°'],
+      ['Martian year', '686.97 Earth days = 668.6 sols'], ['Orbit', 'a = 1.524 AU, e = 0.0934 (1.38–1.67 AU)'],
+      ['Surface pressure', '~6 mbar (4–9 mbar with the seasons; 0.7 mbar atop Olympus, 12 mbar at the floor of Hellas)'],
+      ['Atmosphere', 'CO₂ 95%, N₂ 2.6%, Ar 1.9% · scale height ~11 km'],
+      ['Surface temperature', 'mean −63 °C (−140 … +20 °C)'],
+      ['Olympus Mons', '21.9 km above the surrounding plains, ~600 km across'], ['Valles Marineris', '~4,000 km long, up to 7 km deep'],
+      ['Hellas Planitia', 'floor −8.2 km below the datum'],
+      ['Phobos', '27×22×18 km · 9,376 km from the centre · period 7 h 39 min (rises in the west)'],
+      ['Deimos', '15×12×11 km · 23,463 km from the centre · period 30 h 18 min'],
+      ['Data', 'Viking colour mosaic (NASA/JPL, USGS Astrogeology), MGS MOLA MEGDR topography (NASA GSFC, PDS)'],
+    ],
+  },
   unitKm: RKM,
   camera: { distance: 3.2, polar: 66, azimuth: 0, min: 1.006, max: 30, fov: 45 },
   exposure: 0.7,
   bloom: 0.3,
   params: [
     { key: 'hour', label: 'Giờ địa phương (dưới camera)', type: 'range', min: 0, max: 24, step: 0.1, default: 14, fmt: v => hhmm(v),
-      note: '12:00 = Mặt Trời sau lưng bạn (đĩa tròn đầy); ~19:00 = đường phân chia ngày–đêm đi qua giữa đĩa.' },
+      note: '12:00 = Mặt Trời sau lưng bạn (đĩa tròn đầy); ~19:00 = đường phân chia ngày–đêm đi qua giữa đĩa.',
+      en: { label: 'Local time (below the camera)', note: '12:00 = the Sun behind you (full disc); ~19:00 = the terminator crosses the middle of the disc.' } },
     { key: 'ls', label: 'Mùa — kinh độ Mặt Trời Ls', type: 'range', min: 0, max: 359.9, step: 0.1, default: 60, fmt: v => 'Ls ' + v.toFixed(0) + '°',
-      note: 'Ls 0° = xuân phân Bắc bán cầu, 90° = hạ chí Bắc, 180° = thu phân, 270° = đông chí Bắc. Cận nhật ở Ls 251° (mùa bão bụi), viễn nhật ở Ls 71° (mùa mây băng).' },
+      note: 'Ls 0° = xuân phân Bắc bán cầu, 90° = hạ chí Bắc, 180° = thu phân, 270° = đông chí Bắc. Cận nhật ở Ls 251° (mùa bão bụi), viễn nhật ở Ls 71° (mùa mây băng).',
+      en: { label: 'Season — solar longitude Ls', note: 'Ls 0° = northern spring equinox, 90° = northern summer solstice, 180° = autumn equinox, 270° = northern winter solstice. Perihelion at Ls 251° (dust-storm season), aphelion at Ls 71° (ice-cloud season).' } },
     { key: 'pace', label: 'Nhịp mùa & thời tiết', type: 'seg', options: [[0, 'Dừng'], [1, 'Thực'], [30, '×30'], [300, '×300']], default: 30,
-      note: '"Thực": mùa trôi đúng nhịp một vòng quay = một sol (668,6 sol mỗi năm). ×30, ×300 tua nhanh mùa và các cơn bão bụi, còn mây và gió vẫn chuyển động theo đúng giờ địa phương.' },
+      note: '"Thực": mùa trôi đúng nhịp một vòng quay = một sol (668,6 sol mỗi năm). ×30, ×300 tua nhanh mùa và các cơn bão bụi, còn mây và gió vẫn chuyển động theo đúng giờ địa phương.',
+      en: { label: 'Season & weather pace', options: ['Stop', 'Real', '×30', '×300'], note: '"Real": the seasons advance at the true rate, one rotation = one sol (668.6 sols per year). ×30 and ×300 fast-forward the seasons and dust storms, while clouds and winds still follow local time.' } },
     { key: 'exag', label: 'Phóng đại địa hình', type: 'range', min: 1, max: 20, step: 0.5, default: 4, fmt: v => '×' + v.toFixed(1),
-      note: '×1 = tỉ lệ thật: Olympus Mons cao 0,6 % bán kính. Địa hình là dữ liệu laser MOLA (độ phân giải ~5 km, ~1,9 km quanh Tharsis–Valles Marineris).' },
+      note: '×1 = tỉ lệ thật: Olympus Mons cao 0,6 % bán kính. Địa hình là dữ liệu laser MOLA (độ phân giải ~5 km, ~1,9 km quanh Tharsis–Valles Marineris).',
+      en: { label: 'Terrain exaggeration', note: '×1 = true scale: Olympus Mons rises just 0.6% of the radius. The terrain is MOLA laser altimetry (~5 km resolution, ~1.9 km around Tharsis–Valles Marineris).' } },
     { key: 'dust', label: 'Hoạt động bụi', type: 'range', min: 0, max: 2, step: 0.01, default: 1, fmt: v => '×' + v.toFixed(2),
-      note: 'Nhân độ sâu quang học bụi nền và tần suất bão. Bão cục bộ (vài trăm km) xuất hiện quanh năm; bão khu vực chủ yếu từ Ls 180° đến 330° khi Sao Hỏa ở gần Mặt Trời.' },
+      note: 'Nhân độ sâu quang học bụi nền và tần suất bão. Bão cục bộ (vài trăm km) xuất hiện quanh năm; bão khu vực chủ yếu từ Ls 180° đến 330° khi Sao Hỏa ở gần Mặt Trời.',
+      en: { label: 'Dust activity', note: 'Scales the background dust optical depth and the storm frequency. Local storms (a few hundred km) occur year-round; regional storms mostly from Ls 180° to 330°, when Mars is closest to the Sun.' } },
     { key: 'clouds', label: 'Mây băng nước', type: 'range', min: 0, max: 2, step: 0.01, default: 1, fmt: v => '×' + v.toFixed(2),
-      note: 'Vành đai mây viễn nhật (Ls 40°–150°), mây chụp cực mùa thu–đông, mây địa hình quanh núi lửa Tharsis buổi chiều, sương sớm trong hẻm vực.' },
-    { key: 'atmo', label: 'Khí quyển', type: 'range', min: 0, max: 3, step: 0.01, default: 1, fmt: v => '×' + v.toFixed(2) },
-    { key: 'moons', label: 'Phobos & Deimos', type: 'toggle', default: true },
+      note: 'Vành đai mây viễn nhật (Ls 40°–150°), mây chụp cực mùa thu–đông, mây địa hình quanh núi lửa Tharsis buổi chiều, sương sớm trong hẻm vực.',
+      en: { label: 'Water-ice clouds', note: 'The aphelion cloud belt (Ls 40°–150°), autumn–winter polar hoods, afternoon orographic clouds around the Tharsis volcanoes, morning fog in the canyons.' } },
+    { key: 'atmo', label: 'Khí quyển', type: 'range', min: 0, max: 3, step: 0.01, default: 1, fmt: v => '×' + v.toFixed(2), en: { label: 'Atmosphere' } },
+    { key: 'moons', label: 'Phobos & Deimos', type: 'toggle', default: true, en: { label: 'Phobos & Deimos' } },
   ],
   actions: [
-    { label: 'Olympus Mons', key: 'o', title: 'Bay tới Olympus Mons lúc nắng sớm (bấm lần nữa để quay lại)', run: ctx => ctx.scene._marsShot?.(ctx, 'olympus') },
-    { label: 'Valles Marineris', key: 'v', title: 'Bay tới Valles Marineris lúc bình minh: sương mù trong hẻm vực (bấm lần nữa để quay lại)', run: ctx => ctx.scene._marsShot?.(ctx, 'valles') },
-    { label: 'Bão bụi 2018', key: 'b', title: 'Cơn bão bụi toàn cầu năm 2018 (Ls 185°)', run: ctx => ctx.scene._marsStorm?.(ctx) },
-    { label: 'Hoàng hôn xanh', key: 'x', title: 'Mặt Trời sau hành tinh: tán xạ thuận', run: ctx => {
+    { label: 'Olympus Mons', key: 'o', title: 'Bay tới Olympus Mons lúc nắng sớm (bấm lần nữa để quay lại)', run: ctx => ctx.scene._marsShot?.(ctx, 'olympus'),
+      en: { label: 'Olympus Mons', title: 'Fly to Olympus Mons in the early-morning sun (press again to return)' } },
+    { label: 'Valles Marineris', key: 'v', title: 'Bay tới Valles Marineris lúc bình minh: sương mù trong hẻm vực (bấm lần nữa để quay lại)', run: ctx => ctx.scene._marsShot?.(ctx, 'valles'),
+      en: { label: 'Valles Marineris', title: 'Fly to Valles Marineris at dawn: fog in the canyons (press again to return)' } },
+    { label: 'Bão bụi 2018', key: 'b', title: 'Cơn bão bụi toàn cầu năm 2018 (Ls 185°)', run: ctx => ctx.scene._marsStorm?.(ctx),
+      en: { label: '2018 dust storm', title: 'The 2018 global dust storm (Ls 185°)' } },
+    { label: 'Hoàng hôn xanh', key: 'x', title: 'Mặt Trời sau hành tinh: tán xạ thuận', en: { label: 'Blue sunset', title: 'The Sun behind the planet: forward scattering' }, run: ctx => {
       // put the Sun just behind the planet as seen from the camera: move the camera to the latitude
       // opposite the Sun's declination, then set the local time (just inside the limb)
       const c = ctx.camera.position, sph = new THREE.Spherical().setFromVector3(c);
       const decl = declOf(ctx.params.ls); sph.phi = Math.PI / 2 + decl * D2R; c.setFromSpherical(sph); ctx.camera.lookAt(ctx.controls.target);
       ctx.params.hour = Math.asin(1 / c.length()) / D2R * 0.8 / 15;
       ctx.params.dust = Math.max(ctx.params.dust, 1.2);
-      ctx.toast('Ngược sáng: hạt bụi ~1,5 µm tán xạ thuận ánh sáng xanh mạnh hơn đỏ (g ≈ 0,84 so với 0,58), nên quầng sáng quanh Mặt Trời và viền khí quyển ngả xanh lam — đúng như hoàng hôn mà Curiosity và Spirit chụp được, trong khi bầu trời ban ngày lại màu bơ caramel.'); } },
+      ctx.toast(t('Ngược sáng: hạt bụi ~1,5 µm tán xạ thuận ánh sáng xanh mạnh hơn đỏ (g ≈ 0,84 so với 0,58), nên quầng sáng quanh Mặt Trời và viền khí quyển ngả xanh lam — đúng như hoàng hôn mà Curiosity và Spirit chụp được, trong khi bầu trời ban ngày lại màu bơ caramel.',
+        'Backlit: ~1.5 µm dust grains forward-scatter blue light more strongly than red (g ≈ 0.84 versus 0.58), so the glow around the Sun and the atmospheric limb turn blue — just like the sunsets Curiosity and Spirit photographed, while the daytime sky is butterscotch.')); } },
   ],
   create(ctx) {
     const Rr = ctx.renderer, caps = Rr.capabilities;
@@ -951,10 +982,12 @@ export default [{
     const SHOTS = {
       // from ~420 km south-east of the caldera, looking north-west across the shield and its scarp
       olympus: { cam: [9.0, -125.5, 420], tgt: [19.5, -134.5], hour: 7.6, exag: 2.5,
-        msg: 'Olympus Mons lúc nắng sớm, nhìn từ độ cao ~420 km về phía tây bắc. Ngọn núi lửa hình khiên cao <b>21,9 km</b> (gấp 2,5 lần Everest), rộng ~600 km, viền bởi vách đá dựng đứng cao tới 8 km; miệng núi lửa kép trên đỉnh rộng 80 km. Địa hình là dữ liệu laser MOLA, phóng đại <b>×2,5</b> theo chiều đứng (kéo về ×1 để thấy tỉ lệ thật — sườn núi chỉ dốc ~5°). Buổi chiều, mây băng nước hình thành quanh sườn núi.' },
+        msg: () => t('Olympus Mons lúc nắng sớm, nhìn từ độ cao ~420 km về phía tây bắc. Ngọn núi lửa hình khiên cao <b>21,9 km</b> (gấp 2,5 lần Everest), rộng ~600 km, viền bởi vách đá dựng đứng cao tới 8 km; miệng núi lửa kép trên đỉnh rộng 80 km. Địa hình là dữ liệu laser MOLA, phóng đại <b>×2,5</b> theo chiều đứng (kéo về ×1 để thấy tỉ lệ thật — sườn núi chỉ dốc ~5°). Buổi chiều, mây băng nước hình thành quanh sườn núi.',
+          'Olympus Mons in the early-morning sun, seen from ~420 km up looking north-west. The shield volcano rises <b>21.9 km</b> (2.5 times Everest), is ~600 km across and is ringed by a scarp up to 8 km high; the nested summit caldera is 80 km wide. The terrain is MOLA laser altimetry, exaggerated <b>×2.5</b> vertically (drag back to ×1 for true scale — the flanks slope only ~5°). In the afternoon, water-ice clouds form around its flanks.') },
       // over Ius/Melas, looking east down the trough system at dawn
       valles: { cam: [-18.5, -78.0, 280], tgt: [-8.0, -73.0], hour: 7.2, exag: 3,
-        msg: 'Valles Marineris lúc bình minh: hệ thống hẻm vực dài ~4 000 km, rộng tới 200 km, sâu tới 7 km (Grand Canyon chỉ sâu 1,8 km). Hơi nước đông lại qua đêm thành <b>sương mù băng</b> đọng dưới đáy hẻm — như các tàu Viking từng chụp ở Noctis Labyrinthus — rồi tan khi Mặt Trời lên cao. Địa hình MOLA phóng đại <b>×3</b>.' },
+        msg: () => t('Valles Marineris lúc bình minh: hệ thống hẻm vực dài ~4 000 km, rộng tới 200 km, sâu tới 7 km (Grand Canyon chỉ sâu 1,8 km). Hơi nước đông lại qua đêm thành <b>sương mù băng</b> đọng dưới đáy hẻm — như các tàu Viking từng chụp ở Noctis Labyrinthus — rồi tan khi Mặt Trời lên cao. Địa hình MOLA phóng đại <b>×3</b>.',
+          'Valles Marineris at dawn: a canyon system ~4,000 km long, up to 200 km wide and up to 7 km deep (the Grand Canyon is only 1.8 km deep). Water vapour freezes overnight into <b>ice fog</b> that pools on the canyon floors — as the Viking orbiters photographed in Noctis Labyrinthus — and burns off as the Sun climbs. MOLA terrain exaggerated <b>×3</b>.') },
     };
     function frameOf(name) {
       const s = SHOTS[name];
@@ -988,7 +1021,7 @@ export default [{
       c.controls.minDistance = 0.003;
       if (instant) { applyFrame(c, frameOf(name), rotOf(c.time.sim)); shot.tw = null; }
       else startTween(c, frameOf(name), 4.5);
-      c.toast?.(s.msg, 11000);
+      c.toast?.(s.msg(), 11000);
     }
     function leaveShot(c) {
       c.params.exag = 4; c.params.hour = 14;
@@ -997,13 +1030,14 @@ export default [{
     def._marsShot = (c, name) => { if (shot.tw) return; if (shot.on === name) leaveShot(c); else goShot(c, name, false); };
     def._marsStorm = c => {
       if (clim.storm0 !== null && clim.C - clim.storm0 < 170) {
-        clim.storm0 = null; c.toast('Bụi lắng xuống; độ sâu quang học trở về mức nền của mùa.');
+        clim.storm0 = null; c.toast(t('Bụi lắng xuống; độ sâu quang học trở về mức nền của mùa.', 'The dust settles; the optical depth returns to the seasonal background.'));
         return;
       }
       c.params.pace = 300;
       setLs(c, 185);
       clim.storm0 = clim.C;
-      c.toast('Bão bụi toàn cầu 2018 (tua ×300): bắt đầu là một cơn bão cục bộ ở Arabia Terra (Ls ≈ 185°), chỉ ~3 tuần sau đã bao trùm cả hành tinh; τ > 8 khiến tàu Opportunity thiếu nắng và ngừng hoạt động vĩnh viễn. Bụi cuộn lên tới 60 km, chỉ đỉnh các núi lửa Tharsis nhô lên khỏi màn bụi. Phải 2–3 tháng bụi mới lắng.', 12000);
+      c.toast(t('Bão bụi toàn cầu 2018 (tua ×300): bắt đầu là một cơn bão cục bộ ở Arabia Terra (Ls ≈ 185°), chỉ ~3 tuần sau đã bao trùm cả hành tinh; τ > 8 khiến tàu Opportunity thiếu nắng và ngừng hoạt động vĩnh viễn. Bụi cuộn lên tới 60 km, chỉ đỉnh các núi lửa Tharsis nhô lên khỏi màn bụi. Phải 2–3 tháng bụi mới lắng.',
+        'The 2018 global dust storm (×300 fast-forward): it began as a local storm in Arabia Terra (Ls ≈ 185°) and within ~3 weeks had engulfed the whole planet; τ > 8 starved the Opportunity rover of sunlight and ended its mission for good. Dust was lofted up to 60 km, leaving only the summits of the Tharsis volcanoes poking above it. It took 2–3 months to settle.'), 12000);
     };
     function setLs(c, Ls) {
       c.params.ls = Ls;
@@ -1135,34 +1169,37 @@ export default [{
         const frost = g.lat > cur.capN || g.lat < -cur.capS;
         const T = surfaceTemp(g.lat, c.params.hour, cur.decl, cur.r, cur.tauBg, frost);
         const big = cur.storms[0];
-        const stormTxt = cur.stage ? { local: 'cục bộ, đang lớn', regional: 'khu vực, đang lan rộng', global: 'toàn cầu', decay: 'toàn cầu, đang lắng' }[cur.stage] + ` (sol ${cur.s18.toFixed(0)})`
-          : big ? `${cur.storms.length} cơn, lớn nhất ${big.kind === 'regional' ? 'khu vực' : 'cục bộ'} ~${Math.round(big.R * RKM * 2 / 100) * 100} km` : 'không';
+        const stormTxt = cur.stage ? t({ local: 'cục bộ, đang lớn', regional: 'khu vực, đang lan rộng', global: 'toàn cầu', decay: 'toàn cầu, đang lắng' },
+          { local: 'local, growing', regional: 'regional, spreading', global: 'global', decay: 'global, settling' })[cur.stage] + ` (sol ${cur.s18.toFixed(0)})`
+          : big ? t(`${cur.storms.length} cơn, lớn nhất ${big.kind === 'regional' ? 'khu vực' : 'cục bộ'} ~${Math.round(big.R * RKM * 2 / 100) * 100} km`,
+            `${cur.storms.length}, largest ${big.kind === 'regional' ? 'regional' : 'local'} ~${(Math.round(big.R * RKM * 2 / 100) * 100).toLocaleString('en-US')} km`) : t('không', 'none');
         const d = cp.length(), hKm = (d - 1) * RKM;
         return [
-          ['Độ cao', c.fmt.dist(hKm * 1000)],
-          ['Mùa', `Ls ${vn(cur.Ls, 1)}° · ${seasonName(cur.Ls)}`],
-          ['Khoảng cách tới Mặt Trời', `${vn(cur.r, 3)} AU (nắng ×${vn((A_AU / cur.r) ** 2, 2)} so với trung bình)`],
-          ['Điểm dưới camera', `${latStr(g.lat)} ${lonStr(g.lon)}` + (e === null ? '' : ` · cao ${Math.round(e).toLocaleString('vi-VN')} m`)],
-          ['Giờ Mặt Trời tại đó', hhmm(c.params.hour)],
-          ['Áp suất bề mặt (ước tính)', `${vn(P, 1)} mbar`],
-          ['Nhiệt độ mặt đất (ước tính)', `${Math.round(T - 273.15)} °C (${Math.round(T)} K)`],
-          ['Bụi: độ sâu quang học nền τ', vn(cur.tauBg, 2)],
-          ['Bão bụi', stormTxt],
-          ['Chỏm băng mùa (mép)', `Bắc ${cur.capN.toFixed(0)}°B · Nam ${cur.capS.toFixed(0)}°N`],
-          ['Phóng đại địa hình', '×' + vn(U.uExag.value, 1)],
+          [t('Độ cao', 'Altitude'), c.fmt.dist(hKm * 1000)],
+          [t('Mùa', 'Season'), `Ls ${vn(cur.Ls, 1)}° · ${seasonName(cur.Ls)}`],
+          [t('Khoảng cách tới Mặt Trời', 'Distance from the Sun'), t(`${vn(cur.r, 3)} AU (nắng ×${vn((A_AU / cur.r) ** 2, 2)} so với trung bình)`, `${vn(cur.r, 3)} AU (sunlight ×${vn((A_AU / cur.r) ** 2, 2)} the average)`)],
+          [t('Điểm dưới camera', 'Point below the camera'), `${latStr(g.lat)} ${lonStr(g.lon)}` + (e === null ? '' : t(` · cao ${Math.round(e).toLocaleString(locale())} m`, ` · elevation ${Math.round(e).toLocaleString(locale())} m`))],
+          [t('Giờ Mặt Trời tại đó', 'Local solar time there'), hhmm(c.params.hour)],
+          [t('Áp suất bề mặt (ước tính)', 'Surface pressure (est.)'), `${vn(P, 1)} mbar`],
+          [t('Nhiệt độ mặt đất (ước tính)', 'Ground temperature (est.)'), `${Math.round(T - 273.15)} °C (${Math.round(T)} K)`],
+          [t('Bụi: độ sâu quang học nền τ', 'Dust: background optical depth τ'), vn(cur.tauBg, 2)],
+          [t('Bão bụi', 'Dust storms'), stormTxt],
+          [t('Chỏm băng mùa (mép)', 'Seasonal polar caps (edge)'), t(`Bắc ${cur.capN.toFixed(0)}°B · Nam ${cur.capS.toFixed(0)}°N`, `north ${cur.capN.toFixed(0)}°N · south ${cur.capS.toFixed(0)}°S`)],
+          [t('Phóng đại địa hình', 'Terrain exaggeration'), '×' + vn(U.uExag.value, 1)],
         ];
       },
       onClick(info, c) {
-        const t = hitSphere(info.origin, info.dir);
-        if (t === null) return;
-        const p = info.origin.clone().addScaledVector(info.dir, t).normalize(), L = U.uSunDir.value;
+        const th = hitSphere(info.origin, info.dir);
+        if (th === null) return;
+        const p = info.origin.clone().addScaledVector(info.dir, th).normalize(), L = U.uSunDir.value;
         const g = bodyLatLonE(p, rotOf(c.time.sim));
         const e = elevAt(g.lat, g.lon);
         const hl = localHourE(p, L);
         const P = pDatum(cur.Ls) * Math.exp(-(e || 0) / 11100);
         const T = surfaceTemp(g.lat, hl, cur.decl, cur.r, cur.tauBg, g.lat > cur.capN || g.lat < -cur.capS);
-        const hs = e === null ? '' : ` · độ cao <b>${Math.round(e).toLocaleString('vi-VN')} m</b>`;
-        c.toast(`Vĩ độ <b>${latStr(g.lat)}</b>, kinh độ <b>${lonStr(g.lon)}</b>${hs} · giờ địa phương <b>${hhmm(hl)}</b> · ${sunElevStr(p, L)} · áp suất ~<b>${P.toFixed(1).replace('.', ',')} mbar</b> · mặt đất ~<b>${Math.round(T - 273.15)} °C</b>.`);
+        const hs = e === null ? '' : t(` · độ cao <b>${Math.round(e).toLocaleString(locale())} m</b>`, ` · elevation <b>${Math.round(e).toLocaleString(locale())} m</b>`);
+        c.toast(t(`Vĩ độ <b>${latStr(g.lat)}</b>, kinh độ <b>${lonStr(g.lon)}</b>${hs} · giờ địa phương <b>${hhmm(hl)}</b> · ${sunElevStr(p, L)} · áp suất ~<b>${dec(P, 1)} mbar</b> · mặt đất ~<b>${Math.round(T - 273.15)} °C</b>.`,
+          `Latitude <b>${latStr(g.lat)}</b>, longitude <b>${lonStr(g.lon)}</b>${hs} · local time <b>${hhmm(hl)}</b> · ${sunElevStr(p, L)} · pressure ~<b>${dec(P, 1)} mbar</b> · ground ~<b>${Math.round(T - 273.15)} °C</b>.`));
       },
     };
   },

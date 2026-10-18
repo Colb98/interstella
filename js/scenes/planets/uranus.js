@@ -25,6 +25,7 @@
 // Approximations are marked 'approx.' in the comments.
 import * as THREE from 'three';
 import { COMMON_GLSL, FULLSCREEN_VERT } from '../../glsl/common.js';
+import { t, t as tt, dec, int } from '../../i18n.js';  // tt: for scopes where a local `t` shadows t()
 
 const V3 = THREE.Vector3;
 const D2R = Math.PI / 180, R2D = 180 / Math.PI, TAU = Math.PI * 2;
@@ -37,9 +38,9 @@ const J2 = 3510.7e-6;
 const PHASE_P = 40 * 3600;                     // two-phase advection period (planet seconds)
 const DAY = 86400;
 
-const vn = (x, d = 1) => x.toFixed(d).replace('.', ',').replace('-', '−');
-const fmtInt = n => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-const latStr = d => `${vn(Math.abs(d))}° ${d >= 0 ? 'B' : 'N'}`;
+const vn = (x, d = 1) => dec(x, d).replace('-', '−');
+const fmtInt = n => int(n);
+const latStr = d => `${vn(Math.abs(d))}° ${d >= 0 ? t('B', 'N') : t('N', 'S')}`;
 const wrap = a => ((a % TAU) + TAU) % TAU;
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const NOW_YEAR = 1970 + Date.now() / 31557600000;
@@ -559,12 +560,12 @@ function bodyLatLon(p, k, spin) {
 function seasonText(B, year) {
   const g1 = geometry(year + 0.5).B;
   const rising = g1 > B;
-  if (Math.abs(B) < 3) return rising ? 'điểm xuân phân của bán cầu Bắc' : 'điểm thu phân của bán cầu Bắc';
-  if (Math.abs(B) > 80) return B > 0 ? 'hạ chí Bắc — cực Bắc hướng thẳng vào Mặt Trời' : 'đông chí Bắc — cực Nam hướng vào Mặt Trời';
-  if (B > 0) return rising ? 'xuân ở bán cầu Bắc' : 'hạ ở bán cầu Bắc';
-  return rising ? 'đông ở bán cầu Bắc' : 'thu ở bán cầu Bắc';
+  if (Math.abs(B) < 3) return rising ? t('điểm xuân phân của bán cầu Bắc', 'northern spring equinox') : t('điểm thu phân của bán cầu Bắc', 'northern autumn equinox');
+  if (Math.abs(B) > 80) return B > 0 ? t('hạ chí Bắc — cực Bắc hướng thẳng vào Mặt Trời', 'northern summer solstice — north pole pointing straight at the Sun') : t('đông chí Bắc — cực Nam hướng vào Mặt Trời', 'northern winter solstice — south pole facing the Sun');
+  if (B > 0) return rising ? t('xuân ở bán cầu Bắc', 'northern spring') : t('hạ ở bán cầu Bắc', 'northern summer');
+  return rising ? t('đông ở bán cầu Bắc', 'northern winter') : t('thu ở bán cầu Bắc', 'northern autumn');
 }
-const windStr = u => { const r = Math.round(u); return r === 0 ? '≈ 0 m/s (quay cùng lõi)' : `${r > 0 ? '+' : '−'}${Math.abs(r)} m/s ${r > 0 ? '(thuận chiều quay)' : '(ngược chiều quay)'}`; };
+const windStr = u => { const r = Math.round(u); return r === 0 ? t('≈ 0 m/s (quay cùng lõi)', '≈ 0 m/s (co-rotating with the interior)') : `${r > 0 ? '+' : '−'}${Math.abs(r)} m/s ${r > 0 ? t('(thuận chiều quay)', '(prograde)') : t('(ngược chiều quay)', '(retrograde)')}`; };
 // inertial rotation period of the clouds at a latitude: interior rate + prograde drift (drift > 0 = retrograde)
 const cloudPeriod = latD => TAU / (OMEGA - driftRad(latD)) / 3600;
 
@@ -601,33 +602,61 @@ const DEF = {
     ['Vệ tinh lớn', 'Miranda, Ariel, Umbriel, Titania, Oberon'],
     ['Dữ liệu ảnh', 'HST OPAL 2014/2025 (NASA/ESA, A. Simon, M. Wong; CC BY 4.0), Keck 2012–2014, JWST 2023, Voyager 2'],
   ],
+  en: {
+    name: 'Uranus',
+    subtitle: 'Ice giant · rolling on its side around its orbit',
+    blurb: 'Its spin axis is tilted <b>97.8°</b>: Uranus rolls along its 84-year orbit like a ball, so each pole gets 42 years of daylight followed by 42 years of night. In visible light methane absorbs the red, leaving an almost featureless cyan sphere; in the near-infrared the storms, cloud bands and the <b>seasonal polar cap</b> stand out, drifting on winds that range from −40 m/s at the equator to +258 m/s at latitude 55°.',
+    intro: 'Drag <b>Year</b> to roll Uranus through its seasons (1986 Voyager 2 → 2007 equinox → 2030 solstice). Switch <b>Image</b> to <b>Infrared</b> and set <b>Frame</b> to "Co-rotating" to watch the winds carry storms at different speeds at different latitudes.',
+    facts: [
+      ['Equatorial / polar radius (1 bar)', '25,559 / 24,973 km (4.0 Earths)'], ['Mass', '8.681×10²⁵ kg (14.5 Earths)'],
+      ['Rotation period', '17 h 14 min 52 s, retrograde (Lamy et al. 2025)'], ['Axial tilt', '97.77°'],
+      ['Orbit', '19.19 AU · 84.0 years · e = 0.047'], ['Effective temperature', '59 K; tropopause 53 K'],
+      ['Winds', '−40 m/s at the equator; +258 m/s at 55° (Sromovsky et al. 2015)'],
+      ['Atmosphere', 'H₂ 83%, He 15%, CH₄ ~2.3% (up to ~4% below the clouds)'],
+      ['Rings', '13 rings; the ε ring lies 51,149 km from the center and is 20–96 km wide'],
+      ['Major moons', 'Miranda, Ariel, Umbriel, Titania, Oberon'],
+      ['Image data', 'HST OPAL 2014/2025 (NASA/ESA, A. Simon, M. Wong; CC BY 4.0), Keck 2012–2014, JWST 2023, Voyager 2'],
+    ],
+  },
   unitKm: RE,
   camera: { distance: 4.4, polar: 80, azimuth: 32, min: 1.04, max: 60, fov: 45 },
   exposure: 1.0, bloom: 0.3,
   params: [
     { key: 'view', label: 'Ảnh', type: 'seg', options: [['true', 'Màu thật'], ['enh', 'Tăng tương phản'], ['ir', 'Hồng ngoại']], default: 'true',
-      note: 'Màu thật: hệ số phản xạ đo từ ảnh Hubble OPAL 2025. Tăng tương phản: kéo giãn độ lệch màu như các ảnh Voyager/Keck đã xử lý. Hồng ngoại: dải hấp thụ mê-tan (như Keck H và JWST F140M) — chỉ mây cao và sương mù sáng lên.' },
+      note: 'Màu thật: hệ số phản xạ đo từ ảnh Hubble OPAL 2025. Tăng tương phản: kéo giãn độ lệch màu như các ảnh Voyager/Keck đã xử lý. Hồng ngoại: dải hấp thụ mê-tan (như Keck H và JWST F140M) — chỉ mây cao và sương mù sáng lên.',
+      en: { label: 'Image', options: ['True color', 'Enhanced contrast', 'Infrared'], note: 'True color: reflectance measured from the 2025 Hubble OPAL images. Enhanced contrast: the color differences stretched like processed Voyager/Keck images. Infrared: a methane absorption band (like Keck H and JWST F140M) — only high clouds and haze light up.' } },
     { key: 'year', label: 'Năm', type: 'range', min: 1980, max: 2070, step: 0.1, default: Math.round(NOW_YEAR * 10) / 10, fmt: v => vn(v, 1),
-      note: 'Vị trí thật trên quỹ đạo: 1986 Voyager 2 (cực Nam hướng Mặt Trời), 12/2007 điểm phân, 2030 hạ chí Bắc, 2050 điểm phân.' },
+      note: 'Vị trí thật trên quỹ đạo: 1986 Voyager 2 (cực Nam hướng Mặt Trời), 12/2007 điểm phân, 2030 hạ chí Bắc, 2050 điểm phân.',
+      en: { label: 'Year', note: 'Real orbital position: 1986 Voyager 2 (south pole facing the Sun), December 2007 equinox, 2030 northern summer solstice, 2050 equinox.' } },
     { key: 'tlog', label: 'Tua nhanh', type: 'range', min: 1, max: 4.5, step: 0.05, default: 2.8, fmt: v => '×' + fmtInt(10 ** v),
-      note: 'Số giây trên Sao Thiên Vương cho mỗi giây mô phỏng (nhân thêm với thanh tốc độ thời gian chung). Gió và chuyển động là thật theo cùng tỉ lệ.' },
+      note: 'Số giây trên Sao Thiên Vương cho mỗi giây mô phỏng (nhân thêm với thanh tốc độ thời gian chung). Gió và chuyển động là thật theo cùng tỉ lệ.',
+      en: { label: 'Time-lapse', note: 'Seconds on Uranus per simulated second (further multiplied by the global time-speed slider). Winds and motions are real at the same rate.' } },
     { key: 'frame', label: 'Khung', type: 'seg', options: [['inertial', 'Quán tính'], ['sys3', 'Quay cùng lõi']], default: 'inertial',
-      note: 'Quay cùng lõi: bỏ chuyển động tự quay 17 h 15 m của phần lõi (System III) — chỉ còn gió: vùng cực quay nhanh hơn 4°/giờ, xích đạo chậm hơn.' },
-    { key: 'contrast', label: 'Độ tăng tương phản', type: 'range', min: 1, max: 20, step: 0.5, default: 7, fmt: v => '×' + vn(v, 1) },
-    { key: 'sunAz', label: 'Hướng Mặt Trời', type: 'range', min: 0, max: 360, step: 1, default: 40, fmt: v => v.toFixed(0) + '°', note: 'Xoay ra sau hành tinh để thấy vành bụi sáng lên khi nhìn ngược sáng.' },
-    { key: 'ringGain', label: 'Độ sáng vành (phóng đại)', type: 'range', min: 1, max: 60, step: 1, default: 12, fmt: v => '×' + v.toFixed(0), note: 'Hạt vành có hệ số phản xạ ~0,02 — tối như than; vành ε rộng ≤ 96 km nên chỉ là một sợi chỉ.' },
-    { key: 'rings', label: 'Vành', type: 'toggle', default: true },
-    { key: 'moons', label: 'Năm vệ tinh lớn', type: 'toggle', default: true },
-    { key: 'axis', label: 'Trục quay', type: 'toggle', default: false },
-    { key: 'spin', label: 'Chạy thời gian', type: 'toggle', default: true },
+      note: 'Quay cùng lõi: bỏ chuyển động tự quay 17 h 15 m của phần lõi (System III) — chỉ còn gió: vùng cực quay nhanh hơn 4°/giờ, xích đạo chậm hơn.',
+      en: { label: 'Frame', options: ['Inertial', 'Co-rotating'], note: 'Co-rotating: removes the 17 h 15 m spin of the interior (System III), leaving only the winds — the polar regions turn 4°/hour faster, the equator slower.' } },
+    { key: 'contrast', label: 'Độ tăng tương phản', type: 'range', min: 1, max: 20, step: 0.5, default: 7, fmt: v => '×' + vn(v, 1), en: { label: 'Contrast boost' } },
+    { key: 'sunAz', label: 'Hướng Mặt Trời', type: 'range', min: 0, max: 360, step: 1, default: 40, fmt: v => v.toFixed(0) + '°', note: 'Xoay ra sau hành tinh để thấy vành bụi sáng lên khi nhìn ngược sáng.',
+      en: { label: 'Sun direction', note: 'Swing it behind the planet to see the dusty rings light up in backlight.' } },
+    { key: 'ringGain', label: 'Độ sáng vành (phóng đại)', type: 'range', min: 1, max: 60, step: 1, default: 12, fmt: v => '×' + v.toFixed(0), note: 'Hạt vành có hệ số phản xạ ~0,02 — tối như than; vành ε rộng ≤ 96 km nên chỉ là một sợi chỉ.',
+      en: { label: 'Ring brightness (exaggerated)', note: 'Ring particles have an albedo of ~0.02 — dark as charcoal; the ε ring is at most 96 km wide, so it is only a thread.' } },
+    { key: 'rings', label: 'Vành', type: 'toggle', default: true, en: { label: 'Rings' } },
+    { key: 'moons', label: 'Năm vệ tinh lớn', type: 'toggle', default: true, en: { label: 'Five major moons' } },
+    { key: 'axis', label: 'Trục quay', type: 'toggle', default: false, en: { label: 'Spin axis' } },
+    { key: 'spin', label: 'Chạy thời gian', type: 'toggle', default: true, en: { label: 'Run time' } },
   ],
   actions: [
-    { label: 'Voyager 2 · 1986', key: 'v', title: 'Tháng 1/1986: cực Nam hướng Mặt Trời', run: ctx => epoch(ctx, 1986.07, 'true', 'Voyager 2 bay qua (24/1/1986): Mặt Trời gần như ở thiên đỉnh cực Nam. Ở màu thật hành tinh gần như không có đường nét — chỉ một vùng cực sáng hơn chút. Chuyển sang <b>Tăng tương phản</b> để thấy chỏm sương mù cực Nam.') },
-    { label: 'Điểm phân 2007', key: 'e', title: 'Mặt Trời trên xích đạo', run: ctx => epoch(ctx, 2007.95, null, 'Điểm phân 12/2007: Mặt Trời chiếu ngang xích đạo, vành nhìn từ Mặt Trời gần như một vạch. Chỏm cực Nam đã mờ, cực Bắc vừa ló ra sau 42 năm đêm.') },
-    { label: 'Keck 2014', key: 'i', title: 'Mùa bão kỷ lục, cận hồng ngoại', run: ctx => epoch(ctx, 2014.6, 'ir', 'Tháng 8/2014, kính Keck (quang học thích nghi) ghi nhận mùa bão kỷ lục ở bán cầu Bắc; cơn bão sáng nhất từng thấy ở 2,2 µm nằm gần 15°B. Đặt <b>Khung</b> = Quay cùng lõi để thấy chúng trôi.') },
-    { label: 'JWST 2023', key: 'j', title: 'Chỏm cực Bắc sáng, vành', run: ctx => epoch(ctx, 2023.1, 'ir', 'JWST NIRCam (6/2/2023): chỏm cực Bắc sáng theo mùa, một đám mây sáng ở rìa chỏm, vành ε và vành bụi ζ mờ phía trong.') },
-    { label: 'Hạ chí 2030', key: 'o', title: 'Cực Bắc hướng Mặt Trời', run: ctx => epoch(ctx, 2030.0, null, 'Hạ chí Bắc (2030): Mặt Trời ở 82° B, gần thiên đỉnh cực Bắc; cả bán cầu Nam chìm trong đêm 42 năm. Vành nhìn từ Mặt Trời như một tấm bia.') },
-    { label: 'Nhìn từ Trái Đất', key: 'g', title: 'Đặt camera theo hướng Trái Đất', run: ctx => { earthView(ctx); ctx.toast('Hướng nhìn từ Trái Đất vào năm đang chọn (góc pha luôn < 3°).', 5000); } },
+    { label: 'Voyager 2 · 1986', key: 'v', title: 'Tháng 1/1986: cực Nam hướng Mặt Trời', run: ctx => epoch(ctx, 1986.07, 'true', t('Voyager 2 bay qua (24/1/1986): Mặt Trời gần như ở thiên đỉnh cực Nam. Ở màu thật hành tinh gần như không có đường nét — chỉ một vùng cực sáng hơn chút. Chuyển sang <b>Tăng tương phản</b> để thấy chỏm sương mù cực Nam.', 'Voyager 2 flyby (24 January 1986): the Sun almost overhead at the south pole. In true color the planet is nearly featureless — just a slightly brighter polar region. Switch to <b>Enhanced contrast</b> to see the south polar haze cap.')),
+      en: { title: 'January 1986: south pole facing the Sun' } },
+    { label: 'Điểm phân 2007', key: 'e', title: 'Mặt Trời trên xích đạo', run: ctx => epoch(ctx, 2007.95, null, t('Điểm phân 12/2007: Mặt Trời chiếu ngang xích đạo, vành nhìn từ Mặt Trời gần như một vạch. Chỏm cực Nam đã mờ, cực Bắc vừa ló ra sau 42 năm đêm.', 'Equinox, December 2007: the Sun shines straight across the equator and the rings, seen from the Sun, are almost edge-on. The south polar cap has faded and the north pole has just emerged from 42 years of night.')),
+      en: { label: 'Equinox 2007', title: 'Sun over the equator' } },
+    { label: 'Keck 2014', key: 'i', title: 'Mùa bão kỷ lục, cận hồng ngoại', run: ctx => epoch(ctx, 2014.6, 'ir', t('Tháng 8/2014, kính Keck (quang học thích nghi) ghi nhận mùa bão kỷ lục ở bán cầu Bắc; cơn bão sáng nhất từng thấy ở 2,2 µm nằm gần 15°B. Đặt <b>Khung</b> = Quay cùng lõi để thấy chúng trôi.', 'In August 2014 the Keck telescope (with adaptive optics) recorded a record storm season in the northern hemisphere; the brightest storm ever seen at 2.2 µm lay near 15° N. Set <b>Frame</b> to Co-rotating to watch them drift.')),
+      en: { title: 'Record storm season, near-infrared' } },
+    { label: 'JWST 2023', key: 'j', title: 'Chỏm cực Bắc sáng, vành', run: ctx => epoch(ctx, 2023.1, 'ir', t('JWST NIRCam (6/2/2023): chỏm cực Bắc sáng theo mùa, một đám mây sáng ở rìa chỏm, vành ε và vành bụi ζ mờ phía trong.', 'JWST NIRCam (6 February 2023): the bright seasonal north polar cap, a bright cloud at its edge, the ε ring and the faint dusty ζ ring further in.')),
+      en: { title: 'Bright north polar cap, rings' } },
+    { label: 'Hạ chí 2030', key: 'o', title: 'Cực Bắc hướng Mặt Trời', run: ctx => epoch(ctx, 2030.0, null, t('Hạ chí Bắc (2030): Mặt Trời ở 82° B, gần thiên đỉnh cực Bắc; cả bán cầu Nam chìm trong đêm 42 năm. Vành nhìn từ Mặt Trời như một tấm bia.', 'Northern summer solstice (2030): the Sun at 82° N, close to overhead at the north pole; the whole southern hemisphere is plunged into a 42-year night. Seen from the Sun, the rings look like a bullseye.')),
+      en: { label: 'Solstice 2030', title: 'North pole facing the Sun' } },
+    { label: 'Nhìn từ Trái Đất', key: 'g', title: 'Đặt camera theo hướng Trái Đất', run: ctx => { earthView(ctx); ctx.toast(t('Hướng nhìn từ Trái Đất vào năm đang chọn (góc pha luôn < 3°).', 'The view from Earth in the selected year (the phase angle is always < 3°).'), 5000); },
+      en: { label: 'View from Earth', title: 'Point the camera along the line of sight from Earth' } },
   ],
   create(ctx) {
     const R = ctx.renderer;
@@ -722,15 +751,15 @@ const DEF = {
         const tl = 10 ** p.tlog * (c.bhGlobals?.timeScale ?? 6);
         const phase = Math.acos(THREE.MathUtils.clamp(cam.dot(st.sun), -1, 1)) * R2D;
         return [
-          ['Năm', `${vn(p.year, 1)} — ${seasonText(st.B, p.year)}`],
-          ['Vĩ độ điểm dưới Mặt Trời', `${latStr(st.B)} (Trái Đất: ${latStr(st.geo.BE)})`],
-          ['Cách Mặt Trời', `${vn(st.geo.rAU, 2)} AU · ánh sáng đi ${vn(st.geo.rAU * 499 / 3600, 2)} giờ`],
-          ['Vĩ độ dưới camera', latStr(ll.lat)],
-          ['Gió ở đó', windStr(windMS(ll.lat))],
-          ['Mây ở đó quay một vòng', `${vn(cloudPeriod(ll.lat), 2)} giờ (lõi: 17,25 giờ)`],
-          ['Chỏm cực Bắc / Nam', `${Math.round(ca[0] * 100)} % / ${Math.round(ca[1] * 100)} %`],
-          ['Góc pha', vn(phase, 0) + '°'],
-          ['Tua nhanh', `×${fmtInt(tl)} (1 giây = ${tl >= 3600 ? vn(tl / 3600, 1) + ' giờ' : vn(tl / 60, 0) + ' phút'})`],
+          [t('Năm', 'Year'), `${vn(p.year, 1)} — ${seasonText(st.B, p.year)}`],
+          [t('Vĩ độ điểm dưới Mặt Trời', 'Subsolar latitude'), `${latStr(st.B)} (${t('Trái Đất', 'Earth')}: ${latStr(st.geo.BE)})`],
+          [t('Cách Mặt Trời', 'Distance from the Sun'), t(`${vn(st.geo.rAU, 2)} AU · ánh sáng đi ${vn(st.geo.rAU * 499 / 3600, 2)} giờ`, `${vn(st.geo.rAU, 2)} AU · light takes ${vn(st.geo.rAU * 499 / 3600, 2)} h`)],
+          [t('Vĩ độ dưới camera', 'Latitude below camera'), latStr(ll.lat)],
+          [t('Gió ở đó', 'Wind there'), windStr(windMS(ll.lat))],
+          [t('Mây ở đó quay một vòng', 'Cloud rotation period there'), t(`${vn(cloudPeriod(ll.lat), 2)} giờ (lõi: 17,25 giờ)`, `${vn(cloudPeriod(ll.lat), 2)} h (interior: 17.25 h)`)],
+          [t('Chỏm cực Bắc / Nam', 'North / south polar cap'), t(`${Math.round(ca[0] * 100)} % / ${Math.round(ca[1] * 100)} %`, `${Math.round(ca[0] * 100)}% / ${Math.round(ca[1] * 100)}%`)],
+          [t('Góc pha', 'Phase angle'), vn(phase, 0) + '°'],
+          [t('Tua nhanh', 'Time-lapse'), t(`×${fmtInt(tl)} (1 giây = ${tl >= 3600 ? vn(tl / 3600, 1) + ' giờ' : vn(tl / 60, 0) + ' phút'})`, `×${fmtInt(tl)} (1 s = ${tl >= 3600 ? vn(tl / 3600, 1) + ' h' : vn(tl / 60, 0) + ' min'})`)],
         ];
       },
       onClick(info, c) {
@@ -746,7 +775,8 @@ const DEF = {
               for (const rg of RINGS) if (!best || Math.abs(rg[1] - r) < Math.abs(best[1] - r)) best = rg;
               if (best && Math.abs(best[1] - r) < 1500) {
                 const nDay = Math.sqrt(GM / best[1] ** 3) * DAY * R2D, pr = ringPrec(best[1]) * DAY * R2D;
-                c.toast(`Vành <b>${best[0]}</b>: bán kính ${fmtInt(best[1])} km, độ lệch tâm ${vn(best[2] * 1000, 3)}×10⁻³, rộng ${vn(best[3], 1)}–${vn(best[4], 1)} km. Hạt vành quay ${vn(nDay, 0)}°/ngày; trục elip tiến động ${vn(pr, 3)}°/ngày do Sao Thiên Vương dẹt (J₂).`, 8000);
+                c.toast(tt(`Vành <b>${best[0]}</b>: bán kính ${fmtInt(best[1])} km, độ lệch tâm ${vn(best[2] * 1000, 3)}×10⁻³, rộng ${vn(best[3], 1)}–${vn(best[4], 1)} km. Hạt vành quay ${vn(nDay, 0)}°/ngày; trục elip tiến động ${vn(pr, 3)}°/ngày do Sao Thiên Vương dẹt (J₂).`,
+                  `<b>${best[0]}</b> ring: radius ${fmtInt(best[1])} km, eccentricity ${vn(best[2] * 1000, 3)}×10⁻³, width ${vn(best[3], 1)}–${vn(best[4], 1)} km. Its particles orbit at ${vn(nDay, 0)}°/day; the ellipse's apsides precess ${vn(pr, 3)}°/day because Uranus is oblate (J₂).`), 8000);
               }
             }
           }
@@ -755,8 +785,8 @@ const DEF = {
         const p = h.ro.clone().addScaledVector(h.rd, h.t);
         const ll = bodyLatLon(p, h.k, st.spin);
         const B = st.B;
-        const day = Math.abs(ll.lat) > 90 - Math.abs(B) ? (Math.sign(ll.lat) === Math.sign(B) ? 'Mặt Trời không lặn ở đây vào mùa này' : 'đêm kéo dài suốt mùa này') : 'ngày và đêm luân phiên theo vòng quay';
-        c.toast(`Vĩ độ <b>${latStr(ll.lat)}</b>: gió ${windStr(windMS(ll.lat))}, mây quay một vòng trong ${vn(cloudPeriod(ll.lat), 2)} giờ; ${day}.`, 7000);
+        const day = Math.abs(ll.lat) > 90 - Math.abs(B) ? (Math.sign(ll.lat) === Math.sign(B) ? t('Mặt Trời không lặn ở đây vào mùa này', 'the Sun never sets here this season') : t('đêm kéo dài suốt mùa này', 'night lasts all season long')) : t('ngày và đêm luân phiên theo vòng quay', 'day and night alternate with each rotation');
+        c.toast(t(`Vĩ độ <b>${latStr(ll.lat)}</b>: gió ${windStr(windMS(ll.lat))}, mây quay một vòng trong ${vn(cloudPeriod(ll.lat), 2)} giờ; ${day}.`, `Latitude <b>${latStr(ll.lat)}</b>: wind ${windStr(windMS(ll.lat))}, the clouds complete one rotation in ${vn(cloudPeriod(ll.lat), 2)} h; ${day}.`), 7000);
       },
     };
     DEF.__inst = inst;

@@ -2,6 +2,7 @@
 // One scene unit = one planetary radius. The star is fixed in space; orbit around to see day and night.
 import * as THREE from 'three';
 import { COMMON_GLSL, FULLSCREEN_VERT } from '../glsl/common.js';
+import { t } from '../i18n.js';
 
 const D2R = Math.PI / 180;
 // body-frame unit vector for (latitude, east longitude) — must match the body rotation used below:
@@ -227,24 +228,24 @@ function localHour(p, L) {
   return ((h % 24) + 24) % 24;
 }
 const hhmm = h => `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')}`;
-const latStr = v => `${Math.abs(v).toFixed(1)}°${v >= 0 ? 'B' : 'N'}`;
-const lonStr = v => `${Math.abs(v).toFixed(1)}°${v >= 0 ? 'Đ' : 'T'}`;
+const latStr = v => `${Math.abs(v).toFixed(1)}°${v >= 0 ? t('B', 'N') : t('N', 'S')}`;
+const lonStr = v => `${Math.abs(v).toFixed(1)}°${v >= 0 ? t('Đ', 'E') : t('T', 'W')}`;
 function orbitRows(ctx, Rkm, refR = 1) {
   const d = ctx.camera.position.length(), hKm = (d - refR) * Rkm;
   const horizon = Math.sqrt(Math.max(d * d - refR * refR, 0)) * Rkm;
-  return [['Độ cao', ctx.fmt.dist(hKm * 1000)], ['Khoảng cách tới đường chân trời', ctx.fmt.dist(horizon * 1000)]];
+  return [[t('Độ cao', 'Altitude'), ctx.fmt.dist(hKm * 1000)], [t('Khoảng cách tới đường chân trời', 'Distance to the horizon'), ctx.fmt.dist(horizon * 1000)]];
 }
 const hourParam = (def, note) => ({
   key: 'hour', label: 'Giờ địa phương (dưới camera)', type: 'range', min: 0, max: 24, step: 0.1, default: def,
-  fmt: v => hhmm(v), note,
+  fmt: v => hhmm(v), note, en: { label: 'Local time (below the camera)' },
 });
 function makeMaterial(frag, uniforms) {
   return new THREE.ShaderMaterial({ uniforms, vertexShader: FULLSCREEN_VERT, fragmentShader: frag, depthTest: false, depthWrite: false });
 }
 function sunElevStr(n, L) {
   const e = Math.asin(Math.max(-1, Math.min(1, n.dot(L)))) / D2R;
-  const tag = e > 6 ? 'ban ngày' : e > -0.8 ? 'bình minh/hoàng hôn' : e > -18 ? 'chạng vạng' : 'ban đêm';
-  return `Mặt Trời cao <b>${e.toFixed(1)}°</b> (${tag})`;
+  const tag = e > 6 ? t('ban ngày', 'daytime') : e > -0.8 ? t('bình minh/hoàng hôn', 'sunrise/sunset') : e > -18 ? t('chạng vạng', 'twilight') : t('ban đêm', 'night');
+  return t(`Mặt Trời cao <b>${e.toFixed(1)}°</b> (${tag})`, `Sun elevation <b>${e.toFixed(1)}°</b> (${tag})`);
 }
 
 /* Earth uses a right-handed geography (east = counter-clockwise seen from the north, like the real
@@ -268,21 +269,37 @@ export default [
     ['Sao chủ', '55 Cancri A (Copernicus), K0, 5 200 K'], ['Khoảng cách', '41 năm ánh sáng'],
     ['Khí quyển', 'có dấu hiệu CO/CO₂ thứ cấp (JWST, 2024)'],
   ],
+  en: {
+    name: 'Lava world',
+    subtitle: '55 Cancri e (Janssen) · tidally locked super-Earth',
+    blurb: '55 Cancri e orbits its star in just 17.7 hours, so close that it is <b>tidally locked</b>: one hemisphere is in permanent daylight. The dayside reaches ~2,700 K, hot enough to melt silicate rock into a lava ocean that glows on its own like a <b>blackbody</b>; the star fills ~32° of the sky.',
+    intro: 'The planet does not rotate relative to its star — swing the camera round the back to see the night side with its still-smouldering cracks, and the giant star behind it. Press <b>I</b> for the infrared heat map.',
+    facts: [
+      ['Radius', '1.88 R⊕ (~12,000 km)'], ['Mass', '7.99 M⊕'], ['Surface gravity', '~22 m/s²'],
+      ['Orbital period', '17.7 h'], ['Semi-major axis', '0.0154 AU (2.3 million km)'],
+      ['Dayside temperature (Spitzer)', '~2,700 K'], ['Nightside temperature', '~1,400 K'],
+      ['Host star', '55 Cancri A (Copernicus), K0, 5,200 K'], ['Distance', '41 light-years'],
+      ['Atmosphere', 'signs of a secondary CO/CO₂ atmosphere (JWST, 2024)'],
+    ],
+  },
   unitKm: 12000,
   camera: { distance: 3.4, polar: 78, azimuth: 5, min: 1.03, max: 40, fov: 45 },
   exposure: 0.9,
   bloom: 0.4,
   params: [
-    { key: 'tss', label: 'Nhiệt độ điểm cận sao', type: 'range', min: 1500, max: 3500, step: 10, default: 2700, fmt: v => v.toFixed(0) + ' K', note: 'Cân bằng bức xạ không phân phối nhiệt: T = T₀·cos^¼(góc thiên đỉnh). Độ sáng khả kiến tăng cực nhanh theo T (định luật Planck).' },
-    { key: 'crust', label: 'Lớp vỏ nguội', type: 'range', min: 0, max: 1, step: 0.01, default: 0.5, note: 'Đá silicat đông đặc dưới ~1 600 K thành các mảng vỏ trôi trên biển dung nham.' },
-    { key: 'view', label: 'Chế độ xem', type: 'seg', options: [['vis', 'Khả kiến'], ['ir', 'Bản đồ nhiệt']], default: 'vis', note: 'Bản đồ nhiệt: 900 K (tím đen) → 3 500 K (vàng trắng).' },
+    { key: 'tss', label: 'Nhiệt độ điểm cận sao', type: 'range', min: 1500, max: 3500, step: 10, default: 2700, fmt: v => v.toFixed(0) + ' K', note: 'Cân bằng bức xạ không phân phối nhiệt: T = T₀·cos^¼(góc thiên đỉnh). Độ sáng khả kiến tăng cực nhanh theo T (định luật Planck).',
+      en: { label: 'Substellar-point temperature', note: 'Radiative equilibrium with no heat redistribution: T = T₀·cos^¼(zenith angle). Visible brightness climbs extremely steeply with T (Planck’s law).' } },
+    { key: 'crust', label: 'Lớp vỏ nguội', type: 'range', min: 0, max: 1, step: 0.01, default: 0.5, note: 'Đá silicat đông đặc dưới ~1 600 K thành các mảng vỏ trôi trên biển dung nham.',
+      en: { label: 'Cooled crust', note: 'Below ~1,600 K silicate rock solidifies into crust plates drifting on the lava ocean.' } },
+    { key: 'view', label: 'Chế độ xem', type: 'seg', options: [['vis', 'Khả kiến'], ['ir', 'Bản đồ nhiệt']], default: 'vis', note: 'Bản đồ nhiệt: 900 K (tím đen) → 3 500 K (vàng trắng).',
+      en: { label: 'View', options: ['Visible', 'Heat map'], note: 'Heat map: 900 K (black-violet) → 3,500 K (yellow-white).' } },
   ],
   actions: [
-    { label: 'Hồng ngoại', key: 'i', run: ctx => { ctx.params.view = ctx.params.view === 'ir' ? 'vis' : 'ir'; } },
+    { label: 'Hồng ngoại', key: 'i', run: ctx => { ctx.params.view = ctx.params.view === 'ir' ? 'vis' : 'ir'; }, en: { label: 'Infrared' } },
     { label: 'Ngược sáng', key: 'o', title: 'Bay ra phía đêm, nhìn về ngôi sao', run: ctx => {
       ctx.camera.position.setFromSphericalCoords(3.4, 84 * D2R, 215 * D2R); ctx.camera.lookAt(0, 0, 0); ctx.controls.target.set(0, 0, 0); ctx.controls.update();
-      ctx.toast('Mặt đêm (~1 400 K): lớp vỏ đá đen với các khe nứt dung nham còn âm ỉ. Phía sau là 55 Cancri A — chiếm 32° bầu trời, to gấp ~60 lần Mặt Trời nhìn từ Trái Đất.');
-    } },
+      ctx.toast(t('Mặt đêm (~1 400 K): lớp vỏ đá đen với các khe nứt dung nham còn âm ỉ. Phía sau là 55 Cancri A — chiếm 32° bầu trời, to gấp ~60 lần Mặt Trời nhìn từ Trái Đất.', 'Night side (~1,400 K): a black rock crust with lava cracks still smouldering. Behind it is 55 Cancri A — spanning 32° of the sky, ~60 times wider than the Sun seen from Earth.'));
+    }, en: { label: 'Backlit', title: 'Fly to the night side and look back at the star' } },
   ],
   create(ctx) {
     const uniforms = {
@@ -304,17 +321,18 @@ export default [
         const starAng = 2 * Math.asin(54.7 / c.clone().sub(STAR_DIR.clone().multiplyScalar(193)).length()) / D2R;
         return [
           ...orbitRows(ctx, 12000),
-          ['Nhiệt độ cân bằng dưới camera', Teq(n, ctx.params.tss).toFixed(0) + ' K'],
-          ['Đường kính biểu kiến của sao', starAng.toFixed(1) + '° (Mặt Trời từ Trái Đất: 0,53°)'],
+          [t('Nhiệt độ cân bằng dưới camera', 'Equilibrium temperature below the camera'), Teq(n, ctx.params.tss).toFixed(0) + ' K'],
+          [t('Đường kính biểu kiến của sao', 'Apparent diameter of the star'), starAng.toFixed(1) + t('° (Mặt Trời từ Trái Đất: 0,53°)', '° (the Sun from Earth: 0.53°)')],
         ];
       },
       onClick(info, ctx) {
-        const t = hitSphere(info.origin, info.dir);
-        if (t === null) return;
-        const p = info.origin.clone().addScaledVector(info.dir, t).normalize();
+        const th = hitSphere(info.origin, info.dir);
+        if (th === null) return;
+        const p = info.origin.clone().addScaledVector(info.dir, th).normalize();
         const T = Teq(p, ctx.params.tss), z = Math.acos(Math.max(-1, Math.min(1, p.dot(STAR_DIR)))) / D2R;
-        const state = T > 1900 ? 'biển dung nham lỏng' : T > 1500 ? 'dung nham với các mảng vỏ trôi' : 'vỏ đá đông đặc, nứt nẻ còn âm ỉ';
-        ctx.toast(`Góc thiên đỉnh của sao <b>${z.toFixed(0)}°</b> · nhiệt độ cân bằng <b>${T.toFixed(0)} K</b> (${(T - 273).toFixed(0)} °C): ${state}. Bức xạ nhiệt ∝ T⁴ = ${(5.67e-8 * T ** 4 / 1e6).toFixed(1)} MW/m².`);
+        const state = T > 1900 ? t('biển dung nham lỏng', 'a molten lava ocean') : T > 1500 ? t('dung nham với các mảng vỏ trôi', 'lava with drifting crust plates') : t('vỏ đá đông đặc, nứt nẻ còn âm ỉ', 'solid rock crust, cracked and still smouldering');
+        ctx.toast(t(`Góc thiên đỉnh của sao <b>${z.toFixed(0)}°</b> · nhiệt độ cân bằng <b>${T.toFixed(0)} K</b> (${(T - 273).toFixed(0)} °C): ${state}. Bức xạ nhiệt ∝ T⁴ = ${(5.67e-8 * T ** 4 / 1e6).toFixed(1)} MW/m².`,
+          `Stellar zenith angle <b>${z.toFixed(0)}°</b> · equilibrium temperature <b>${T.toFixed(0)} K</b> (${(T - 273).toFixed(0)} °C): ${state}. Thermal emission ∝ T⁴ = ${(5.67e-8 * T ** 4 / 1e6).toFixed(1)} MW/m².`));
       },
     };
   },

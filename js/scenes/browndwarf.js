@@ -4,6 +4,7 @@
 // blackbody × alkali absorption, fast-rotating banded and patchy clouds.
 import * as THREE from 'three';
 import { COMMON_GLSL, FULLSCREEN_VERT } from '../glsl/common.js';
+import { t, dec, int } from '../i18n.js';
 
 const V3 = THREE.Vector3;
 const D2R = Math.PI / 180, R2D = 180 / Math.PI, TAU = Math.PI * 2;
@@ -42,11 +43,11 @@ function lerpTab(pts, x) {
   return pts[pts.length - 1][1];
 }
 const latlonJS = (latD, lonE) => { const la = latD * D2R; return new V3(Math.cos(la) * Math.cos(lonE), Math.sin(la), -Math.cos(la) * Math.sin(lonE)); };
-const vn = (x, d = 1) => x.toFixed(d).replace('.', ',');
-const latStr = d => `${vn(Math.abs(d))}° ${d >= 0 ? 'B' : 'N'}`;
-const windStr = u => `${u >= 0 ? '+' : '−'}${Math.abs(u).toFixed(0)} m/s ${u >= 0 ? '(về đông)' : '(về tây)'}`;
+const vn = (x, d = 1) => dec(x, d);
+const latStr = d => `${vn(Math.abs(d))}° ${d >= 0 ? t('B', 'N') : t('N', 'S')}`;
+const windStr = u => `${u >= 0 ? '+' : '−'}${Math.abs(u).toFixed(0)} m/s ${u >= 0 ? t('(về đông)', '(eastward)') : t('(về tây)', '(westward)')}`;
 const wrap = a => ((a % TAU) + TAU) % TAU;
-const fmtInt = n => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+const fmtInt = n => int(n);
 
 /* ------------------------------------------------------------------------------------------------ */
 /* zonal wind profiles (planetographic latitude °, m/s, relative to the interior rotation)            */
@@ -214,7 +215,7 @@ function dwarfColour(T, alkali) {
   const lum = 0.2126 * r + 0.7152 * gg + 0.0722 * b;
   return [r / lum, gg / lum, b / lum];
 }
-const specType = T => T > 2300 ? 'M muộn' : T > 1300 ? 'L' + Math.min(9, Math.max(0, Math.round((2300 - T) / 110))) : T > 550 ? 'T' + Math.min(9, Math.max(0, Math.round((1300 - T) / 85))) : 'Y';
+const specType = T => T > 2300 ? t('M muộn', 'late M') : T > 1300 ? 'L' + Math.min(9, Math.max(0, Math.round((2300 - T) / 110))) : T > 550 ? 'T' + Math.min(9, Math.max(0, Math.round((1300 - T) / 85))) : 'Y';
 
 const BROWN_DWARF = {
   id: 'brown-dwarf', name: 'Sao lùn nâu', category: 'stars', order: 60,
@@ -228,18 +229,33 @@ const BROWN_DWARF = {
     ['Bạn đồng hành', 'Luhman 16A (L7,5, ~34 M_J), cách 3,5 AU'],
     ['Ngưỡng đốt deuterium', '≈ 13 M_J'], ['Ngưỡng đốt hydro (thành sao)', '≈ 75 – 80 M_J'],
   ],
+  en: {
+    name: 'Brown dwarf',
+    subtitle: 'Luhman 16B · spectral type T0.5 · 6.5 light-years',
+    blurb: 'Too massive to be a planet, too light to be a star: a brown dwarf (13–80 Jupiter masses) can fuse only <b>deuterium</b>, and only briefly, then cools forever. Luhman 16B is ~1,200 K and glows evenly on both hemispheres; sodium and potassium absorb the yellow–orange light, so to the human eye it would look <b>magenta</b>.',
+    intro: 'Switch <b>Wavelength</b> to the J-band infrared to see the gaps between the clouds — exactly what Doppler imaging (Crossfield 2014) and JWST use to map its weather.',
+    facts: [
+      ['Mass', '~28 M_Jup (Garcia 2017)'], ['Radius', '~0.85 – 1 R_Jup'], ['Effective temperature', '~1,210 K'],
+      ['Rotation period', '5.28 h'], ['Distance', '2.0 pc (6.5 light-years) — the nearest brown dwarf'],
+      ['Companion', 'Luhman 16A (L7.5, ~34 M_J), 3.5 AU away'],
+      ['Deuterium-burning limit', '≈ 13 M_J'], ['Hydrogen-burning limit (becoming a star)', '≈ 75 – 80 M_J'],
+    ],
+  },
   unitKm: 70000,
   camera: { distance: 3.2, polar: 80, azimuth: 20, min: 1.05, max: 60, fov: 45 },
   exposure: 1.0, bloom: 0.5,
   params: [
-    { key: 'teff', label: 'Nhiệt độ hiệu dụng', type: 'range', min: 500, max: 2400, step: 10, default: 1210, fmt: v => v.toFixed(0) + ' K', note: 'Kéo để đi qua dãy L → T → Y: sao lùn nâu nguội dần theo tuổi.' },
-    { key: 'view', label: 'Bước sóng', type: 'seg', options: [['eye', 'Mắt người'], ['ir', 'Hồng ngoại J'], ['bb', 'Vật đen thuần']], default: 'eye', note: '“Vật đen thuần” bỏ đi sự hấp thụ của Na, K, H₂O, CH₄ — so sánh để thấy vì sao nó không “nâu”.' },
-    { key: 'clouds', label: 'Độ loang lổ của mây', type: 'range', min: 0, max: 1, step: 0.01, default: 0.7 },
-    { key: 'windx', label: 'Tua nhanh gió', type: 'range', min: 0, max: 20, step: 0.5, default: 1, fmt: v => '×' + v.toFixed(1) },
-    { key: 'spin', label: 'Tự quay', type: 'toggle', default: true },
+    { key: 'teff', label: 'Nhiệt độ hiệu dụng', type: 'range', min: 500, max: 2400, step: 10, default: 1210, fmt: v => v.toFixed(0) + ' K', note: 'Kéo để đi qua dãy L → T → Y: sao lùn nâu nguội dần theo tuổi.',
+      en: { label: 'Effective temperature', note: 'Drag through the L → T → Y sequence: brown dwarfs cool as they age.' } },
+    { key: 'view', label: 'Bước sóng', type: 'seg', options: [['eye', 'Mắt người'], ['ir', 'Hồng ngoại J'], ['bb', 'Vật đen thuần']], default: 'eye', note: '“Vật đen thuần” bỏ đi sự hấp thụ của Na, K, H₂O, CH₄ — so sánh để thấy vì sao nó không “nâu”.',
+      en: { label: 'Wavelength', options: ['Human eye', 'J-band infrared', 'Pure blackbody'], note: '“Pure blackbody” removes the absorption by Na, K, H₂O and CH₄ — compare to see why it isn’t “brown”.' } },
+    { key: 'clouds', label: 'Độ loang lổ của mây', type: 'range', min: 0, max: 1, step: 0.01, default: 0.7, en: { label: 'Cloud patchiness' } },
+    { key: 'windx', label: 'Tua nhanh gió', type: 'range', min: 0, max: 20, step: 0.5, default: 1, fmt: v => '×' + v.toFixed(1), en: { label: 'Wind speed-up' } },
+    { key: 'spin', label: 'Tự quay', type: 'toggle', default: true, en: { label: 'Rotation' } },
   ],
   actions: [
-    { label: 'Hồng ngoại', key: 'i', title: 'Chuyển giữa mắt người và hồng ngoại J', run: ctx => { ctx.params.view = ctx.params.view === 'ir' ? 'eye' : 'ir'; ctx.toast(ctx.params.view === 'ir' ? 'Hồng ngoại J (1,25 µm): ánh sáng thoát ra từ sâu hơn qua các khe mây — chỗ sáng là nơi mây mỏng, nhìn thấy lớp khí nóng hơn.' : 'Ánh sáng khả kiến (mô phỏng mắt người).'); } },
+    { label: 'Hồng ngoại', key: 'i', title: 'Chuyển giữa mắt người và hồng ngoại J', run: ctx => { ctx.params.view = ctx.params.view === 'ir' ? 'eye' : 'ir'; ctx.toast(ctx.params.view === 'ir' ? t('Hồng ngoại J (1,25 µm): ánh sáng thoát ra từ sâu hơn qua các khe mây — chỗ sáng là nơi mây mỏng, nhìn thấy lớp khí nóng hơn.', 'J-band infrared (1.25 µm): light escapes from deeper down through the cloud gaps — bright patches are where the clouds are thin and the hotter gas below shows through.') : t('Ánh sáng khả kiến (mô phỏng mắt người).', 'Visible light (simulated human eye).')); },
+      en: { label: 'Infrared', title: 'Toggle between the human eye and J-band infrared' } },
   ],
   create(ctx) {
     const R = 7.0e7, prot = 5.28 * 3600, phaseP = 4e4, flat = 0.012;
@@ -288,10 +304,10 @@ const BROWN_DWARF = {
       hud(ctx) {
         const T = ctx.params.teff;
         return [
-          ['Kiểu phổ (theo T)', specType(T)],
-          ['Đỉnh phát xạ (Wien)', vn(2898 / T, 2) + ' µm — hồng ngoại'],
-          ['Tốc độ quay ở xích đạo', vn(TAU * R / prot / 1000) + ' km/s'],
-          ['Độ sáng so với Mặt Trời', '~' + ctx.fmt.sci(Math.pow(T / 5772, 4) * 0.01) + ' L☉'],
+          [t('Kiểu phổ (theo T)', 'Spectral type (from T)'), specType(T)],
+          [t('Đỉnh phát xạ (Wien)', 'Emission peak (Wien)'), vn(2898 / T, 2) + t(' µm — hồng ngoại', ' µm — infrared')],
+          [t('Tốc độ quay ở xích đạo', 'Equatorial rotation speed'), vn(TAU * R / prot / 1000) + ' km/s'],
+          [t('Độ sáng so với Mặt Trời', 'Luminosity relative to the Sun'), '~' + ctx.fmt.sci(Math.pow(T / 5772, 4) * 0.01) + ' L☉'],
         ];
       },
       onClick(info, ctx) {
@@ -302,7 +318,8 @@ const BROWN_DWARF = {
         const ll = bodyLatLon(p, h.k, 0);
         const mu = Math.max(0, -ll.n.dot(h.rd));
         const Tb = ctx.params.teff * Math.pow(0.75 * (mu + 2 / 3), 0.25);
-        ctx.toast(`Nhiệt độ sáng ở đây ≈ <b>${fmtInt(Tb)} K</b> (μ = ${vn(mu, 2)}). Ở rìa đĩa ta nhìn xiên vào các lớp khí cao hơn, lạnh hơn — nên rìa tối và đỏ hơn tâm (khí quyển xám Eddington).`, 6000);
+        ctx.toast(t(`Nhiệt độ sáng ở đây ≈ <b>${fmtInt(Tb)} K</b> (μ = ${vn(mu, 2)}). Ở rìa đĩa ta nhìn xiên vào các lớp khí cao hơn, lạnh hơn — nên rìa tối và đỏ hơn tâm (khí quyển xám Eddington).`,
+          `Brightness temperature here ≈ <b>${fmtInt(Tb)} K</b> (μ = ${vn(mu, 2)}). Near the limb we look obliquely into higher, cooler layers — so the limb is darker and redder than the centre (Eddington grey atmosphere).`), 6000);
       },
     };
   },

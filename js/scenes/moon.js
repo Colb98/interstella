@@ -2,6 +2,7 @@
 // One scene unit = one lunar radius (1 737.4 km). Sunlight is a directional light.
 import * as THREE from 'three';
 import { COMMON_GLSL, FULLSCREEN_VERT } from '../glsl/common.js';
+import { t, dec } from '../i18n.js';
 
 const FRAG = COMMON_GLSL + /* glsl */`
 uniform vec3 uSunDir;
@@ -77,17 +78,29 @@ export default [{
     ['Bán kính', '1 737,4 km'], ['Khối lượng', '7,35×10²² kg'], ['Khoảng cách tới Trái Đất', '384 400 km'],
     ['Suất phản chiếu', '0,12'], ['Chu kỳ tự quay', '27,3 ngày (khóa thủy triều)'],
   ],
+  en: {
+    name: 'The Moon',
+    subtitle: "Earth's natural satellite",
+    blurb: 'An airless surface blanketed in regolith dust and pocked by millions of impact craters. Because it scatters light by the Lommel–Seeliger law, the full Moon looks flat, like a disc, rather than a shaded ball.',
+    facts: [
+      ['Radius', '1,737.4 km'], ['Mass', '7.35×10²² kg'], ['Distance from Earth', '384,400 km'],
+      ['Albedo', '0.12'], ['Rotation period', '27.3 days (tidally locked)'],
+    ],
+  },
   unitKm: 1737.4,
   camera: { distance: 3.4, polar: 82, azimuth: 20, min: 1.05, max: 30, fov: 45 },
   exposure: 1.0,
   bloom: 0.35,
   params: [
-    { key: 'sunAngle', label: 'Góc pha (Mặt Trời)', type: 'range', min: 0, max: 180, step: 1, default: 70, fmt: v => v.toFixed(0) + '°', note: '0° = trăng tròn (Mặt Trời sau lưng bạn), 180° = trăng non.' },
-    { key: 'craters', label: 'Mật độ hố va chạm', type: 'range', min: 0, max: 1, step: 0.01, default: 0.55 },
-    { key: 'earthshine', label: 'Ánh Trái Đất', type: 'toggle', default: true, note: 'Ánh sáng Trái Đất phản chiếu lên phần tối của Mặt Trăng.' },
+    { key: 'sunAngle', label: 'Góc pha (Mặt Trời)', type: 'range', min: 0, max: 180, step: 1, default: 70, fmt: v => v.toFixed(0) + '°', note: '0° = trăng tròn (Mặt Trời sau lưng bạn), 180° = trăng non.',
+      en: { label: 'Phase angle (Sun)', note: '0° = full Moon (the Sun behind you), 180° = new Moon.' } },
+    { key: 'craters', label: 'Mật độ hố va chạm', type: 'range', min: 0, max: 1, step: 0.01, default: 0.55, en: { label: 'Crater density' } },
+    { key: 'earthshine', label: 'Ánh Trái Đất', type: 'toggle', default: true, note: 'Ánh sáng Trái Đất phản chiếu lên phần tối của Mặt Trăng.',
+      en: { label: 'Earthshine', note: "Sunlight reflected off Earth onto the Moon's night side." } },
   ],
   actions: [
-    { label: 'Trăng tròn', key: 'o', run: ctx => { ctx.params.sunAngle = 0; ctx.toast('Góc pha 0°: bóng đổ biến mất, các hố gần như vô hình — hiệu ứng đối pha.'); } },
+    { label: 'Trăng tròn', key: 'o', run: ctx => { ctx.params.sunAngle = 0; ctx.toast(t('Góc pha 0°: bóng đổ biến mất, các hố gần như vô hình — hiệu ứng đối pha.', 'Phase angle 0°: shadows vanish and craters almost disappear — the opposition effect.')); },
+      en: { label: 'Full Moon' } },
   ],
   create(ctx) {
     const uniforms = {
@@ -114,9 +127,9 @@ export default [{
         const d = ctx.camera.position.length();
         const ang = 2 * Math.asin(Math.min(1, 1 / d));
         return [
-          ['Độ cao', ctx.fmt.dist((d - 1) * 1737.4e3)],
-          ['Đường kính góc', THREE.MathUtils.radToDeg(ang).toFixed(1) + '°'],
-          ['Phần được chiếu sáng', (50 * (1 + Math.cos(THREE.MathUtils.degToRad(ctx.params.sunAngle)))).toFixed(0) + '%'],
+          [t('Độ cao', 'Altitude'), ctx.fmt.dist((d - 1) * 1737.4e3)],
+          [t('Đường kính góc', 'Angular diameter'), dec(THREE.MathUtils.radToDeg(ang), 1) + '°'],
+          [t('Phần được chiếu sáng', 'Illuminated fraction'), (50 * (1 + Math.cos(THREE.MathUtils.degToRad(ctx.params.sunAngle)))).toFixed(0) + '%'],
         ];
       },
       onClick(info, ctx) {
@@ -124,7 +137,8 @@ export default [{
         if (h === null) return;
         const p = info.origin.clone().addScaledVector(info.dir, h);
         const lat = THREE.MathUtils.radToDeg(Math.asin(p.y)), lon = THREE.MathUtils.radToDeg(Math.atan2(p.z, p.x));
-        ctx.toast(`Điểm chạm: vĩ độ <b>${lat.toFixed(1)}°</b>, kinh độ <b>${lon.toFixed(1)}°</b>. Trọng lực bề mặt 1,62 m/s² — một bước nhảy cao gấp 6 lần trên Trái Đất.`);
+        ctx.toast(t(`Điểm chạm: vĩ độ <b>${lat.toFixed(1)}°</b>, kinh độ <b>${lon.toFixed(1)}°</b>. Trọng lực bề mặt 1,62 m/s² — một bước nhảy cao gấp 6 lần trên Trái Đất.`,
+          `Touchdown: latitude <b>${lat.toFixed(1)}°</b>, longitude <b>${lon.toFixed(1)}°</b>. Surface gravity 1.62 m/s² — you would jump six times higher than on Earth.`));
       },
     };
   },

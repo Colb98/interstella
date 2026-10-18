@@ -22,6 +22,7 @@
 // The vortex patches are re-born pre-rotated by the collar's rotation, so the GRS keeps turning across resets.
 import * as THREE from 'three';
 import { COMMON_GLSL, FULLSCREEN_VERT } from '../../glsl/common.js';
+import { t, dec, int } from '../../i18n.js';
 
 const V3 = THREE.Vector3;
 const D2R = Math.PI / 180, R2D = 180 / Math.PI, TAU = Math.PI * 2;
@@ -531,11 +532,11 @@ void main(){
 /* JS helpers                                                                                       */
 /* ---------------------------------------------------------------------------------------------- */
 const latlonJS = (latD, lonE) => { const la = latD * D2R; return new V3(Math.cos(la) * Math.cos(lonE), Math.sin(la), -Math.cos(la) * Math.sin(lonE)); };
-const vn = (x, d = 1) => x.toFixed(d).replace('.', ',');
-const latStr = d => `${vn(Math.abs(d))}° ${d >= 0 ? 'B' : 'N'}`;
-const windStr = u => `${u >= 0 ? '+' : '−'}${Math.abs(u).toFixed(0)} m/s ${u >= 0 ? '(về đông)' : '(về tây)'}`;
+const vn = (x, d = 1) => dec(x, d);
+const latStr = d => `${vn(Math.abs(d))}° ${d >= 0 ? t('B', 'N') : t('N', 'S')}`;
+const windStr = u => `${u >= 0 ? '+' : '−'}${Math.abs(u).toFixed(0)} m/s ${u >= 0 ? t('(về đông)', '(eastward)') : t('(về tây)', '(westward)')}`;
 const wrap = a => ((a % TAU) + TAU) % TAU;
-const fmtInt = n => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+const fmtInt = n => int(n);
 const toHalf = THREE.DataUtils.toHalfFloat;
 
 function loadImageTex(url, { srgb = false, aniso = 1 }) {
@@ -545,10 +546,10 @@ function loadImageTex(url, { srgb = false, aniso = 1 }) {
     tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter;
     tex.generateMipmaps = true; tex.anisotropy = aniso; tex.needsUpdate = true;
     resolve(tex);
-  }, undefined, () => reject(new Error(`không tải được ${url}`))));
+  }, undefined, () => reject(new Error(t(`không tải được ${url}`, `could not load ${url}`)))));
 }
 const retry = (fn, url, ...a) => fn(url, ...a).catch(() => new Promise(r => setTimeout(r, 500)).then(() => fn(url + '?r=' + Date.now(), ...a)));
-const loadJSON = url => fetch(url).then(r => { if (!r.ok) throw new Error(`không tải được ${url}`); return r.json(); });
+const loadJSON = url => fetch(url).then(r => { if (!r.ok) throw new Error(t(`không tải được ${url}`, `could not load ${url}`)); return r.json(); });
 
 // per-latitude band texture (0.25° steps): ω, relative vorticity, turbulence, parallel radius
 function bandTexture(windAt, turbAt) {
@@ -664,32 +665,58 @@ const def = {
     ['Vết Đỏ Lớn (12/2025)', '≈ 14 000 × 9 500 km, gió viền ~110–120 m/s'],
     ['Dữ liệu', 'NASA/ESA Hubble OPAL — A. Simon, M. H. Wong (CC BY 4.0); cực theo Juno/JunoCam (NASA/JPL-Caltech/SwRI/MSSS)'],
   ],
+  en: {
+    name: 'Jupiter',
+    subtitle: 'Gas giant · H₂ + He · Hubble imagery 2025',
+    blurb: 'The surface here is a <b>real image</b>: the Hubble Space Telescope\'s global map (OPAL programme, December 2025) — set <b>in motion by the measured winds</b>. Fast rotation (under 10 hours) stretches the atmosphere into alternating east–west <b>jet streams</b> of up to 140 m/s; along their boundaries the clouds are sheared and rolled into vortices. The <b>Great Red Spot</b> is an anticyclone wider than Earth, turning counterclockwise and drifting slowly west.',
+    intro: 'Press <b>G</b> to fly to the Great Red Spot and follow it: cloud bands slide past each other, eddies roll up along their edges and the storm spins. Turn off <b>Winds & vortices</b> to compare with the still image.',
+    facts: [
+      ['Equatorial radius', '71,492 km (11.2 Earths)'], ['Polar radius', '66,854 km · oblateness 0.065'],
+      ['Mass', '1.898×10²⁷ kg (318 Earths)'], ['Rotation period (System III)', '9 h 55 min 30 s'],
+      ['Distance from the Sun', '5.20 AU'], ['Temperature at 1 bar', '165 K'],
+      ['Strongest jet', '~140 m/s at 24° N (measured from these two images)'],
+      ['Great Red Spot (Dec 2025)', '≈ 14,000 × 9,500 km, rim winds ~110–120 m/s'],
+      ['Data', 'NASA/ESA Hubble OPAL — A. Simon, M. H. Wong (CC BY 4.0); poles after Juno/JunoCam (NASA/JPL-Caltech/SwRI/MSSS)'],
+    ],
+  },
   unitKm: A_EQ / 1000,
   camera: { distance: 3.2, polar: 82, azimuth: 20, min: 1.05, max: 60, fov: 45 },
   exposure: 1.0, bloom: 0.3,
   params: [
     { key: 'band', label: 'Ảnh / bước sóng', type: 'seg', default: 'hst',
       options: [['hst', 'Hubble (OPAL)'], ['vis', 'Màu thật'], ['enh', 'Tăng tương phản'], ['ch4', 'Mê-tan 889 nm'], ['uv', 'Tử ngoại']],
-      note: 'Hubble: cách đội OPAL kéo giãn độ sáng cho ảnh màu công bố. Màu thật: hệ số phản xạ đã hiệu chuẩn ở 631/502/467 nm — Sao Mộc thật nhạt hơn ảnh báo chí nhiều. Mê-tan: chỉ mây cao và sương mù ở cực sáng lên. Tử ngoại (275 nm): sương mù cực hấp thụ, kèm cực quang tia cực tím.' },
+      note: 'Hubble: cách đội OPAL kéo giãn độ sáng cho ảnh màu công bố. Màu thật: hệ số phản xạ đã hiệu chuẩn ở 631/502/467 nm — Sao Mộc thật nhạt hơn ảnh báo chí nhiều. Mê-tan: chỉ mây cao và sương mù ở cực sáng lên. Tử ngoại (275 nm): sương mù cực hấp thụ, kèm cực quang tia cực tím.',
+      en: { label: 'Image / wavelength', options: ['Hubble (OPAL)', 'True colour', 'Enhanced contrast', 'Methane 889 nm', 'Ultraviolet'],
+        note: 'Hubble: the OPAL team\'s brightness stretch for the published colour image. True colour: calibrated reflectance at 631/502/467 nm — the real Jupiter is far paler than press images. Methane: only high clouds and polar haze light up. Ultraviolet (275 nm): the polar haze absorbs, plus the UV aurora.' } },
     { key: 'lapse', label: 'Tua nhanh thời tiết', type: 'range', min: 1, max: 60, step: 1, default: 10, fmt: v => '×' + fmtInt(v * 60),
-      note: 'Số giây trên Sao Mộc ứng với một giây mô phỏng. Mặc định (×600, đồng hồ chung 6×) ≈ 1 giờ Sao Mộc mỗi giây thật.' },
+      note: 'Số giây trên Sao Mộc ứng với một giây mô phỏng. Mặc định (×600, đồng hồ chung 6×) ≈ 1 giờ Sao Mộc mỗi giây thật.',
+      en: { label: 'Weather fast-forward', note: 'Jupiter seconds per simulated second. The default (×600, with the global clock at 6×) ≈ 1 Jupiter hour per real second.' } },
     { key: 'track', label: 'Khung nhìn', type: 'seg', default: 'spin',
       options: [['spin', 'Tự quay'], ['s3', 'Đứng yên (System III)'], ['grs', 'Bám Vết Đỏ']],
-      note: 'Tự quay: hành tinh quay thật (9 h 55 m). Đứng yên: nhìn trong hệ quay cùng lõi hành tinh, chỉ thấy gió. Bám Vết Đỏ: khung trôi theo cơn bão, như các phim Juno/Cassini.' },
-    { key: 'flow', label: 'Gió & xoáy', type: 'toggle', default: true, note: 'Tắt để thấy ảnh Hubble tĩnh.' },
+      note: 'Tự quay: hành tinh quay thật (9 h 55 m). Đứng yên: nhìn trong hệ quay cùng lõi hành tinh, chỉ thấy gió. Bám Vết Đỏ: khung trôi theo cơn bão, như các phim Juno/Cassini.',
+      en: { label: 'View frame', options: ['Rotating', 'Fixed (System III)', 'Follow the Red Spot'],
+        note: 'Rotating: the planet spins at its real rate (9 h 55 m). Fixed: the frame co-rotates with the interior, so you see only the winds. Follow the Red Spot: the frame drifts with the storm, as in the Juno/Cassini movies.' } },
+    { key: 'flow', label: 'Gió & xoáy', type: 'toggle', default: true, note: 'Tắt để thấy ảnh Hubble tĩnh.',
+      en: { label: 'Winds & vortices', note: 'Turn off to see the still Hubble image.' } },
     { key: 'detail', label: 'Rối nhỏ (dưới độ phân giải ảnh)', type: 'range', min: 0, max: 1.5, step: 0.05, default: 0.8,
-      note: 'Ảnh Hubble có ~120 km mỗi điểm ảnh; khi phóng to, các xoáy nhỏ hơn được sinh thêm theo thống kê rối của từng dải, và trôi cùng dòng chảy.' },
-    { key: 'sunAz', label: 'Hướng Mặt Trời', type: 'range', min: 0, max: 360, step: 1, default: 55, fmt: v => v.toFixed(0) + '°' },
+      note: 'Ảnh Hubble có ~120 km mỗi điểm ảnh; khi phóng to, các xoáy nhỏ hơn được sinh thêm theo thống kê rối của từng dải, và trôi cùng dòng chảy.',
+      en: { label: 'Small-scale turbulence (below image resolution)', note: 'The Hubble image has ~120 km per pixel; when you zoom in, smaller eddies are synthesised from each band\'s turbulence statistics and drift with the flow.' } },
+    { key: 'sunAz', label: 'Hướng Mặt Trời', type: 'range', min: 0, max: 360, step: 1, default: 55, fmt: v => v.toFixed(0) + '°', en: { label: 'Sun direction' } },
     { key: 'junoLight', label: 'Ánh sáng kiểu JunoCam', type: 'toggle', default: false,
-      note: 'Mặt Trời chỉ cao vài độ trên vùng cực (trục Sao Mộc nghiêng 3°). Ảnh JunoCam được xử lý làm sáng vùng gần đường phân chia ngày–đêm; bật để xem các cơn bão cực như vậy.' },
-    { key: 'aurora', label: 'Cực quang (ở chế độ tử ngoại)', type: 'toggle', default: true },
-    { key: 'rings', label: 'Vành bụi mờ (phóng đại ×1000)', type: 'toggle', default: true },
+      note: 'Mặt Trời chỉ cao vài độ trên vùng cực (trục Sao Mộc nghiêng 3°). Ảnh JunoCam được xử lý làm sáng vùng gần đường phân chia ngày–đêm; bật để xem các cơn bão cực như vậy.',
+      en: { label: 'JunoCam-style lighting', note: 'The Sun is only a few degrees above the polar regions (Jupiter\'s axis is tilted 3°). JunoCam images are processed to brighten the area near the terminator; turn this on to see the polar storms that way.' } },
+    { key: 'aurora', label: 'Cực quang (ở chế độ tử ngoại)', type: 'toggle', default: true, en: { label: 'Aurora (in ultraviolet mode)' } },
+    { key: 'rings', label: 'Vành bụi mờ (phóng đại ×1000)', type: 'toggle', default: true, en: { label: 'Faint dust rings (boosted ×1000)' } },
   ],
   actions: [
-    { label: 'Vết Đỏ Lớn', key: 'g', title: 'Bay tới Vết Đỏ Lớn và bám theo nó', run: ctx => def.__inst?.goGRS(ctx) },
-    { label: 'Oval BA', key: 'b', title: 'Quay Oval BA (“Vết Đỏ Nhỏ”) về phía camera', run: ctx => def.__inst?.goBA(ctx) },
-    { label: 'Cực Bắc (Juno)', key: 'j', title: 'Bay lên trên cực Bắc', run: ctx => def.__inst?.goPole(ctx, 1) },
-    { label: 'Cực Nam (Juno)', key: 'n', title: 'Bay xuống dưới cực Nam', run: ctx => def.__inst?.goPole(ctx, -1) },
+    { label: 'Vết Đỏ Lớn', key: 'g', title: 'Bay tới Vết Đỏ Lớn và bám theo nó', run: ctx => def.__inst?.goGRS(ctx),
+      en: { label: 'Great Red Spot', title: 'Fly to the Great Red Spot and follow it' } },
+    { label: 'Oval BA', key: 'b', title: 'Quay Oval BA (“Vết Đỏ Nhỏ”) về phía camera', run: ctx => def.__inst?.goBA(ctx),
+      en: { label: 'Oval BA', title: 'Turn Oval BA (“Red Spot Jr.”) toward the camera' } },
+    { label: 'Cực Bắc (Juno)', key: 'j', title: 'Bay lên trên cực Bắc', run: ctx => def.__inst?.goPole(ctx, 1),
+      en: { label: 'North pole (Juno)', title: 'Fly up over the north pole' } },
+    { label: 'Cực Nam (Juno)', key: 'n', title: 'Bay xuống dưới cực Nam', run: ctx => def.__inst?.goPole(ctx, -1),
+      en: { label: 'South pole (Juno)', title: 'Fly down under the south pole' } },
   ],
   create(ctx) {
     const R = ctx.renderer, aniso = Math.min(8, R.capabilities.getMaxAnisotropy());
@@ -844,11 +871,13 @@ const def = {
         const date = new Date(EPOCH + st.T * 1000);
         const gW = (360 - wrap(vLon(GRS, GRS_G, st.T)) * R2D) % 360;
         const rows = [
-          ['Tua nhanh', `1 giây ≈ ${hPerS >= 10 ? vn(hPerS, 0) : vn(hPerS)} giờ trên Sao Mộc`],
-          ['Đã trôi qua', `${vn(days, days < 10 ? 2 : 1)} ngày · ${date.getUTCDate()}/${date.getUTCMonth() + 1}/${date.getUTCFullYear()}`],
-          ['Vĩ độ dưới camera', latStr(sc.lat)], ['Gió tại vĩ độ đó', windStr(windAt(sc.lat))],
-          ['Vết Đỏ Lớn', `kinh độ ${vn(gW, 1)}° T (System III) · viền quay 1 vòng ≈ ${vn(GRS_G.periodEdge / 86400)} ngày`],
-          ['Góc pha', vn(phase, 0) + '°'],
+          [t('Tua nhanh', 'Fast-forward'), t(`1 giây ≈ ${hPerS >= 10 ? vn(hPerS, 0) : vn(hPerS)} giờ trên Sao Mộc`, `1 s ≈ ${hPerS >= 10 ? vn(hPerS, 0) : vn(hPerS)} h on Jupiter`)],
+          [t('Đã trôi qua', 'Elapsed'), t(`${vn(days, days < 10 ? 2 : 1)} ngày · ${date.getUTCDate()}/${date.getUTCMonth() + 1}/${date.getUTCFullYear()}`,
+            `${vn(days, days < 10 ? 2 : 1)} days · ${date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}`)],
+          [t('Vĩ độ dưới camera', 'Latitude below the camera'), latStr(sc.lat)], [t('Gió tại vĩ độ đó', 'Wind at that latitude'), windStr(windAt(sc.lat))],
+          [t('Vết Đỏ Lớn', 'Great Red Spot'), t(`kinh độ ${vn(gW, 1)}° T (System III) · viền quay 1 vòng ≈ ${vn(GRS_G.periodEdge / 86400)} ngày`,
+            `longitude ${vn(gW, 1)}° W (System III) · rim turns once in ≈ ${vn(GRS_G.periodEdge / 86400)} days`)],
+          [t('Góc pha', 'Phase angle'), vn(phase, 0) + '°'],
         ];
         return rows;
       },
@@ -860,14 +889,16 @@ const def = {
         const w = worldOf(GRS.lat + 1.0, vLon(GRS, GRS_G, st.T));
         flyTo(ctx, w.multiplyScalar(1.55));
         ctx.syncUI();
-        ctx.toast(`Vết Đỏ Lớn: xoáy nghịch rộng ≈ 14 000 km, quay <b>ngược chiều kim đồng hồ</b>; gió ở viền ~${GRS.vmax} m/s nên viền quay một vòng mất ≈ ${vn(GRS_G.periodEdge / 86400)} ngày, còn lõi gần như lặng. Nó trôi chậm về phía tây (~4 m/s) và dao động ±1,2° kinh độ với chu kỳ 90 ngày. Phía tây bắc là vùng rối nơi dòng tia 19,5° N (về tây, ~50 m/s) bị cơn bão chặn lại.`, 10000);
+        ctx.toast(t(`Vết Đỏ Lớn: xoáy nghịch rộng ≈ 14 000 km, quay <b>ngược chiều kim đồng hồ</b>; gió ở viền ~${GRS.vmax} m/s nên viền quay một vòng mất ≈ ${vn(GRS_G.periodEdge / 86400)} ngày, còn lõi gần như lặng. Nó trôi chậm về phía tây (~4 m/s) và dao động ±1,2° kinh độ với chu kỳ 90 ngày. Phía tây bắc là vùng rối nơi dòng tia 19,5° N (về tây, ~50 m/s) bị cơn bão chặn lại.`,
+          `Great Red Spot: an anticyclone ≈ 14,000 km across, turning <b>counterclockwise</b>; rim winds of ~${GRS.vmax} m/s carry the rim around once every ≈ ${vn(GRS_G.periodEdge / 86400)} days, while the core is nearly calm. It drifts slowly west (~4 m/s) and oscillates ±1.2° in longitude with a 90-day period. To the north-west lies the turbulent wake where the 19.5° S jet (westward, ~50 m/s) is blocked by the storm.`), 10000);
       },
       goBA(ctx) {
         clock(ctx);
         const dirCam = ctx.camera.position.clone().normalize();
         faceFeature(BA.lat, vLon(BA, BA_G, st.T), dirCam);
         flyTo(ctx, worldOf(BA.lat + 1, vLon(BA, BA_G, st.T)).multiplyScalar(1.45));
-        ctx.toast('Oval BA (“Vết Đỏ Nhỏ”): sinh ra năm 2000 khi ba xoáy trắng hợp nhất, ngả đỏ năm 2006. Xoáy nghịch rộng ~7 000 km ở 33° N, quay ngược chiều kim đồng hồ.', 8000);
+        ctx.toast(t('Oval BA (“Vết Đỏ Nhỏ”): sinh ra năm 2000 khi ba xoáy trắng hợp nhất, ngả đỏ năm 2006. Xoáy nghịch rộng ~7 000 km ở 33° N, quay ngược chiều kim đồng hồ.',
+          'Oval BA (“Red Spot Jr.”): born in 2000 when three white ovals merged, it turned red in 2006. An anticyclone ~7,000 km across at 33° S, turning counterclockwise.'), 8000);
       },
       goPole(ctx, sg) {
         clock(ctx);
@@ -879,8 +910,10 @@ const def = {
         ctx.params.junoLight = true; ctx.syncUI?.();
         if (ctx.bhGlobals) ctx.bhGlobals.exposure = Math.max(ctx.bhGlobals.exposure, 1.6);
         ctx.toast(sg > 0
-          ? 'Cực Bắc (Juno, 2017): 8 xoáy thuận, mỗi cơn rộng ~4 000 km, xếp thành hình bát giác quanh một cơn ở chính cực — không trôi, không hợp nhất suốt nhiều năm. Giữa chúng là vùng rối “sợi gấp nếp”. Mặt Trời chỉ cao vài độ nên rất tối.'
-          : 'Cực Nam (Juno): 5 xoáy thuận quanh một cơn ở cực (năm 2019 có thêm cơn thứ 6 chen vào rồi tan). Các xoáy thuận quay cùng chiều tự quay của hành tinh.', 9000);
+          ? t('Cực Bắc (Juno, 2017): 8 xoáy thuận, mỗi cơn rộng ~4 000 km, xếp thành hình bát giác quanh một cơn ở chính cực — không trôi, không hợp nhất suốt nhiều năm. Giữa chúng là vùng rối “sợi gấp nếp”. Mặt Trời chỉ cao vài độ nên rất tối.',
+            'North pole (Juno, 2017): 8 cyclones, each ~4,000 km across, arranged in an octagon around one at the pole itself — they neither drift nor merge for years. Between them lies “folded filamentary” turbulence. The Sun is only a few degrees up, so it is very dark.')
+          : t('Cực Nam (Juno): 5 xoáy thuận quanh một cơn ở cực (năm 2019 có thêm cơn thứ 6 chen vào rồi tan). Các xoáy thuận quay cùng chiều tự quay của hành tinh.',
+            'South pole (Juno): 5 cyclones around one at the pole (in 2019 a sixth squeezed in, then dissipated). Cyclones turn in the same sense as the planet\'s rotation.'), 9000);
       },
       onClick(info, ctx) {
         clock(ctx);
@@ -890,10 +923,11 @@ const def = {
         const ll = bodyLatLon(p, h.k, st.spin);
         const u = windAt(ll.lat);
         const s = st.sun.clone().applyMatrix3(st.W2B);
-        if (ll.n.dot(s) <= 0.02) { ctx.toast(`Vĩ độ <b>${latStr(ll.lat)}</b>, gió ${windStr(u)}. Điểm này đang là ban đêm.`); return; }
+        if (ll.n.dot(s) <= 0.02) { ctx.toast(t(`Vĩ độ <b>${latStr(ll.lat)}</b>, gió ${windStr(u)}. Điểm này đang là ban đêm.`, `Latitude <b>${latStr(ll.lat)}</b>, wind ${windStr(u)}. It is night at this point.`)); return; }
         const i = st.nextMoon; st.nextMoon = (i + 1) % 4;
         const trackLat = placeShadow(i, p);
-        ctx.toast(`Vĩ độ <b>${latStr(ll.lat)}</b>, gió ${windStr(u)}. Bóng của <b>${MOON_NAMES[i][0]}</b> (đường kính ${fmtInt(MOON_NAMES[i][1])} km) vừa được đặt gần đó — bóng vệ tinh chỉ rơi trên một vệt quanh vĩ độ ${latStr(trackLat)}.`, 7000);
+        ctx.toast(t(`Vĩ độ <b>${latStr(ll.lat)}</b>, gió ${windStr(u)}. Bóng của <b>${MOON_NAMES[i][0]}</b> (đường kính ${fmtInt(MOON_NAMES[i][1])} km) vừa được đặt gần đó — bóng vệ tinh chỉ rơi trên một vệt quanh vĩ độ ${latStr(trackLat)}.`,
+          `Latitude <b>${latStr(ll.lat)}</b>, wind ${windStr(u)}. The shadow of <b>${MOON_NAMES[i][0]}</b> (${fmtInt(MOON_NAMES[i][1])} km across) has been placed nearby — a moon\'s shadow can only fall along a track around latitude ${latStr(trackLat)}.`), 7000);
         ctx.audio.ping(520 - i * 70, 0.05, info.ndcX);
       },
     };

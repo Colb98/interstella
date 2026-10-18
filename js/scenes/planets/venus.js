@@ -13,6 +13,7 @@
 // sense ~60× faster: a cloud parcel's body longitude decreases at ω(φ) = u(φ)/(R cos φ).
 import * as THREE from 'three';
 import { COMMON_GLSL, FULLSCREEN_VERT } from '../../glsl/common.js';
+import { t, locale } from '../../i18n.js';
 
 const D2R = Math.PI / 180;
 const RKM = 6051.8;
@@ -434,7 +435,7 @@ function decodeImage(url) {
       g.drawImage(img, 0, 0);
       resolve({ W, H, px: g.getImageData(0, 0, W, H).data });
     };
-    img.onerror = () => reject(new Error(`không tải được ${url}`));
+    img.onerror = () => reject(new Error(t(`không tải được ${url}`, `failed to load ${url}`)));
     img.src = url;
   });
 }
@@ -454,7 +455,7 @@ function loadImageTex(url, { aniso = 1, maxSize = 16384, repeat = true }) {
     tex.generateMipmaps = true; tex.anisotropy = aniso;
     tex.needsUpdate = true;
     resolve(tex);
-  }, undefined, () => reject(new Error(`không tải được ${url}`))));
+  }, undefined, () => reject(new Error(t(`không tải được ${url}`, `failed to load ${url}`)))));
 }
 const retry = (fn, url, ...a) => fn(url, ...a).catch(() => new Promise(r => setTimeout(r, 500)).then(() => fn(url + '?r=' + Date.now(), ...a)));
 function solidTex(data, format, type) { const t = new THREE.DataTexture(data, 1, 1, format, type); t.needsUpdate = true; return t; }
@@ -520,9 +521,9 @@ function sampleTopo(cpu, lat, lon) {
    ================================================================================================ */
 const wrap180 = a => ((a + 180) % 360 + 360) % 360 - 180;
 const hhmm = h => `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')}`;
-const latStr = v => `${Math.abs(v).toFixed(1)}°${v >= 0 ? 'B' : 'N'}`;
-const lonStr = v => `${Math.abs(v).toFixed(1)}°${v >= 0 ? 'Đ' : 'T'}`;
-const num = (x, d = 0) => x.toLocaleString('vi-VN', { minimumFractionDigits: d, maximumFractionDigits: d });
+const latStr = v => `${Math.abs(v).toFixed(1)}°${v >= 0 ? t('B', 'N') : t('N', 'S')}`;
+const lonStr = v => `${Math.abs(v).toFixed(1)}°${v >= 0 ? t('Đ', 'E') : t('T', 'W')}`;
+const num = (x, d = 0) => x.toLocaleString(locale(), { minimumFractionDigits: d, maximumFractionDigits: d });
 // afternoon is west of the subsolar meridian on retrograde Venus: the Sun sits east (+azimuth) of the camera meridian
 function sunFromHour(cam, hour, out) {
   const az = Math.atan2(cam.x, cam.z) + (hour - 12) * Math.PI / 12;
@@ -537,15 +538,15 @@ function hitSphere(o, d, R = 1) {
 }
 // named features (planetocentric, east longitude), for click / HUD read-outs
 const FEATURES = [
-  ['Maat Mons', 0.5, 194.6, 'núi lửa khiên cao nhất, ~8 km'], ['Ozza Mons', 4.5, 201.0, 'núi lửa khiên'], ['Sapas Mons', 8.5, 188.3, 'núi lửa khiên'],
-  ['Atla Regio', 9.2, 199.9, 'vùng cao núi lửa'], ['Maxwell Montes', 65.2, 3.3, 'dãy núi cao nhất, ~11 km'], ['Lakshmi Planum', 68.6, 339.3, 'cao nguyên ~4 km'],
-  ['Ishtar Terra', 70.4, 27.5, '"lục địa" phía bắc'], ['Cleopatra', 65.8, 7.1, 'hố va chạm 105 km trên sườn Maxwell'],
-  ['Aphrodite Terra', -5.8, 104.8, '"lục địa" xích đạo'], ['Ovda Regio', -2.8, 85.6, 'cao nguyên tessera'], ['Thetis Regio', -11.4, 129.9, 'cao nguyên tessera'],
-  ['Artemis Corona', -41.0, 135.0, 'corona lớn nhất, ~2 600 km'], ['Diana Chasma', -14.6, 155.3, 'hẻm vực sâu ~3 km'],
-  ['Beta Regio', 25.3, 282.8, 'vùng cao núi lửa – tách giãn'], ['Theia Mons', 22.7, 281.0, 'núi lửa khiên'], ['Rhea Mons', 32.4, 282.1, 'núi lửa'],
-  ['Phoebe Regio', -6.0, 282.8, 'vùng cao'], ['Themis Regio', -37.4, 284.2, 'vùng cao núi lửa'], ['Idunn Mons', -46.6, 214.5, 'núi lửa có thể còn hoạt động'],
-  ['Gula Mons', 21.9, 359.2, 'núi lửa khiên'], ['Sif Mons', 22.0, 352.4, 'núi lửa khiên'], ['Alpha Regio', -25.5, 1.0, 'cao nguyên tessera'],
-  ['Lada Terra', -59.3, 20.0, 'vùng cao phía nam'], ['Mead', 12.5, 57.2, 'hố va chạm lớn nhất, ~270 km'],
+  ['Maat Mons', 0.5, 194.6, 'núi lửa khiên cao nhất, ~8 km', 'highest shield volcano, ~8 km'], ['Ozza Mons', 4.5, 201.0, 'núi lửa khiên', 'shield volcano'], ['Sapas Mons', 8.5, 188.3, 'núi lửa khiên', 'shield volcano'],
+  ['Atla Regio', 9.2, 199.9, 'vùng cao núi lửa', 'volcanic highland'], ['Maxwell Montes', 65.2, 3.3, 'dãy núi cao nhất, ~11 km', 'highest mountain range, ~11 km'], ['Lakshmi Planum', 68.6, 339.3, 'cao nguyên ~4 km', 'plateau ~4 km high'],
+  ['Ishtar Terra', 70.4, 27.5, '"lục địa" phía bắc', 'northern "continent"'], ['Cleopatra', 65.8, 7.1, 'hố va chạm 105 km trên sườn Maxwell', '105 km impact crater on the flank of Maxwell'],
+  ['Aphrodite Terra', -5.8, 104.8, '"lục địa" xích đạo', 'equatorial "continent"'], ['Ovda Regio', -2.8, 85.6, 'cao nguyên tessera', 'tessera highland'], ['Thetis Regio', -11.4, 129.9, 'cao nguyên tessera', 'tessera highland'],
+  ['Artemis Corona', -41.0, 135.0, 'corona lớn nhất, ~2 600 km', 'largest corona, ~2,600 km'], ['Diana Chasma', -14.6, 155.3, 'hẻm vực sâu ~3 km', 'canyon ~3 km deep'],
+  ['Beta Regio', 25.3, 282.8, 'vùng cao núi lửa – tách giãn', 'volcanic rift highland'], ['Theia Mons', 22.7, 281.0, 'núi lửa khiên', 'shield volcano'], ['Rhea Mons', 32.4, 282.1, 'núi lửa', 'volcano'],
+  ['Phoebe Regio', -6.0, 282.8, 'vùng cao', 'highland'], ['Themis Regio', -37.4, 284.2, 'vùng cao núi lửa', 'volcanic highland'], ['Idunn Mons', -46.6, 214.5, 'núi lửa có thể còn hoạt động', 'possibly still-active volcano'],
+  ['Gula Mons', 21.9, 359.2, 'núi lửa khiên', 'shield volcano'], ['Sif Mons', 22.0, 352.4, 'núi lửa khiên', 'shield volcano'], ['Alpha Regio', -25.5, 1.0, 'cao nguyên tessera', 'tessera highland'],
+  ['Lada Terra', -59.3, 20.0, 'vùng cao phía nam', 'southern highland'], ['Mead', 12.5, 57.2, 'hố va chạm lớn nhất, ~270 km', 'largest impact crater, ~270 km'],
 ];
 function nearestFeature(lat, lon) {
   let best = null, bd = 1e9;
@@ -560,6 +561,13 @@ const VIEW_TOAST = {
   ir: 'Cận hồng ngoại 2,26 µm, mặt đêm (ảnh tổng hợp thật từ camera IR2 của Akatsuki, 8/2016): khí quyển sâu nóng ~500 K phát sáng xuyên qua mây; mây dày hiện thành bóng tối, trôi chậm hơn (~76 m/s ở độ cao ~50 km). Lưỡi liềm ban ngày bị cháy sáng.',
   lir: 'Hồng ngoại nhiệt 10 µm (kiểu camera LIR của Akatsuki): nhiệt độ đỉnh mây ~230 K, vòng "cổ áo" lạnh ở vĩ độ ~65° và xoáy cực ấm hình chữ S.',
   radar: 'Radar 12,6 cm xuyên qua mây (ảnh khảm thật của tàu Magellan 1990–94, độ phân giải 2 km; quanh Maat Mons 450 m): sáng = gồ ghề hoặc sườn quay về phía radar.',
+};
+const VIEW_TOAST_EN = {
+  vis: 'Visible light: an almost featureless cream-coloured ball — the sulfuric acid clouds reflect ~76 % of the sunlight.',
+  uv: 'Ultraviolet 365 nm (real composite from the Akatsuki UVI camera, Aug 2017): an unknown UV absorber paints a sideways Y and spiral streaks, swept around the planet in 4.3 days by ~100 m/s winds.',
+  ir: 'Near-infrared 2.26 µm, night side (real composite from the Akatsuki IR2 camera, Aug 2016): the hot ~500 K deep atmosphere glows through the clouds; thick clouds show up as dark silhouettes drifting more slowly (~76 m/s at ~50 km altitude). The dayside crescent is saturated.',
+  lir: 'Thermal infrared 10 µm (in the style of the Akatsuki LIR camera): cloud tops at ~230 K, a cold "collar" at ~65° latitude and a warm S-shaped polar vortex.',
+  radar: '12.6 cm radar sees through the clouds (real Magellan mosaic, 1990–94, 2 km resolution; 450 m around Maat Mons): bright = rough terrain or slopes facing the radar.',
 };
 
 /* ================================================================================================
@@ -585,19 +593,43 @@ export default [
     ['Đỉnh cao nhất', 'Maxwell Montes ~11 km'],
     ['Dữ liệu', 'NASA/JPL Magellan (USGS Astrogeology), JAXA/ISAS Akatsuki UVI & IR2 (DARTS, CC BY 4.0)'],
   ],
+  en: {
+    name: 'Venus',
+    subtitle: 'Rocky planet · runaway greenhouse',
+    blurb: 'A deck of sulfuric acid clouds reflects ~76 % of the sunlight and hides the surface completely; beneath it lie <b>464 °C</b> and <b>92 bar</b>. The planet itself spins backwards (retrograde) so slowly that one turn takes 243 days — yet the cloud tops <b>super-rotate</b> at ~100 m/s, circling the planet in only ~4 days, fastest at the equator and slower towards the poles, which stretches the ultraviolet markings into a Y. Every map here is <b>real data</b> from Magellan and Akatsuki.',
+    intro: 'Press <b>V</b> to change wavelength (visible · ultraviolet · night-side infrared · thermal · radar). <b>O</b>: fly to the Maat Mons volcano; <b>P</b>: the polar vortex; <b>G</b>: the giant gravity wave over Aphrodite.',
+    facts: [
+      ['Mean radius', '6,051.8 km'], ['Mass', '4.87×10²⁴ kg'], ['Surface gravity', '8.87 m/s²'],
+      ['Surface temperature', '~464 °C (737 K), day and night alike'], ['Surface pressure', '92 bar (CO₂ 96.5 %, N₂ 3.5 %)'],
+      ['Rotation period', '243.02 days (retrograde, axial tilt 177.4°)'], ['Solar day', '116.75 days'], ['Orbital period', '224.7 days'],
+      ['Cloud-top wind (70 km)', '103 m/s at the equator → one circuit in 4.3 days (measured on UVI images, Aug 2017)'],
+      ['Lower-cloud wind (~50 km)', '~76 m/s → 5.8 days (measured on night-side IR2 images, Aug 2016)'],
+      ['Cloud tops', '~70 km, ~−45 °C, ~0.03 bar'], ['Bond / geometric albedo', '0.76 / 0.69'],
+      ['Highest peak', 'Maxwell Montes ~11 km'],
+      ['Data', 'NASA/JPL Magellan (USGS Astrogeology), JAXA/ISAS Akatsuki UVI & IR2 (DARTS, CC BY 4.0)'],
+    ],
+  },
   unitKm: RKM,
   camera: { distance: 3.2, polar: 80, azimuth: 30, min: 1.003, max: 30, fov: 45 },
   exposure: 0.85,
   bloom: 0.3,
   params: [
-    { key: 'view', label: 'Bước sóng quan sát', type: 'seg', options: [['vis', 'Khả kiến'], ['uv', 'UV 365 nm'], ['ir', 'IR 2,3 µm'], ['lir', 'Nhiệt 10 µm'], ['radar', 'Radar']], default: 'vis', note: 'UV: Akatsuki UVI · IR 2,3 µm: Akatsuki IR2 (mặt đêm) · Nhiệt: kiểu Akatsuki LIR (mô hình) · Radar: Magellan SAR.' },
-    { key: 'hour', label: 'Giờ địa phương (dưới camera)', type: 'range', min: 0, max: 24, step: 0.1, default: 14.5, fmt: v => hhmm(v), note: '12:00 = Mặt Trời sau lưng bạn. Sao Kim quay ngược chiều nên Mặt Trời mọc ở phía tây, lặn ở phía đông; buổi chiều nằm ở phía tây điểm cận nhật. Xem IR 2,3 µm vào ~00:00 để thấy mặt đêm.' },
-    { key: 'speed', label: 'Nhịp thời gian Sao Kim', type: 'range', min: 0, max: 3, step: 0.01, default: 0.4, fmt: v => `${(v * 6).toFixed(1)} giờ / giây`, note: 'Số giờ trên Sao Kim trôi qua mỗi giây (với tốc độ thời gian chung 6×). Đỉnh mây quay một vòng sau 104 giờ; bề mặt sau 5 832 giờ.' },
-    { key: 'contrast', label: 'Độ tương phản ảnh', type: 'range', min: 0.3, max: 3, step: 0.01, default: 1, fmt: v => '×' + v.toFixed(2), note: '×1 = mức kéo giãn của ảnh công bố (UV ×3, IR ×2,6 so với tương phản thật). Kéo về 0,33 để thấy tương phản thật của UV: chữ Y chỉ tối hơn ~30 %.' },
-    { key: 'atmo', label: 'Lớp sương mù trên mây', type: 'range', min: 0, max: 4, step: 0.01, default: 1, fmt: v => '×' + v.toFixed(2), note: 'Tán xạ Rayleigh của CO₂ và lớp sương mù H₂SO₄ ở 70–90 km: viền sáng quanh đĩa và ánh hoàng hôn vượt qua đường phân chia ngày–đêm.' },
-    { key: 'exag', label: 'Phóng đại địa hình (radar)', type: 'range', min: 1, max: 40, step: 0.5, default: 10, fmt: v => '×' + v.toFixed(1), note: 'Maat Mons cao 8 km — chỉ 0,13 % bán kính. Ảnh phối cảnh nổi tiếng của JPL về Maat Mons phóng đại ×10.' },
-    { key: 'tint', label: 'Màu ảnh radar', type: 'seg', options: [['grey', 'Xám SAR'], ['venera', 'Cam Venera'], ['topo', 'Màu độ cao']], default: 'venera', note: 'Xám = tán xạ ngược radar gốc. Cam: màu thật của đá dưới ánh sáng lọc qua khí quyển (ảnh Venera 13). Màu độ cao: bản đồ cao độ Magellan.' },
-    { key: 'wave', label: 'Sóng trọng lực đứng (Aphrodite)', type: 'toggle', default: true, note: 'Sóng hình cánh cung dài 10 000 km đứng yên trên dãy núi Aphrodite Terra (Akatsuki LIR, 12/2015). Chỉ thấy trong ảnh nhiệt, vào buổi chiều.' },
+    { key: 'view', label: 'Bước sóng quan sát', type: 'seg', options: [['vis', 'Khả kiến'], ['uv', 'UV 365 nm'], ['ir', 'IR 2,3 µm'], ['lir', 'Nhiệt 10 µm'], ['radar', 'Radar']], default: 'vis', note: 'UV: Akatsuki UVI · IR 2,3 µm: Akatsuki IR2 (mặt đêm) · Nhiệt: kiểu Akatsuki LIR (mô hình) · Radar: Magellan SAR.',
+      en: { label: 'Observing wavelength', options: ['Visible', 'UV 365 nm', 'IR 2.3 µm', 'Thermal 10 µm', 'Radar'], note: 'UV: Akatsuki UVI · IR 2.3 µm: Akatsuki IR2 (night side) · Thermal: Akatsuki LIR style (model) · Radar: Magellan SAR.' } },
+    { key: 'hour', label: 'Giờ địa phương (dưới camera)', type: 'range', min: 0, max: 24, step: 0.1, default: 14.5, fmt: v => hhmm(v), note: '12:00 = Mặt Trời sau lưng bạn. Sao Kim quay ngược chiều nên Mặt Trời mọc ở phía tây, lặn ở phía đông; buổi chiều nằm ở phía tây điểm cận nhật. Xem IR 2,3 µm vào ~00:00 để thấy mặt đêm.',
+      en: { label: 'Local time (below camera)', note: '12:00 = the Sun behind you. Venus spins backwards, so the Sun rises in the west and sets in the east; afternoon lies west of the subsolar point. Use IR 2.3 µm at ~00:00 to see the night side.' } },
+    { key: 'speed', label: 'Nhịp thời gian Sao Kim', type: 'range', min: 0, max: 3, step: 0.01, default: 0.4, fmt: v => t(`${(v * 6).toFixed(1)} giờ / giây`, `${(v * 6).toFixed(1)} h / s`), note: 'Số giờ trên Sao Kim trôi qua mỗi giây (với tốc độ thời gian chung 6×). Đỉnh mây quay một vòng sau 104 giờ; bề mặt sau 5 832 giờ.',
+      en: { label: 'Venus time rate', note: 'Hours on Venus elapsed per second (with the global time speed at 6×). The cloud tops go round once in 104 hours; the surface in 5,832 hours.' } },
+    { key: 'contrast', label: 'Độ tương phản ảnh', type: 'range', min: 0.3, max: 3, step: 0.01, default: 1, fmt: v => '×' + v.toFixed(2), note: '×1 = mức kéo giãn của ảnh công bố (UV ×3, IR ×2,6 so với tương phản thật). Kéo về 0,33 để thấy tương phản thật của UV: chữ Y chỉ tối hơn ~30 %.',
+      en: { label: 'Image contrast', note: '×1 = the stretch of the published images (UV ×3, IR ×2.6 relative to true contrast). Pull it down to 0.33 to see the true UV contrast: the Y is only ~30 % darker.' } },
+    { key: 'atmo', label: 'Lớp sương mù trên mây', type: 'range', min: 0, max: 4, step: 0.01, default: 1, fmt: v => '×' + v.toFixed(2), note: 'Tán xạ Rayleigh của CO₂ và lớp sương mù H₂SO₄ ở 70–90 km: viền sáng quanh đĩa và ánh hoàng hôn vượt qua đường phân chia ngày–đêm.',
+      en: { label: 'Haze above the clouds', note: 'Rayleigh scattering by CO₂ and the H₂SO₄ haze at 70–90 km: the bright rim around the disc and twilight glow reaching past the terminator.' } },
+    { key: 'exag', label: 'Phóng đại địa hình (radar)', type: 'range', min: 1, max: 40, step: 0.5, default: 10, fmt: v => '×' + v.toFixed(1), note: 'Maat Mons cao 8 km — chỉ 0,13 % bán kính. Ảnh phối cảnh nổi tiếng của JPL về Maat Mons phóng đại ×10.',
+      en: { label: 'Terrain exaggeration (radar)', note: 'Maat Mons is 8 km high — only 0.13 % of the radius. JPL\'s famous perspective view of Maat Mons is exaggerated ×10.' } },
+    { key: 'tint', label: 'Màu ảnh radar', type: 'seg', options: [['grey', 'Xám SAR'], ['venera', 'Cam Venera'], ['topo', 'Màu độ cao']], default: 'venera', note: 'Xám = tán xạ ngược radar gốc. Cam: màu thật của đá dưới ánh sáng lọc qua khí quyển (ảnh Venera 13). Màu độ cao: bản đồ cao độ Magellan.',
+      en: { label: 'Radar image colour', options: ['SAR grey', 'Venera orange', 'Elevation colour'], note: 'Grey = raw radar backscatter. Orange: the true colour of the rock under light filtered by the atmosphere (Venera 13 images). Elevation colour: Magellan altimetry map.' } },
+    { key: 'wave', label: 'Sóng trọng lực đứng (Aphrodite)', type: 'toggle', default: true, note: 'Sóng hình cánh cung dài 10 000 km đứng yên trên dãy núi Aphrodite Terra (Akatsuki LIR, 12/2015). Chỉ thấy trong ảnh nhiệt, vào buổi chiều.',
+      en: { label: 'Stationary gravity wave (Aphrodite)', note: 'A 10,000 km bow-shaped wave standing still over the Aphrodite Terra mountains (Akatsuki LIR, Dec 2015). Visible only in the thermal view, in the afternoon.' } },
   ],
   actions: [
     { label: 'Đổi bước sóng', key: 'v', title: 'Khả kiến → UV → IR đêm → nhiệt → radar', run: ctx => {
@@ -605,11 +637,14 @@ export default [
       ctx.params.view = nx;
       if (nx === 'ir') ctx.params.hour = 0.5;
       else if (nx === 'vis' || nx === 'uv') ctx.params.hour = 14.5;
-      ctx.toast(VIEW_TOAST[nx], 7000);
-    } },
-    { label: 'Maat Mons', key: 'o', title: 'Phối cảnh núi lửa Maat Mons (radar Magellan, phóng đại ×10)', run: ctx => ctx.scene._venusShot?.(ctx, 'maat') },
-    { label: 'Xoáy cực', key: 'p', title: 'Nhìn xuống xoáy cực nam hình chữ S', run: ctx => ctx.scene._venusShot?.(ctx, 'pole') },
-    { label: 'Sóng núi', key: 'g', title: 'Sóng trọng lực đứng 10 000 km trên Aphrodite Terra', run: ctx => ctx.scene._venusShot?.(ctx, 'wave') },
+      ctx.toast(t(VIEW_TOAST[nx], VIEW_TOAST_EN[nx]), 7000);
+    }, en: { label: 'Change wavelength', title: 'Visible → UV → night IR → thermal → radar' } },
+    { label: 'Maat Mons', key: 'o', title: 'Phối cảnh núi lửa Maat Mons (radar Magellan, phóng đại ×10)', run: ctx => ctx.scene._venusShot?.(ctx, 'maat'),
+      en: { label: 'Maat Mons', title: 'Perspective view of the Maat Mons volcano (Magellan radar, exaggerated ×10)' } },
+    { label: 'Xoáy cực', key: 'p', title: 'Nhìn xuống xoáy cực nam hình chữ S', run: ctx => ctx.scene._venusShot?.(ctx, 'pole'),
+      en: { label: 'Polar vortex', title: 'Look down on the S-shaped south polar vortex' } },
+    { label: 'Sóng núi', key: 'g', title: 'Sóng trọng lực đứng 10 000 km trên Aphrodite Terra', run: ctx => ctx.scene._venusShot?.(ctx, 'wave'),
+      en: { label: 'Mountain wave', title: 'The 10,000 km stationary gravity wave over Aphrodite Terra' } },
   ],
   create(ctx) {
     const R = ctx.renderer, caps = R.capabilities;
@@ -691,11 +726,15 @@ export default [
       const f = frames(kind);
       if (instant) { applyFrame(c, f, spinOf(tH ?? 0)); shot.tw = null; }
       else startTween(c, f, 4);
-      c.toast?.({
+      c.toast?.(t({
         maat: 'Maat Mons (0,5°B, 194,6°Đ): núi lửa khiên cao nhất Sao Kim, ~8 km trên bán kính trung bình, chân rộng ~400 km. Ảnh radar Magellan độ phân giải 450 m (khảm nhìn trái 225 m, lấy trung bình): các dòng dung nham trẻ, gồ ghề phản xạ radar mạnh nên sáng, toả ra từ miệng núi. Địa hình phóng đại ×10 như ảnh phối cảnh PIA00254 của JPL. Bên phải là Ozza Mons.',
         pole: 'Xoáy cực nam: lõi ấm (~240 K) hình chữ S quay một vòng trong ~2,5 ngày, tâm lắc lư vài độ quanh cực và đổi dạng (lưỡng cực ↔ đơn cực) trong một–hai ngày — Venus Express phát hiện năm 2006. Bao quanh là "cổ áo" lạnh ~220 K ở vĩ độ ~65°.',
         wave: 'Tháng 12/2015 camera LIR của Akatsuki thấy một sóng hình cánh cung dài 10 000 km, chênh nhiệt ~1–2 K, <b>đứng yên</b> phía trên dãy núi Aphrodite Terra suốt nhiều ngày dù gió ở đó thổi 100 m/s: sóng trọng lực sinh ra khi khí quyển tầng thấp trượt qua núi, lan thẳng lên 65 km. Nó chỉ xuất hiện khi vùng núi đang buổi chiều (lớp khí sát mặt đất ổn định nhất), mạnh nhất gần đường hoàng hôn.',
-      }[kind], 12000);
+      }[kind], {
+        maat: 'Maat Mons (0.5°N, 194.6°E): the highest shield volcano on Venus, ~8 km above the mean radius, ~400 km across at the base. Magellan radar at 450 m resolution (left-looking 225 m mosaic, averaged): young, rough lava flows reflect the radar strongly, so they shine bright as they spread from the summit. Terrain exaggerated ×10 as in JPL\'s perspective view PIA00254. Ozza Mons is on the right.',
+        pole: 'South polar vortex: an S-shaped warm core (~240 K) turning once every ~2.5 days, its centre wandering a few degrees around the pole and changing shape (dipole ↔ monopole) within a day or two — discovered by Venus Express in 2006. It is surrounded by a cold ~220 K "collar" at ~65° latitude.',
+        wave: 'In December 2015 Akatsuki\'s LIR camera saw a 10,000 km bow-shaped wave, ~1–2 K warmer than its surroundings, <b>standing still</b> above the Aphrodite Terra mountains for days even though the wind there blows at 100 m/s: a gravity wave launched as the lower atmosphere flows over the mountains, propagating straight up to 65 km. It appears only when the highlands are in the afternoon (when the near-surface layer is most stable), strongest near the evening terminator.',
+      }[kind]), 12000);
     }
     function leave(c) {
       c.params.exag = 10;
@@ -765,31 +804,33 @@ export default [
         const perTop = TAU / (W_TOP * ratioTop(phi)) / 24;
         const alt = (cp.length() - 1) * RKM;
         const rows = [
-          [c.params.view === 'radar' ? 'Độ cao trên bề mặt' : 'Độ cao trên đỉnh mây', c.fmt.dist((c.params.view === 'radar' ? alt : alt - 70) * 1000)],
-          ['Điểm dưới camera', `${latStr(g.lat)} ${lonStr(g.lon)}`],
-          ['Giờ Mặt Trời tại đó', hhmm(c.params.hour)],
-          ['Gió đỉnh mây ở vĩ độ này', `${num(uTop)} m/s về phía tây · vòng quanh trong ${num(perTop, 1)} ngày`],
-          ['Gió tầng mây dưới (~50 km)', `${num(uLow)} m/s`],
-          ['Thời gian trên Sao Kim', `${num(h / 24, 2)} ngày · mây đỉnh đã quay ${num(W_TOP * h / TAU, 2)} vòng, bề mặt ${num(W_SURF * h / TAU, 3)} vòng`],
+          [c.params.view === 'radar' ? t('Độ cao trên bề mặt', 'Altitude above surface') : t('Độ cao trên đỉnh mây', 'Altitude above cloud tops'), c.fmt.dist((c.params.view === 'radar' ? alt : alt - 70) * 1000)],
+          [t('Điểm dưới camera', 'Point below camera'), `${latStr(g.lat)} ${lonStr(g.lon)}`],
+          [t('Giờ Mặt Trời tại đó', 'Local solar time there'), hhmm(c.params.hour)],
+          [t('Gió đỉnh mây ở vĩ độ này', 'Cloud-top wind at this latitude'), t(`${num(uTop)} m/s về phía tây · vòng quanh trong ${num(perTop, 1)} ngày`, `${num(uTop)} m/s westward · one circuit in ${num(perTop, 1)} days`)],
+          [t('Gió tầng mây dưới (~50 km)', 'Lower-cloud wind (~50 km)'), `${num(uLow)} m/s`],
+          [t('Thời gian trên Sao Kim', 'Time on Venus'), t(`${num(h / 24, 2)} ngày · mây đỉnh đã quay ${num(W_TOP * h / TAU, 2)} vòng, bề mặt ${num(W_SURF * h / TAU, 3)} vòng`, `${num(h / 24, 2)} days · cloud tops have turned ${num(W_TOP * h / TAU, 2)} times, the surface ${num(W_SURF * h / TAU, 3)} times`)],
         ];
-        if (topoCPU) rows.push(['Độ cao địa hình dưới camera', `${num(sampleTopo(topoCPU, g.lat, g.lon) * 1000)} m (so với bán kính 6 051,8 km)`]);
+        if (topoCPU) rows.push([t('Độ cao địa hình dưới camera', 'Terrain height below camera'), t(`${num(sampleTopo(topoCPU, g.lat, g.lon) * 1000)} m (so với bán kính 6 051,8 km)`, `${num(sampleTopo(topoCPU, g.lat, g.lon) * 1000)} m (relative to the 6,051.8 km radius)`)]);
         return rows;
       },
       onClick(info, c) {
         const radar = c.params.view === 'radar';
-        const t = hitSphere(info.origin, info.dir, radar ? 1 : 1 + 70 / RKM);
-        if (t === null) return;
-        const p = info.origin.clone().addScaledVector(info.dir, t).normalize(), L = U.uSunDir.value;
+        const th = hitSphere(info.origin, info.dir, radar ? 1 : 1 + 70 / RKM);
+        if (th === null) return;
+        const p = info.origin.clone().addScaledVector(info.dir, th).normalize(), L = U.uSunDir.value;
         const g = bodyLatLon(p, tH ?? 0), phi = g.lat * D2R;
         const e = topoCPU ? sampleTopo(topoCPU, g.lat, g.lon) : null;
         const nf = nearestFeature(g.lat, ((g.lon % 360) + 360) % 360);
-        const near = nf ? ` · gần <b>${nf.f[0]}</b> (${nf.f[3]})` : '';
-        const where = `Vĩ độ <b>${latStr(g.lat)}</b>, kinh độ <b>${lonStr(g.lon)}</b>${near}`;
+        const near = nf ? t(` · gần <b>${nf.f[0]}</b> (${nf.f[3]})`, ` · near <b>${nf.f[0]}</b> (${nf.f[4]})`) : '';
+        const where = t(`Vĩ độ <b>${latStr(g.lat)}</b>, kinh độ <b>${lonStr(g.lon)}</b>${near}`, `Latitude <b>${latStr(g.lat)}</b>, longitude <b>${lonStr(g.lon)}</b>${near}`);
         if (radar) {
-          c.toast(`${where} · độ cao <b>${e === null ? '?' : num(e * 1000)} m</b>. Trên mặt đất: 464 °C, 92 bar — áp suất như ở độ sâu 900 m dưới biển; bầu trời màu cam đục và nắng chỉ còn vài phần trăm.`);
+          c.toast(t(`${where} · độ cao <b>${e === null ? '?' : num(e * 1000)} m</b>. Trên mặt đất: 464 °C, 92 bar — áp suất như ở độ sâu 900 m dưới biển; bầu trời màu cam đục và nắng chỉ còn vài phần trăm.`,
+            `${where} · elevation <b>${e === null ? '?' : num(e * 1000)} m</b>. On the ground: 464 °C, 92 bar — the pressure 900 m deep in the ocean; the sky is a murky orange and only a few percent of the sunlight gets through.`));
         } else {
           const u = 102.9 * ratioTop(phi) * Math.cos(phi);
-          c.toast(`${where} · giờ địa phương <b>${hhmm(localHour(p, L))}</b>. Ở đỉnh mây (70 km): ~−45 °C, ~0,03 bar, gió <b>${num(u)} m/s</b> về phía tây. Ở độ cao ~55 km nhiệt độ và áp suất gần giống mặt đất Trái Đất.`);
+          c.toast(t(`${where} · giờ địa phương <b>${hhmm(localHour(p, L))}</b>. Ở đỉnh mây (70 km): ~−45 °C, ~0,03 bar, gió <b>${num(u)} m/s</b> về phía tây. Ở độ cao ~55 km nhiệt độ và áp suất gần giống mặt đất Trái Đất.`,
+            `${where} · local time <b>${hhmm(localHour(p, L))}</b>. At the cloud tops (70 km): ~−45 °C, ~0.03 bar, wind <b>${num(u)} m/s</b> westward. At ~55 km the temperature and pressure are close to those on Earth's surface.`));
         }
       },
     };

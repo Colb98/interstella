@@ -23,6 +23,7 @@
 // dark matter), so switching the rotation curve is continuous and the CPU does nothing per star.
 import * as THREE from 'three';
 import { COMMON_GLSL, FULLSCREEN_VERT } from '../glsl/common.js';
+import { t, dec } from '../i18n.js';
 
 // ---------------------------------------------------------------------------------------------
 // physics constants shared by JS and GLSL
@@ -439,21 +440,21 @@ function labelTexture() {
   g.shadowColor = 'rgba(0,0,0,0.9)'; g.shadowBlur = 8;
   g.fillStyle = '#ffe9a8';
   g.font = '600 44px system-ui, "Segoe UI", sans-serif';
-  g.fillText('Bạn ở đây', 256, 92);
+  g.fillText(t('Bạn ở đây', 'You are here'), 256, 92);
   g.fillStyle = '#cfe0ff';
   g.font = '26px system-ui, "Segoe UI", sans-serif';
-  g.fillText('Mặt Trời · 8,2 kpc', 256, 132);
+  g.fillText(t('Mặt Trời · 8,2 kpc', 'The Sun · 8.2 kpc'), 256, 132);
   g.strokeStyle = '#ffe9a8'; g.lineWidth = 3;
   g.beginPath(); g.moveTo(256, 146); g.lineTo(256, 178); g.stroke();
   g.beginPath(); g.arc(256, 196, 14, 0, Math.PI * 2); g.stroke();
   g.fillStyle = '#ffffff'; g.beginPath(); g.arc(256, 196, 3.5, 0, Math.PI * 2); g.fill();
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
 }
 
 // ---------------------------------------------------------------------------------------------
-const VIEWS = [['Nhìn chính diện', 2.5], ['Nghiêng 60°', 60], ['Nhìn cạnh', 89.4]];
+const VIEWS = [['Nhìn chính diện', 2.5, 'Face-on'], ['Nghiêng 60°', 60, 'Tilted 60°'], ['Nhìn cạnh', 89.4, 'Edge-on']];
 
 const spiral = {
   id: 'spiral-galaxy',
@@ -472,27 +473,47 @@ const spiral = {
     ['Mặt Trời cách tâm', '8,2 kpc'],
     ['Hố đen trung tâm', 'Sgr A* · 4,3×10⁶ M☉'],
   ],
+  en: {
+    name: 'Spiral galaxy',
+    subtitle: 'Barred spiral SBbc · Milky Way type',
+    blurb: 'Spiral arms are not fixed bands of stars but <b>density waves</b>: stellar orbits are ellipses whose orientation shifts gradually with radius, creating crowded zones that stars and gas flow through like cars through a traffic jam — gas compressed there forms blue stars and pink H II regions. Vera Rubin measured rotation speeds that <b>do not fall off</b> all the way to the edge: most of the mass is invisible <b>dark matter</b>.',
+    intro: 'Try switching <b>Rotation curve</b> to <b>No dark matter</b>: with only the visible mass left, stars at the edge slow down in Keplerian fashion and the arms wind up ever tighter. Press <b>V</b> to change the view, <b>G</b> to fly to the Sun.',
+    facts: [
+      ['Classification', 'SBbc (barred spiral)'],
+      ['Disc diameter', '≈ 30 kpc · 100,000 light-years'],
+      ['Number of stars', '100–400 billion'],
+      ['Mass', '≈ 1.5×10¹² M☉ (≈ 95% dark)'],
+      ['Sun’s distance from the centre', '8.2 kpc'],
+      ['Central black hole', 'Sgr A* · 4.3×10⁶ M☉'],
+    ],
+  },
   camera: { distance: 40, polar: 55, azimuth: 30, min: 3, max: 150, fov: 50 },
   exposure: 1.0,
   bloom: 0.55,
   params: [
     { key: 'darkMatter', label: 'Đường cong quay', type: 'seg', options: [[1, 'Có vật chất tối'], [0, 'Không có vật chất tối']], default: 1,
-      note: 'Có quầng tối: v ≈ 220 km/s gần như không đổi tới rìa. Không có: v giảm dần theo Kepler từ khối lượng nhìn thấy (sao, khí).' },
-    { key: 'speed', label: 'Tốc độ thời gian', type: 'range', min: 0, max: 40, step: 0.5, default: 6, fmt: v => v.toFixed(1) + ' triệu năm/s',
-      note: 'Ở tốc độ thời gian chung mặc định. Một vòng quay của Mặt Trời (năm thiên hà) ≈ 230 triệu năm.' },
-    { key: 'arms', label: 'Số nhánh', type: 'seg', options: [[2, '2 nhánh'], [4, '4 nhánh']], default: 2 },
+      note: 'Có quầng tối: v ≈ 220 km/s gần như không đổi tới rìa. Không có: v giảm dần theo Kepler từ khối lượng nhìn thấy (sao, khí).',
+      en: { label: 'Rotation curve', options: ['With dark matter', 'No dark matter'], note: 'With a dark halo: v ≈ 220 km/s, nearly flat out to the edge. Without: v falls off in Keplerian fashion from the visible mass (stars, gas).' } },
+    { key: 'speed', label: 'Tốc độ thời gian', type: 'range', min: 0, max: 40, step: 0.5, default: 6, fmt: v => v.toFixed(1) + t(' triệu năm/s', ' Myr/s'),
+      note: 'Ở tốc độ thời gian chung mặc định. Một vòng quay của Mặt Trời (năm thiên hà) ≈ 230 triệu năm.',
+      en: { label: 'Time speed', note: 'At the default global time speed. One orbit of the Sun (a galactic year) ≈ 230 million years.' } },
+    { key: 'arms', label: 'Số nhánh', type: 'seg', options: [[2, '2 nhánh'], [4, '4 nhánh']], default: 2, en: { label: 'Number of arms', options: ['2 arms', '4 arms'] } },
     { key: 'pitch', label: 'Góc mở nhánh', type: 'range', min: 7, max: 25, step: 0.5, default: 15, fmt: v => v.toFixed(1) + '°',
-      note: 'Ngân Hà ≈ 12–13°. Nhánh mở rộng là đặc trưng của loại Sc, nhánh cuốn chặt của loại Sa.' },
-    { key: 'dust', label: 'Bụi', type: 'range', min: 0, max: 2, step: 0.05, default: 1 },
-    { key: 'count', label: 'Số hạt sao', type: 'range', min: 0.15, max: 1, step: 0.05, default: 1, fmt: v => Math.round(v * 100) + '%' },
-    { key: 'bright', label: 'Độ sáng sao', type: 'range', min: 0.2, max: 3, step: 0.05, default: 1 },
-    { key: 'glow', label: 'Ánh sáng khuếch tán', type: 'range', min: 0, max: 2, step: 0.05, default: 1, note: 'Ánh sáng gộp của hàng tỷ sao không phân giải được.' },
-    { key: 'marker', label: 'Đánh dấu Mặt Trời', type: 'toggle', default: true },
+      note: 'Ngân Hà ≈ 12–13°. Nhánh mở rộng là đặc trưng của loại Sc, nhánh cuốn chặt của loại Sa.',
+      en: { label: 'Arm pitch angle', note: 'Milky Way ≈ 12–13°. Open arms are typical of type Sc, tightly wound arms of type Sa.' } },
+    { key: 'dust', label: 'Bụi', type: 'range', min: 0, max: 2, step: 0.05, default: 1, en: { label: 'Dust' } },
+    { key: 'count', label: 'Số hạt sao', type: 'range', min: 0.15, max: 1, step: 0.05, default: 1, fmt: v => Math.round(v * 100) + '%', en: { label: 'Star particles' } },
+    { key: 'bright', label: 'Độ sáng sao', type: 'range', min: 0.2, max: 3, step: 0.05, default: 1, en: { label: 'Star brightness' } },
+    { key: 'glow', label: 'Ánh sáng khuếch tán', type: 'range', min: 0, max: 2, step: 0.05, default: 1, note: 'Ánh sáng gộp của hàng tỷ sao không phân giải được.', en: { label: 'Diffuse light', note: 'The combined light of billions of unresolved stars.' } },
+    { key: 'marker', label: 'Đánh dấu Mặt Trời', type: 'toggle', default: true, en: { label: 'Mark the Sun' } },
   ],
   actions: [
-    { label: 'Đổi góc nhìn', key: 'v', title: 'Chính diện → nghiêng 60° → nhìn cạnh', run: ctx => ctx.scene._inst?.cycleView(ctx) },
-    { label: 'Tới Mặt Trời', key: 'g', title: 'Bay tới vị trí Mặt Trời và bám theo quỹ đạo', run: ctx => ctx.scene._inst?.toggleSun(ctx) },
-    { label: 'Đặt lại thời gian', key: 'r', title: 'Trở về t = 0 (các nhánh chưa bị xoắn)', run: ctx => ctx.scene._inst?.resetTime(ctx) },
+    { label: 'Đổi góc nhìn', key: 'v', title: 'Chính diện → nghiêng 60° → nhìn cạnh', run: ctx => ctx.scene._inst?.cycleView(ctx),
+      en: { label: 'Change view', title: 'Face-on → tilted 60° → edge-on' } },
+    { label: 'Tới Mặt Trời', key: 'g', title: 'Bay tới vị trí Mặt Trời và bám theo quỹ đạo', run: ctx => ctx.scene._inst?.toggleSun(ctx),
+      en: { label: 'Go to the Sun', title: 'Fly to the Sun’s position and follow its orbit' } },
+    { label: 'Đặt lại thời gian', key: 'r', title: 'Trở về t = 0 (các nhánh chưa bị xoắn)', run: ctx => ctx.scene._inst?.resetTime(ctx),
+      en: { label: 'Reset time', title: 'Back to t = 0 (arms not yet wound up)' } },
   ],
   create(ctx) {
     const def = this;
@@ -568,7 +589,7 @@ const spiral = {
         sph.setFromVector3(tmp.copy(camera.position).sub(controls.target));
         const dist = follow ? Math.max(sph.radius, 4) : (sph.radius < 25 ? 40 : sph.radius);
         startFly(dist, VIEWS[viewIdx][1], null, null, 2.2);
-        c.toast(VIEWS[viewIdx][0] + (viewIdx === 2 ? ' — làn bụi ở mặt phẳng giữa cắt ngang đĩa sáng, khối phình hiện rõ hình hộp/hạt lạc của thanh ngang.' : viewIdx === 0 ? ' — nhìn thẳng xuống đĩa: thanh ngang, các nhánh và làn bụi ở mép trong của nhánh.' : ''), 4500);
+        c.toast(t(VIEWS[viewIdx][0], VIEWS[viewIdx][2]) + (viewIdx === 2 ? t(' — làn bụi ở mặt phẳng giữa cắt ngang đĩa sáng, khối phình hiện rõ hình hộp/hạt lạc của thanh ngang.', ' — the midplane dust lane cuts across the bright disc, and the bulge shows the boxy/peanut shape of the bar.') : viewIdx === 0 ? t(' — nhìn thẳng xuống đĩa: thanh ngang, các nhánh và làn bụi ở mép trong của nhánh.', ' — looking straight down on the disc: the bar, the arms and the dust lanes on the inner edges of the arms.') : ''), 4500);
       },
       toggleSun(c) {
         if (!follow) {
@@ -576,7 +597,7 @@ const spiral = {
           controls.minDistance = 0.6;
           const az = Math.atan2(sunPos.x, sunPos.z);   // look inward from behind the Sun
           startFly(4.5, 68, az, () => sunPos, 3.0);
-          c.toast('Mặt Trời ở <b>8,2 kpc</b> từ tâm, giữa nhánh Perseus và nhánh Nhân Mã, quay ~220 km/s — mỗi vòng ≈ 230 triệu năm. Nhấn <b>G</b> lần nữa để quay về.', 7000);
+          c.toast(t('Mặt Trời ở <b>8,2 kpc</b> từ tâm, giữa nhánh Perseus và nhánh Nhân Mã, quay ~220 km/s — mỗi vòng ≈ 230 triệu năm. Nhấn <b>G</b> lần nữa để quay về.', 'The Sun is <b>8.2 kpc</b> from the centre, between the Perseus and Sagittarius arms, orbiting at ~220 km/s — one lap ≈ 230 million years. Press <b>G</b> again to go back.'), 7000);
         } else {
           follow = false;
           controls.minDistance = def.camera.min;
@@ -585,7 +606,7 @@ const spiral = {
       },
       resetTime(c) {
         Tdm = 0; Tkep = 0; updateSun(); prevSun.copy(sunPos);
-        c.toast('t = 0: các nhánh trở lại hình dạng ban đầu.', 2500);
+        c.toast(t('t = 0: các nhánh trở lại hình dạng ban đầu.', 't = 0: the arms are back to their original shape.'), 2500);
       },
       update(dt, c) {
         const p = c.params;
@@ -635,15 +656,16 @@ const spiral = {
         const T = Tdm + Tkep;
         const year = 2 * Math.PI * R_SUN / (vMix * KMS);
         const laps = (omDM(R_SUN) * Tdm + omKep(R_SUN) * Tkep) / (2 * Math.PI);
-        const fT = T >= 1000 ? (T / 1000).toFixed(2).replace('.', ',') + ' tỷ năm' : Math.round(T) + ' tr. năm';
+        const fT = T >= 1000 ? dec(T / 1000, 2) + t(' tỷ năm', ' Gyr') : Math.round(T) + t(' tr. năm', ' Myr');
         return [
-          ['Bán kính dưới camera', `${rc.toFixed(1).replace('.', ',')} kpc`],
-          ['Tốc độ Mặt Trời', `${Math.round(vMix)} km/s` + (v < 200 ? ' · Kepler' : '')],
-          ['Năm thiên hà', `${Math.round(year)} tr. năm`],
-          ['Thời gian', `${fT} · ${laps.toFixed(2).replace('.', ',')} vòng`],
+          [t('Bán kính dưới camera', 'Radius below the camera'), `${dec(rc, 1)} kpc`],
+          [t('Tốc độ Mặt Trời', 'Sun’s orbital speed'), `${Math.round(vMix)} km/s` + (v < 200 ? ' · Kepler' : '')],
+          [t('Năm thiên hà', 'Galactic year'), `${Math.round(year)}` + t(' tr. năm', ' Myr')],
+          [t('Thời gian', 'Time'), `${fT} · ${dec(laps, 2)} ` + t('vòng', 'orbits')],
         ];
       },
       enter(c) { if (inited) lastSim = c.time.sim; fly = null; follow = false; controls.minDistance = def.camera.min; },
+      onLang() { const old = sprite.material.map; sprite.material.map = labelTexture(); sprite.material.needsUpdate = true; old.dispose(); },
       exit() { fly = null; follow = false; },
     };
     def._inst = inst;
@@ -720,20 +742,38 @@ const collision = {
     ['Một lần lướt qua', 'vài trăm triệu năm'],
     ['Ngân Hà + Andromeda', 'đang tiến lại gần ở 110 km/s'],
   ],
+  en: {
+    name: 'Colliding galaxies',
+    subtitle: 'Tidal interaction · Toomre & Toomre (1972) model',
+    blurb: 'When two galaxies swing past each other, tidal forces pull the stars on their outskirts into long <b>tails</b> and <b>bridges</b> — like the Antennae (NGC 4038/39) or the Mice (NGC 4676). In 1972 the Toomre brothers reproduced those shapes with just two point masses and non-self-gravitating “test” stars: the tails are longest when a disc spins in the <b>same sense</b> as the orbit, because the outer stars resonate with the tidal pull.',
+    intro: 'Switch <b>Disc A spin</b> to <b>Retrograde</b>: disc A barely forms a tidal tail — the resonance between the orbital motion and the disc’s rotation is the key. Press <b>R</b> to run it again.',
+    facts: [
+      ['Model', 'Restricted three-body problem'],
+      ['Orbit', 'Parabolic, pericentre 8–30 kpc'],
+      ['Examples', 'Antennae · Mice · Cartwheel'],
+      ['Antennae tidal tails', '≈ 100 kpc'],
+      ['One passage', 'a few hundred million years'],
+      ['Milky Way + Andromeda', 'approaching at 110 km/s'],
+    ],
+  },
   camera: { distance: 150, polar: 38, azimuth: 20, min: 12, max: 400, fov: 50 },
   exposure: 1.0,
   bloom: 0.6,
   params: [
-    { key: 'speed', label: 'Tốc độ thời gian', type: 'range', min: 0, max: 40, step: 0.5, default: 10, fmt: v => v.toFixed(1) + ' triệu năm/s', note: 'Ở tốc độ thời gian chung mặc định.' },
-    { key: 'spinA', label: 'Chiều quay đĩa A', type: 'seg', options: [[1, 'Thuận'], [-1, 'Nghịch']], default: 1, note: 'So với chiều chuyển động trên quỹ đạo. Đổi sẽ chạy lại mô phỏng.' },
-    { key: 'incB', label: 'Độ nghiêng đĩa B', type: 'range', min: 0, max: 180, step: 5, default: 60, fmt: v => v + '°', note: '> 90° nghĩa là đĩa B quay nghịch.' },
-    { key: 'ratio', label: 'Tỉ lệ khối lượng B/A', type: 'range', min: 0.2, max: 1, step: 0.05, default: 1, fmt: v => v.toFixed(2).replace('.', ',') },
-    { key: 'peri', label: 'Khoảng cách cận điểm', type: 'range', min: 8, max: 30, step: 1, default: 14, fmt: v => v + ' kpc' },
-    { key: 'friction', label: 'Ma sát động lực (quầng tối)', type: 'toggle', default: true, note: 'Quầng vật chất tối hãm chuyển động của hai nhân, khiến chúng quay lại và sáp nhập. Mô hình Toomre gốc không có hiệu ứng này.' },
-    { key: 'bright', label: 'Độ sáng sao', type: 'range', min: 0.2, max: 3, step: 0.05, default: 1 },
+    { key: 'speed', label: 'Tốc độ thời gian', type: 'range', min: 0, max: 40, step: 0.5, default: 10, fmt: v => v.toFixed(1) + t(' triệu năm/s', ' Myr/s'), note: 'Ở tốc độ thời gian chung mặc định.',
+      en: { label: 'Time speed', note: 'At the default global time speed.' } },
+    { key: 'spinA', label: 'Chiều quay đĩa A', type: 'seg', options: [[1, 'Thuận'], [-1, 'Nghịch']], default: 1, note: 'So với chiều chuyển động trên quỹ đạo. Đổi sẽ chạy lại mô phỏng.',
+      en: { label: 'Disc A spin', options: ['Prograde', 'Retrograde'], note: 'Relative to the direction of orbital motion. Changing it restarts the simulation.' } },
+    { key: 'incB', label: 'Độ nghiêng đĩa B', type: 'range', min: 0, max: 180, step: 5, default: 60, fmt: v => v + '°', note: '> 90° nghĩa là đĩa B quay nghịch.', en: { label: 'Disc B inclination', note: '> 90° means disc B is retrograde.' } },
+    { key: 'ratio', label: 'Tỉ lệ khối lượng B/A', type: 'range', min: 0.2, max: 1, step: 0.05, default: 1, fmt: v => dec(v, 2), en: { label: 'Mass ratio B/A' } },
+    { key: 'peri', label: 'Khoảng cách cận điểm', type: 'range', min: 8, max: 30, step: 1, default: 14, fmt: v => v + ' kpc', en: { label: 'Pericentre distance' } },
+    { key: 'friction', label: 'Ma sát động lực (quầng tối)', type: 'toggle', default: true, note: 'Quầng vật chất tối hãm chuyển động của hai nhân, khiến chúng quay lại và sáp nhập. Mô hình Toomre gốc không có hiệu ứng này.',
+      en: { label: 'Dynamical friction (dark halo)', note: 'The dark matter halos brake the two nuclei, making them fall back and merge. The original Toomre model has no such effect.' } },
+    { key: 'bright', label: 'Độ sáng sao', type: 'range', min: 0.2, max: 3, step: 0.05, default: 1, en: { label: 'Star brightness' } },
   ],
   actions: [
-    { label: 'Chạy lại', key: 'r', title: 'Đặt lại hai thiên hà ở vị trí ban đầu', run: ctx => ctx.scene._inst?.restart(ctx, true) },
+    { label: 'Chạy lại', key: 'r', title: 'Đặt lại hai thiên hà ở vị trí ban đầu', run: ctx => ctx.scene._inst?.restart(ctx, true),
+      en: { label: 'Run again', title: 'Put both galaxies back at their starting positions' } },
   ],
   create(ctx) {
     const def = this;
@@ -850,7 +890,7 @@ const collision = {
       material, overlay: pts,
       restart(c, toast) {
         setup(c.params);
-        if (toast) c.toast(`Hai thiên hà trở lại vị trí xuất phát, còn ${T_PERI} triệu năm nữa tới cận điểm.`, 3000);
+        if (toast) c.toast(t(`Hai thiên hà trở lại vị trí xuất phát, còn ${T_PERI} triệu năm nữa tới cận điểm.`, `Both galaxies are back at the start, ${T_PERI} million years from pericentre.`), 3000);
       },
       onParam(key, v, c) { if (RESTART_KEYS.includes(key)) inst.restart(c, false); },
       update(dt, c) {
@@ -872,12 +912,12 @@ const collision = {
         const sep = C.p[0].distanceTo(C.p[1]);
         const vrel = C.v[0].distanceTo(C.v[1]) / KMS;   // kpc/Myr → km/s
         const tp = T - T_PERI;
-        const state = merged ? 'Đã sáp nhập' : T < T_PERI - 20 ? 'Đang tiến lại gần' : Math.abs(tp) <= 20 ? 'Cận điểm!' : 'Đang tách ra / quay lại';
+        const state = merged ? t('Đã sáp nhập', 'Merged') : T < T_PERI - 20 ? t('Đang tiến lại gần', 'Approaching') : Math.abs(tp) <= 20 ? t('Cận điểm!', 'Pericentre!') : t('Đang tách ra / quay lại', 'Separating / falling back');
         return [
-          ['Khoảng cách hai nhân', `${sep.toFixed(1).replace('.', ',')} kpc`],
-          ['Vận tốc tương đối', `${Math.round(vrel)} km/s`],
-          ['So với cận điểm', `${tp < 0 ? '−' : '+'}${Math.abs(Math.round(tp))} triệu năm`],
-          ['Trạng thái', state],
+          [t('Khoảng cách hai nhân', 'Nuclear separation'), `${dec(sep, 1)} kpc`],
+          [t('Vận tốc tương đối', 'Relative velocity'), `${Math.round(vrel)} km/s`],
+          [t('So với cận điểm', 'Relative to pericentre'), `${tp < 0 ? '−' : '+'}${Math.abs(Math.round(tp))}` + t(' triệu năm', ' Myr')],
+          [t('Trạng thái', 'Status'), state],
         ];
       },
       enter(c) { if (inited) lastSim = c.time.sim; },

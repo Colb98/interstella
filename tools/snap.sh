@@ -7,6 +7,8 @@
 #                        "t=120"        (simulation time)
 #                        "params=sunAngle:120,craters:0.8"
 #                        "ui=0"         (hide the HUD)   "q=low|med|high"
+#                        "lang=en"      (English UI; untranslated text is reported as errors)
+#                        "relang=en"    (load in Vietnamese, then switch live)
 #
 # Prints the page's status JSON: {"ok":bool,"scene":id,"errors":[...],"hud":[...]}.
 # Shader compile errors include the offending source lines. Writes the PNG to out.png.

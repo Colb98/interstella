@@ -18,6 +18,7 @@
 // limb is darker AND redder (blue light comes from shallower, cooler layers near the limb).
 import * as THREE from 'three';
 import { COMMON_GLSL, FULLSCREEN_VERT } from '../glsl/common.js';
+import { t, dec, locale } from '../i18n.js';
 
 const NS = 16, NL = 8, NF = 4, NP = 24;   // spots, loops (flare loops / 171 Å loops), flares, volumetric prominences
 const R_SUN_KM = 695700, AU_KM = 1.495978707e8, C_KMS = 299792.458, G_SUN = 274.0; // m/s²
@@ -1433,11 +1434,11 @@ function starHud(ctx, R, T, M) {
   const rkm = R * R_SUN_KM;
   const ang = rkm < AU_KM ? 2 * Math.asin(rkm / AU_KM) / D2R : null;
   return [
-    ['Độ sáng', `${f.num(L, L < 0.1 ? 4 : L < 100 ? 3 : 0)} L☉`],
-    ['Hấp dẫn bề mặt', `${f.num(g, g < 1 ? 4 : 1)} m/s² · log g = ${Math.log10(g * 100).toFixed(2)}`],
-    ['Vận tốc thoát', `${f.num(vesc, 0)} km/s`],
-    ['Nhìn từ 1 AU', ang === null ? 'bạn ở <b>bên trong</b> ngôi sao' : (ang > 0.5 ? ang.toFixed(2) + '°' : (ang * 60).toFixed(ang * 60 < 1 ? 3 : 1) + '′') + ` (Mặt Trời: 0.53°)`],
-    ['Ánh sáng đi qua đường kính', f.time(2 * rkm / C_KMS)],
+    [t('Độ sáng', 'Luminosity'), `${f.num(L, L < 0.1 ? 4 : L < 100 ? 3 : 0)} L☉`],
+    [t('Hấp dẫn bề mặt', 'Surface gravity'), `${f.num(g, g < 1 ? 4 : 1)} m/s² · log g = ${Math.log10(g * 100).toFixed(2)}`],
+    [t('Vận tốc thoát', 'Escape velocity'), `${f.num(vesc, 0)} km/s`],
+    [t('Nhìn từ 1 AU', 'Seen from 1 AU'), ang === null ? t('bạn ở <b>bên trong</b> ngôi sao', 'you are <b>inside</b> the star') : (ang > 0.5 ? ang.toFixed(2) + '°' : (ang * 60).toFixed(ang * 60 < 1 ? 3 : 1) + '′') + t(` (Mặt Trời: 0.53°)`, ` (the Sun: 0.53°)`)],
+    [t('Ánh sáng đi qua đường kính', 'Light-crossing time (diameter)'), f.time(2 * rkm / C_KMS)],
   ];
 }
 
@@ -1467,20 +1468,26 @@ function makeOrbits(list, scaleRsun) {
     g.setAttribute('aT', new THREE.Float32BufferAttribute(at, 1));
     const line = new THREE.LineLoop(g, mat(col)); line.frustumCulled = false;
     group.add(line);
-    const lab = makeLabel(`${name} · ${au} AU`, col);
+    const lab = makeLabel(`${t(name[0], name[1])} · ${au} AU`, col);
     lab.position.set(r * Math.cos(-0.6), 0, r * Math.sin(-0.6));
-    group.add(lab); labels.push(lab);
+    group.add(lab); labels.push({ lab, name, au, col });
   }
+  group.userData.relabel = () => labels.forEach(({ lab, name, au, col }) => drawLabel(lab.material.map, `${t(name[0], name[1])} · ${au} AU`, col));
   group.userData.update = (cam, op) => group.children.forEach(c => { if (c.material.uniforms) { c.material.uniforms.uCam.value.copy(cam); c.material.uniforms.uOp.value = op; } else c.material.opacity = op; });
   return group;
 }
-function makeLabel(text, col) {
-  const cv = document.createElement('canvas'); cv.width = 512; cv.height = 64;
-  const g = cv.getContext('2d');
+function drawLabel(tex, text, col) {
+  const cv = tex.image, g = cv.getContext('2d');
+  g.clearRect(0, 0, cv.width, cv.height);
   g.font = '500 30px system-ui, "Segoe UI", sans-serif'; g.textBaseline = 'middle';
   g.fillStyle = `rgb(${col.map(c => Math.round(Math.min(1, c) * 255)).join(',')})`;
   g.fillText(text, 14, 32);
+  tex.needsUpdate = true;
+}
+function makeLabel(text, col) {
+  const cv = document.createElement('canvas'); cv.width = 512; cv.height = 64;
   const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.LinearSRGBColorSpace;
+  drawLabel(tex, text, col);
   const m = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false, sizeAttenuation: false, opacity: 0.85 });
   const s = new THREE.Sprite(m); s.center.set(0, 0.5); s.scale.set(0.16, 0.02, 1);
   return s;
@@ -1568,8 +1575,12 @@ const SDO_SRC = {
   euv171: { file: 'assets/sun/sdo_aia171_20261018_053634.jpg', date: '2026-10-18T05:36:34Z', inst: 'SDO/AIA 171 Å', table: 'aia171',
             live: { list: SWPC + '/products/animations/suvi-primary-171.json', inst: 'GOES-19/SUVI 171 Å', table: 'aia171', pct: [0.229, 0.437] } },
   wl: { file: 'assets/sun/sdo_hmi_cont_20261018_053000.jpg', date: '2026-10-18T05:30:00Z', inst: 'SDO/HMI continuum 617 nm', table: 'hmi',
-        live: { list: SWPC + '/products/animations/sdo-hmii.json', inst: 'SDO/HMI (ảnh cường độ)', table: 'hmi' } },
+        live: { list: SWPC + '/products/animations/sdo-hmii.json', inst: 'SDO/HMI (ảnh cường độ)', instEn: 'SDO/HMI (intensitygram)', table: 'hmi' } },
 };
+// instrument name and error text in the current language (errors are stored in Vietnamese)
+const instName = it => t(it.inst, it.instEn ?? it.inst);
+const ERR_EN = { 'tải ảnh lỗi': 'image failed to load', 'hết thời gian chờ': 'timed out', 'lỗi mạng': 'network error' };
+const errText = e => t(e, ERR_EN[e] ?? e);
 // sdoaia304 = IDL colour table 3 "Red Temperature" (SunPy idl_3.csv); sdoaia171 = (r0, c0, b0) of it
 const idl3JS = s => [Math.min(255, s * 255 / 176), Math.min(255, Math.max(0, (s - 120) * 255 / 135)), Math.min(255, Math.max(0, (s - 190) * 255 / 65))];
 // Inverse colour table: R+G+B rises monotonically along both tables, so the pixel's sum gives its value.
@@ -1786,11 +1797,11 @@ function sunLapse(alt) {
 }
 // "1 s = 2 phút" — a duration in solar seconds, in Vietnamese
 function fmtSolar(sec) {
-  const n = (v, d) => v.toFixed(d).replace('.', ',');
-  if (sec < 90) return `${n(sec, 0)} giây`;
-  if (sec < 5400) return `${n(sec / 60, sec < 600 ? 1 : 0)} phút`;
-  if (sec < 2 * 86400) return `${n(sec / 3600, sec < 36000 ? 1 : 0)} giờ`;
-  return `${n(sec / 86400, 1)} ngày`;
+  const n = (v, d) => dec(v, d);
+  if (sec < 90) return `${n(sec, 0)} ${t('giây', 's')}`;
+  if (sec < 5400) return `${n(sec / 60, sec < 600 ? 1 : 0)} ${t('phút', 'min')}`;
+  if (sec < 2 * 86400) return `${n(sec / 3600, sec < 36000 ? 1 : 0)} ${t('giờ', 'h')}`;
+  return `${n(sec / 86400, 1)} ${t('ngày', 'days')}`;
 }
 
 // ---- prominences (CPU side) ----------------------------------------------------------------------------
@@ -1799,6 +1810,8 @@ function fmtSolar(sec) {
 // current view (limb first, plus the one the camera follows / that erupts) are uploaded to the shader.
 const VIEWS = ['wl', 'ha', 'euv304', 'euv171'];
 const VIEW_NAME = ['Ánh sáng trắng (quang cầu, ~5 800 K)', 'Hα 656,3 nm (sắc cầu, ~10 000 K)', 'EUV 30,4 nm He II (~80 000 K)', 'EUV 17,1 nm Fe IX (~0,7 triệu K)'];
+const VIEW_NAME_EN = ['White light (photosphere, ~5,800 K)', 'Hα 656.3 nm (chromosphere, ~10,000 K)', 'EUV 30.4 nm He II (~80,000 K)', 'EUV 17.1 nm Fe IX (~0.7 million K)'];
+const PROM_NAME_EN = ['quiescent “hedgerow” prominence', 'arch prominence (twisted flux rope)', 'post-flare loops & coronal rain', 'erupting prominence'];
 const PROM_NAME = ['tai lửa yên tĩnh dạng “hàng rào”', 'tai lửa hình vòm (dây từ thông xoắn)', 'hệ vòng sau bùng nổ & mưa nhật hoa', 'tai lửa phun trào'];
 // the first cycle of three candidates is placed so the default view opens with them on the limb
 const PROM_HEROES = {
@@ -1891,34 +1904,58 @@ const sun = {
     ['Tai lửa', '~10 000 K, cao 10–100 Mm, sợi mảnh ~300 km; sống vài giờ đến vài tháng'],
     ['Tuổi', '4,6 tỷ năm'],
   ],
+  en: {
+    name: 'The Sun',
+    subtitle: 'G2V yellow dwarf · our star',
+    blurb: 'A boiling surface: each bright <b>granule</b> (~1,000 km) is a column of hot plasma that rises, cools and sinks back down in the dark intergranular lanes. Above, in the million-degree corona, <b>prominences</b> — curtains of cool ~10,000 K plasma a hundred times denser than their surroundings — are held up by magnetic fields: at the limb they glow pink in <b>Hα</b>, on the disc they appear as dark <b>filaments</b>.',
+    intro: 'This is the Sun in <b>EUV 304 Å</b>, as SDO/AIA sees it. Press <b>O</b> to see <b>today\'s real image</b> projected onto the sphere, <b>V</b> to change wavelength, <b>L</b> to fly to a <b>prominence</b> on the limb, <b>R</b> to watch a prominence <b>erupt</b>, <b>E</b> for an eclipse.',
+    facts: [
+      ['Classification', 'G2V — main-sequence yellow dwarf'],
+      ['Radius', '695,700 km (109 × Earth)'],
+      ['Mass', '1.989×10³⁰ kg (333,000 × Earth)'],
+      ['Effective temperature', '5,772 K'],
+      ['Luminosity', '3.828×10²⁶ W'],
+      ['Rotation', '25.4 days (equator) · ~35 days (poles)'],
+      ['Core / corona temperature', '15.7 million K / 1–2 million K'],
+      ['Granules', '~1,000 km, lasting 8–10 minutes'],
+      ['Prominences', '~10,000 K, 10–100 Mm tall, ~300 km threads; last hours to months'],
+      ['Age', '4.6 billion years'],
+    ],
+  },
   unitKm: R_SUN_KM,
   camera: { distance: 3.5, polar: 82, azimuth: 20, min: 1.01, max: 30, fov: 45 },   // min: 7 Mm above the surface: ~50 granules, a DKIST-like field
   exposure: 1.0,
   bloom: 0.25,
   params: [
-    { key: 'view', label: 'Bước sóng quan sát', type: 'seg', options: [['wl', 'Ánh sáng trắng'], ['ha', 'Hα 656 nm'], ['euv304', 'EUV 304 Å'], ['euv171', 'EUV 171 Å']], default: 'euv304', note: 'Ánh sáng trắng: quang cầu. Hα: sắc cầu — tai lửa sáng ở rìa, sợi tối trên đĩa. 304 Å (He II): sắc cầu–vùng chuyển tiếp. 171 Å (Fe IX): vành nhật hoa ~1 triệu K với các vòng từ. Ảnh hẹp băng là đơn sắc; màu là bảng màu quy ước (như SDO).' },
-    { key: 'mgn', label: 'Tăng cường tương phản (MGN)', type: 'range', min: 0, max: 1, step: 0.01, default: 0.9, note: 'Ảnh EUV của SDO được xử lý bằng “chuẩn hóa Gauss đa thang” (MGN, Morgan & Druckmüller 2014): ở mỗi thang kích thước, độ sáng được so với trung bình và độ lệch chuẩn quanh nó, làm nổi chi tiết ở cả vùng tối lẫn vùng sáng. 0 = ảnh thô như ảnh “browse” của SDO, 1 = kiểu phim 4K của NASA Goddard. Áp dụng cho 304 Å và ảnh thật.' },
-    { key: 'sdo', label: 'Mặt Trời hôm nay (SDO)', type: 'toggle', default: false, note: 'Chiếu ảnh toàn đĩa thật lên nửa cầu nhìn từ Trái Đất lúc chụp (nghiêng B₀, bắc ở trên); nửa kia vẫn là mô phỏng. 304 Å / 171 Å / ánh sáng trắng (HMI); Hα không có ảnh. Ảnh SDO đi kèm luôn có sẵn; khi có mạng sẽ tải ảnh mới nhất (máy chủ SDO không cho phép tải chéo nguồn nên 304/171 trực tuyến lấy từ GOES-19/SUVI của NOAA, cùng vạch phổ).' },
-    { key: 'activity', label: 'Mức hoạt động (vết đen)', type: 'range', min: 0, max: 1, step: 0.01, default: 0.85, note: 'Chu kỳ 11 năm: 0 = cực tiểu (đĩa trơn, vành nhật hoa dẹt theo xích đạo), 1 = cực đại (nhiều nhóm vết đen, các tia vành nhật hoa tỏa mọi hướng).' },
-    { key: 'granulation', label: 'Độ tương phản hạt', type: 'range', min: 0, max: 2, step: 0.01, default: 1, note: 'Hạt nóng hơn rãnh tối ~200–300 K; thấy rõ khi lại gần (khoảng cách < 1.2). Thời gian được tua nhanh theo khoảng cách, như phim của kính thiên văn mặt trời: cận cảnh 1 s ≈ 2 phút (từng hạt sinh ra, phình, tách đôi rồi tan trong vài giây), toàn đĩa 1 s ≈ 7 giờ (thấy Mặt Trời quay). Thanh “Tốc độ thời gian” nhân thêm hệ số này.' },
-    { key: 'corona', label: 'Vành nhật hoa', type: 'range', min: 0, max: 2, step: 0.01, default: 0.6 },
-    { key: 'prominences', label: 'Sắc cầu & tai lửa', type: 'range', min: 0, max: 2, step: 0.01, default: 1, note: 'Mật độ plasma trong tai lửa. Ở ánh sáng trắng tai lửa gần như vô hình (chỉ lộ ra khi nhật thực); hãy xem ở Hα.' },
-    { key: 'eclipse', label: 'Nhật thực toàn phần', type: 'toggle', default: false, note: 'Mặt Trăng che vừa khít quang cầu (chỉ ở ánh sáng trắng).' },
+    { key: 'view', label: 'Bước sóng quan sát', type: 'seg', options: [['wl', 'Ánh sáng trắng'], ['ha', 'Hα 656 nm'], ['euv304', 'EUV 304 Å'], ['euv171', 'EUV 171 Å']], default: 'euv304', note: 'Ánh sáng trắng: quang cầu. Hα: sắc cầu — tai lửa sáng ở rìa, sợi tối trên đĩa. 304 Å (He II): sắc cầu–vùng chuyển tiếp. 171 Å (Fe IX): vành nhật hoa ~1 triệu K với các vòng từ. Ảnh hẹp băng là đơn sắc; màu là bảng màu quy ước (như SDO).', en: { label: 'Observing wavelength', options: ['White light', 'Hα 656 nm', 'EUV 304 Å', 'EUV 171 Å'], note: 'White light: the photosphere. Hα: the chromosphere — prominences bright at the limb, dark filaments on the disc. 304 Å (He II): chromosphere–transition region. 171 Å (Fe IX): the ~1 million K corona with its magnetic loops. Narrow-band images are monochrome; the colours are a conventional colour table (as used by SDO).' } },
+    { key: 'mgn', label: 'Tăng cường tương phản (MGN)', type: 'range', min: 0, max: 1, step: 0.01, default: 0.9, note: 'Ảnh EUV của SDO được xử lý bằng “chuẩn hóa Gauss đa thang” (MGN, Morgan & Druckmüller 2014): ở mỗi thang kích thước, độ sáng được so với trung bình và độ lệch chuẩn quanh nó, làm nổi chi tiết ở cả vùng tối lẫn vùng sáng. 0 = ảnh thô như ảnh “browse” của SDO, 1 = kiểu phim 4K của NASA Goddard. Áp dụng cho 304 Å và ảnh thật.', en: { label: 'Contrast enhancement (MGN)', note: 'SDO EUV images are processed with “multi-scale Gaussian normalization” (MGN, Morgan & Druckmüller 2014): at each scale, brightness is compared with the local mean and standard deviation, bringing out detail in both dark and bright regions. 0 = raw, like SDO “browse” images; 1 = the look of NASA Goddard\'s 4K movies. Applies to 304 Å and to the real images.' } },
+    { key: 'sdo', label: 'Mặt Trời hôm nay (SDO)', type: 'toggle', default: false, note: 'Chiếu ảnh toàn đĩa thật lên nửa cầu nhìn từ Trái Đất lúc chụp (nghiêng B₀, bắc ở trên); nửa kia vẫn là mô phỏng. 304 Å / 171 Å / ánh sáng trắng (HMI); Hα không có ảnh. Ảnh SDO đi kèm luôn có sẵn; khi có mạng sẽ tải ảnh mới nhất (máy chủ SDO không cho phép tải chéo nguồn nên 304/171 trực tuyến lấy từ GOES-19/SUVI của NOAA, cùng vạch phổ).', en: { label: 'Today\'s Sun (SDO)', note: 'Projects a real full-disc image onto the hemisphere that faced Earth when it was taken (tilted by B₀, north up); the other half stays simulated. 304 Å / 171 Å / white light (HMI); there is no Hα image. The bundled SDO images are always available; when online, the latest image is downloaded (SDO servers do not allow cross-origin loading, so live 304/171 images come from NOAA\'s GOES-19/SUVI, in the same spectral lines).' } },
+    { key: 'activity', label: 'Mức hoạt động (vết đen)', type: 'range', min: 0, max: 1, step: 0.01, default: 0.85, note: 'Chu kỳ 11 năm: 0 = cực tiểu (đĩa trơn, vành nhật hoa dẹt theo xích đạo), 1 = cực đại (nhiều nhóm vết đen, các tia vành nhật hoa tỏa mọi hướng).', en: { label: 'Activity level (sunspots)', note: 'The 11-year cycle: 0 = minimum (clean disc, corona flattened along the equator), 1 = maximum (many sunspot groups, coronal streamers in every direction).' } },
+    { key: 'granulation', label: 'Độ tương phản hạt', type: 'range', min: 0, max: 2, step: 0.01, default: 1, note: 'Hạt nóng hơn rãnh tối ~200–300 K; thấy rõ khi lại gần (khoảng cách < 1.2). Thời gian được tua nhanh theo khoảng cách, như phim của kính thiên văn mặt trời: cận cảnh 1 s ≈ 2 phút (từng hạt sinh ra, phình, tách đôi rồi tan trong vài giây), toàn đĩa 1 s ≈ 7 giờ (thấy Mặt Trời quay). Thanh “Tốc độ thời gian” nhân thêm hệ số này.', en: { label: 'Granulation contrast', note: 'Granules are ~200–300 K hotter than the dark intergranular lanes; visible up close (distance < 1.2). Time is sped up according to distance, like solar telescope movies: close up 1 s ≈ 2 minutes (each granule appears, swells, splits and fades within seconds), full disc 1 s ≈ 7 hours (you see the Sun rotate). The time-speed slider multiplies this factor.' } },
+    { key: 'corona', label: 'Vành nhật hoa', type: 'range', min: 0, max: 2, step: 0.01, default: 0.6, en: { label: 'Corona' } },
+    { key: 'prominences', label: 'Sắc cầu & tai lửa', type: 'range', min: 0, max: 2, step: 0.01, default: 1, note: 'Mật độ plasma trong tai lửa. Ở ánh sáng trắng tai lửa gần như vô hình (chỉ lộ ra khi nhật thực); hãy xem ở Hα.', en: { label: 'Chromosphere & prominences', note: 'Plasma density in the prominences. In white light prominences are almost invisible (they only show during an eclipse); view them in Hα.' } },
+    { key: 'eclipse', label: 'Nhật thực toàn phần', type: 'toggle', default: false, note: 'Mặt Trăng che vừa khít quang cầu (chỉ ở ánh sáng trắng).', en: { label: 'Total solar eclipse', note: 'The Moon exactly covers the photosphere (white light only).' } },
   ],
   actions: [
-    { label: 'Bước sóng', key: 'v', title: 'Đổi bước sóng quan sát', run: ctx => {
+    { label: 'Bước sóng', key: 'v', title: 'Đổi bước sóng quan sát', en: { label: 'Wavelength', title: 'Change the observing wavelength' }, run: ctx => {
       const p = ctx.params; p.view = VIEWS[(VIEWS.indexOf(p.view) + 1) % VIEWS.length];
-      ctx.toast({
+      const vi = {
         wl: 'Ánh sáng trắng: <b>quang cầu</b> 5 800 K. Tai lửa sáng kém đĩa cả triệu lần nên chỉ thấy khi <b>nhật thực</b>.',
         ha: '<b>Hα 656,3 nm</b> — vạch đỏ của hydro: thấy <b>sắc cầu</b> (~10 000 K). Ở rìa, tai lửa phát sáng trên nền trời tối; trên đĩa chúng hấp thụ ánh sáng phía sau thành <b>sợi tối</b> (filament). Viền rìa lởm chởm là rừng <b>gai spicule</b>.',
         euv304: '<b>EUV 304 Å</b> (He II, ~80 000 K, như kính SDO/AIA): mạng lưới sắc cầu sáng, vùng hoạt động rực, tai lửa ở rìa sáng rõ nhất ở bước sóng này.',
         euv171: '<b>EUV 171 Å</b> (Fe IX, ~0,7 triệu K): vành nhật hoa và các <b>vòng từ</b> trên vùng hoạt động. Plasma lạnh của tai lửa ở đây lại <b>tối</b> — nó hấp thụ tia EUV.',
-      }[p.view], 7000);
+      }, en = {
+        wl: 'White light: the <b>photosphere</b> at 5,800 K. Prominences are a million times fainter than the disc, so they are only seen during an <b>eclipse</b>.',
+        ha: '<b>Hα 656.3 nm</b> — the red line of hydrogen: shows the <b>chromosphere</b> (~10,000 K). At the limb, prominences glow against the dark sky; on the disc they absorb the light from behind and appear as dark <b>filaments</b>. The ragged limb is a forest of <b>spicules</b>.',
+        euv304: '<b>EUV 304 Å</b> (He II, ~80,000 K, as seen by SDO/AIA): the bright chromospheric network and glowing active regions; limb prominences stand out best at this wavelength.',
+        euv171: '<b>EUV 171 Å</b> (Fe IX, ~0.7 million K): the corona and the <b>coronal loops</b> above active regions. Here the cool prominence plasma is <b>dark</b> — it absorbs EUV.',
+      };
+      ctx.toast(t(vi[p.view], en[p.view]), 7000);
     } },
-    { label: 'Cận cảnh rìa', key: 'l', title: 'Bay tới tai lửa ở rìa đĩa (nhấn tiếp để đổi loại, rồi quay về)', run: ctx => sun.__inst?.limbTour(ctx) },
-    { label: 'Phun trào', key: 'r', title: 'Cho một tai lửa phun trào (CME)', run: ctx => sun.__inst?.erupt(ctx) },
-    { label: 'Ảnh SDO', key: 'o', title: 'Mặt Trời hôm nay: ảnh thật của SDO chiếu lên quả cầu', run: ctx => sun.__inst?.toggleSdo(ctx) },
-    { label: 'Nhật thực', key: 'e', title: 'Bật/tắt nhật thực toàn phần', run: ctx => { ctx.params.eclipse = !ctx.params.eclipse; if (ctx.params.eclipse) ctx.params.view = 'wl'; ctx.toast(ctx.params.eclipse ? 'Nhật thực toàn phần: quang cầu bị che, lộ ra <b>vành nhật hoa</b> (1–2 triệu K) và các <b>tai lửa</b> hồng (vạch Balmer của hydro).' : 'Quang cầu sáng trở lại — vành nhật hoa mờ hơn ~một triệu lần nên chìm trong ánh chói.'); } },
+    { label: 'Cận cảnh rìa', key: 'l', title: 'Bay tới tai lửa ở rìa đĩa (nhấn tiếp để đổi loại, rồi quay về)', en: { label: 'Limb close-up', title: 'Fly to a prominence on the limb (press again to change type, then return)' }, run: ctx => sun.__inst?.limbTour(ctx) },
+    { label: 'Phun trào', key: 'r', title: 'Cho một tai lửa phun trào (CME)', en: { label: 'Eruption', title: 'Make a prominence erupt (CME)' }, run: ctx => sun.__inst?.erupt(ctx) },
+    { label: 'Ảnh SDO', key: 'o', title: 'Mặt Trời hôm nay: ảnh thật của SDO chiếu lên quả cầu', en: { label: 'SDO image', title: 'Today\'s Sun: a real SDO image projected onto the sphere' }, run: ctx => sun.__inst?.toggleSdo(ctx) },
+    { label: 'Nhật thực', key: 'e', title: 'Bật/tắt nhật thực toàn phần', en: { label: 'Eclipse', title: 'Toggle a total solar eclipse' }, run: ctx => { ctx.params.eclipse = !ctx.params.eclipse; if (ctx.params.eclipse) ctx.params.view = 'wl'; ctx.toast(ctx.params.eclipse ? t('Nhật thực toàn phần: quang cầu bị che, lộ ra <b>vành nhật hoa</b> (1–2 triệu K) và các <b>tai lửa</b> hồng (vạch Balmer của hydro).', 'Total solar eclipse: the photosphere is covered, revealing the <b>corona</b> (1–2 million K) and pink <b>prominences</b> (hydrogen Balmer lines).') : t('Quang cầu sáng trở lại — vành nhật hoa mờ hơn ~một triệu lần nên chìm trong ánh chói.', 'The photosphere is back — the corona is ~a million times fainter, so it vanishes in the glare.')); } },
   ],
   create(ctx) {
     const { U, material } = makeStar(ctx, 0, {
@@ -1992,16 +2029,16 @@ const sun = {
       sdo.status[view] = 'live-loading';
       return latestSWPC(src.list, ac.signal)
         .then(({ url, date }) => Promise.race([loadImg(url), new Promise((_, rej) => setTimeout(() => rej(new Error('hết thời gian chờ')), 30000))])
-          .then(im => decodeDisc(im, src)).then(r => ({ ...r, date, inst: src.inst, live: true })))
+          .then(im => decodeDisc(im, src)).then(r => ({ ...r, date, inst: src.inst, instEn: src.instEn, live: true })))
         .then(it => {
           clearTimeout(timer);
           sdo.img[view] = it; sdo.status[view] = 'live';
-          if (ctx.params.sdo && sdoView(ctx.params.view) === view) ctx.toast(`Đã tải ảnh mới nhất: <b>${it.inst}</b> lúc ${fmtUTC(it.date)} UTC.`, 5000);
+          if (ctx.params.sdo && sdoView(ctx.params.view) === view) ctx.toast(t(`Đã tải ảnh mới nhất: <b>${instName(it)}</b> lúc ${fmtUTC(it.date)} UTC.`, `Latest image loaded: <b>${instName(it)}</b> from ${fmtUTC(it.date)} UTC.`), 5000);
         })
         .catch(e => {
           clearTimeout(timer);
           sdo.status[view] = 'live-failed'; sdo.err = e && e.name === 'AbortError' ? 'hết thời gian chờ' : (e && e.message) || 'lỗi mạng';
-          if (ctx.params.sdo) ctx.toast(`Không tải được ảnh trực tuyến (${sdo.err}) — dùng ảnh SDO đi kèm.`, 5000);
+          if (ctx.params.sdo) ctx.toast(t(`Không tải được ảnh trực tuyến (${errText(sdo.err)}) — dùng ảnh SDO đi kèm.`, `Could not load the live image (${errText(sdo.err)}) — using the bundled SDO image.`), 5000);
         });
     };
     // snapshots use the bundled images (no network dependence); ?sdolive=1 also waits for the live download
@@ -2075,13 +2112,18 @@ const sun = {
       cam.fromPos.copy(ctx.camera.position); cam.fromTgt.copy(ctx.controls.target); cam.fromUp.copy(ctx.camera.up);
     };
     const typeToast = (it, ctx) => {
-      const base = [
+      const base = t([
         'Tai lửa yên tĩnh dạng <b>“hàng rào”</b>: một tấm plasma ~10 000 K, đặc gấp ~100 lần vành nhật hoa xung quanh, nằm trong các <b>võng</b> của đường sức từ. Nó gồm hàng nghìn <b>sợi mảnh</b> ~300 km; plasma liên tục <b>rơi xuống</b> dọc các sợi, còn những bọt tối trồi lên từ bên dưới. Các “chân” cắm xuống sắc cầu. Có thể tồn tại hàng tháng.',
         'Tai lửa <b>hình vòm</b>: plasma lạnh nằm trên các đường sức <b>xoắn ốc</b> của một <b>dây từ thông</b>, hai chân cắm xuống quang cầu. Nhấn <b>R</b> để nó mất cân bằng và phun trào.',
         '<b>Hệ vòng sau bùng nổ</b>: plasma bị đốt tới hàng chục triệu K trong một vụ bùng nổ nguội dần, ngưng tụ thành giọt — <b>mưa nhật hoa</b> trượt xuống hai chân vòng với vận tốc ~50–100 km/s.',
         'Tai lửa <b>phun trào</b>: dây từ thông bị đẩy lên, nở ra và tự tháo xoắn.',
-      ][it.type];
-      ctx.toast(base + (prevView ? ' <br>Đã chuyển sang <b>Hα</b> — ở ánh sáng trắng tai lửa gần như vô hình.' : ''), 8000);
+      ][it.type], [
+        'A quiescent <b>“hedgerow”</b> prominence: a sheet of ~10,000 K plasma, ~100 times denser than the surrounding corona, resting in the <b>dips</b> of magnetic field lines. It is made of thousands of fine <b>threads</b> ~300 km wide; plasma keeps <b>draining down</b> along the threads while dark bubbles rise from below. Its “feet” reach down into the chromosphere. It can last for months.',
+        'An <b>arch</b> prominence: cool plasma lying on the <b>helical</b> field lines of a <b>magnetic flux rope</b>, both feet anchored in the photosphere. Press <b>R</b> to make it lose equilibrium and erupt.',
+        '<b>Post-flare loops</b>: plasma heated to tens of millions of K in a flare cools and condenses into blobs — <b>coronal rain</b> sliding down both legs of the loops at ~50–100 km/s.',
+        'An <b>erupting</b> prominence: the flux rope is driven upward, expands and unwinds itself.',
+      ][it.type]);
+      ctx.toast(base + (prevView ? t(' <br>Đã chuyển sang <b>Hα</b> — ở ánh sáng trắng tai lửa gần như vô hình.', ' <br>Switched to <b>Hα</b> — in white light prominences are almost invisible.') : ''), 8000);
     };
     const pickEruptCandidate = () => {
       const f = cam.mode === 1 || cam.mode === 2 ? findItem(cam.i, cam.k) : null;
@@ -2103,8 +2145,9 @@ const sun = {
         ctx.params.sdo = !ctx.params.sdo;
         if (ctx.params.sdo) {
           if (!sdoView(ctx.params.view)) ctx.params.view = 'euv304';
-          ctx.toast('<b>Mặt Trời hôm nay</b>: ảnh toàn đĩa thật chiếu lên nửa cầu hướng về Trái Đất lúc chụp (trục quay nghiêng B₀ về phía ta, bắc ở trên). Xoay quanh để thấy nửa kia — phần mô phỏng. Thanh <b>MGN</b> chỉnh độ tương phản như ảnh 4K của NASA Goddard.', 8000);
-        } else ctx.toast('Trở lại Mặt Trời mô phỏng.');
+          ctx.toast(t('<b>Mặt Trời hôm nay</b>: ảnh toàn đĩa thật chiếu lên nửa cầu hướng về Trái Đất lúc chụp (trục quay nghiêng B₀ về phía ta, bắc ở trên). Xoay quanh để thấy nửa kia — phần mô phỏng. Thanh <b>MGN</b> chỉnh độ tương phản như ảnh 4K của NASA Goddard.',
+            '<b>Today\'s Sun</b>: a real full-disc image projected onto the hemisphere that faced Earth when it was taken (rotation axis tilted by B₀ toward us, north up). Orbit around to see the other half — the simulation. The <b>MGN</b> slider sets the contrast, like NASA Goddard\'s 4K images.'), 8000);
+        } else ctx.toast(t('Trở lại Mặt Trời mô phỏng.', 'Back to the simulated Sun.'));
       },
       sdoOn(ctx) {
         sdo.active = true;
@@ -2121,15 +2164,15 @@ const sun = {
         if (erupt && erupt.cur && cam.i !== erupt.i) { const it = findItem(erupt.i, erupt.k); if (it) { setFeatured(it, ctx); return; } }
         // cycle hedgerow → arch → arcade → back to the full disc
         for (let s = cam.step + 1; s <= 3; s++) {
-          if (s === 3) { exitLimb(ctx); ctx.toast('Quay về toàn đĩa.'); return; }
+          if (s === 3) { exitLimb(ctx); ctx.toast(t('Quay về toàn đĩa.', 'Back to the full disc.')); return; }
           const it = biggest(s);
           if (it) { cam.step = s; leaveSdo(ctx); toHalpha(ctx); setFeatured(it, ctx); typeToast(it, ctx); return; }
         }
       },
       erupt(ctx, age = 0, quiet = false) {
-        if (erupt) { if (!quiet) ctx.toast('Một tai lửa đang phun trào — chờ nó rời khỏi Mặt Trời đã.'); return; }
+        if (erupt) { if (!quiet) ctx.toast(t('Một tai lửa đang phun trào — chờ nó rời khỏi Mặt Trời đã.', 'A prominence is already erupting — wait until it has left the Sun.')); return; }
         const it = pickEruptCandidate();
-        if (!it) { if (!quiet) ctx.toast('Không có tai lửa nào đủ lớn ở rìa đĩa lúc này — thử lại sau ít giây.'); return; }
+        if (!it) { if (!quiet) ctx.toast(t('Không có tai lửa nào đủ lớn ở rìa đĩa lúc này — thử lại sau ít giây.', 'No prominence on the limb is big enough right now — try again in a few seconds.')); return; }
         erupt = { i: it.pr.i, k: it.k, age };
         if (cam.mode !== 1 && cam.mode !== 2) cam.step = 0;
         if (!quiet) {
@@ -2137,7 +2180,8 @@ const sun = {
           toHalpha(ctx);
           setFeatured(it, ctx);
           ctx.audio?.tone?.(55, 4, 0.2, 0, 'sawtooth');
-          ctx.toast('<b>Phun trào tai lửa!</b> Dây từ thông xoắn mất cân bằng (<b>bất ổn định xuyến</b>), bung lên, nở ra và tháo xoắn, đạt vận tốc hàng trăm km/s. Nó kéo theo một <b>CME</b> — bong bóng hàng tỷ tấn plasma. Nếu hướng về Trái Đất, CME gây bão địa từ và cực quang (như tháng 5/2024).', 9000);
+          ctx.toast(t('<b>Phun trào tai lửa!</b> Dây từ thông xoắn mất cân bằng (<b>bất ổn định xuyến</b>), bung lên, nở ra và tháo xoắn, đạt vận tốc hàng trăm km/s. Nó kéo theo một <b>CME</b> — bong bóng hàng tỷ tấn plasma. Nếu hướng về Trái Đất, CME gây bão địa từ và cực quang (như tháng 5/2024).',
+            '<b>Prominence eruption!</b> The twisted flux rope loses equilibrium (the <b>torus instability</b>), lifts off, expands and unwinds, reaching hundreds of km/s. It drives a <b>CME</b> — a bubble of billions of tonnes of plasma. Aimed at Earth, a CME causes geomagnetic storms and aurorae (as in May 2024).'), 9000);
         }
       },
       update(dt, ctx) {
@@ -2309,30 +2353,30 @@ const sun = {
         const P = 360 / (SUN_OMEGA_DEG[0] + SUN_OMEGA_DEG[1] * Math.sin(lat) ** 2 + SUN_OMEGA_DEG[2] * Math.sin(lat) ** 4);
         const rate = clk.S * clk.k, rateF = clk.SF * clk.k;
         const rows = [
-          ['Bước sóng', VIEW_NAME[Math.max(0, VIEWS.indexOf(ctx.params.view))]],
-          ['Tua nhanh thời gian', rate <= 0 ? 'tạm dừng' : `1 s = ${fmtSolar(rate)} trên Mặt Trời` +
-            (rateF > 0 && rateF < 0.9 * rate ? ` (hạt đối lưu: ${fmtSolar(rateF)})` : '') + (rateF > 0 ? ` · hạt sống ~${(480 / rateF).toFixed(rateF > 160 ? 1 : 0).replace('.', ',')} s` : '')],
-          ['Số vết đen Wolf (R = 10g + s)', `${10 * g + s} · ${g} nhóm`],
-          ['Tai lửa gần rìa đĩa · sợi tối trên đĩa', `${nVisible} · ${nFil}`],
+          [t('Bước sóng', 'Wavelength'), t(VIEW_NAME, VIEW_NAME_EN)[Math.max(0, VIEWS.indexOf(ctx.params.view))]],
+          [t('Tua nhanh thời gian', 'Time-lapse'), rate <= 0 ? t('tạm dừng', 'paused') : t(`1 s = ${fmtSolar(rate)} trên Mặt Trời`, `1 s = ${fmtSolar(rate)} on the Sun`) +
+            (rateF > 0 && rateF < 0.9 * rate ? t(` (hạt đối lưu: ${fmtSolar(rateF)})`, ` (granules: ${fmtSolar(rateF)})`) : '') + (rateF > 0 ? t(` · hạt sống ~${dec(480 / rateF, rateF > 160 ? 1 : 0)} s`, ` · a granule lives ~${dec(480 / rateF, rateF > 160 ? 1 : 0)} s`) : '')],
+          [t('Số vết đen Wolf (R = 10g + s)', 'Wolf sunspot number (R = 10g + s)'), `${10 * g + s} · ${g} ${t('nhóm', g === 1 ? 'group' : 'groups')}`],
+          [t('Tai lửa gần rìa đĩa · sợi tối trên đĩa', 'Prominences near the limb · filaments on the disc'), `${nVisible} · ${nFil}`],
         ];
         const f = cam.mode === 1 || cam.mode === 2 ? findItem(cam.i, cam.k) : null;
-        if (f && !f.erupting) rows.push(['Đang xem', `${PROM_NAME[f.type]} · dài ${Math.round(2 * f.L * 696)} Mm, cao ${Math.round(f.H * 696)} Mm`]);
+        if (f && !f.erupting) rows.push([t('Đang xem', 'Viewing'), t(`${PROM_NAME[f.type]} · dài ${Math.round(2 * f.L * 696)} Mm, cao ${Math.round(f.H * 696)} Mm`, `${PROM_NAME_EN[f.type]} · ${Math.round(2 * f.L * 696)} Mm long, ${Math.round(f.H * 696)} Mm tall`)]);
         if (erupt && erupt.cur) {
-          rows.push(['Phun trào: độ cao', `${Math.round(erupt.cur.H * 696).toLocaleString('vi-VN')} Mm (${(erupt.cur.H).toFixed(2)} R☉)`]);
-          rows.push(['Phun trào: vận tốc', `~${Math.round(erupt.cur.v * R_SUN_KM / REAL_PER_WALL)} km/s`]);
+          rows.push([t('Phun trào: độ cao', 'Eruption: height'), `${Math.round(erupt.cur.H * 696).toLocaleString(locale())} Mm (${(erupt.cur.H).toFixed(2)} R☉)`]);
+          rows.push([t('Phun trào: vận tốc', 'Eruption: speed'), `~${Math.round(erupt.cur.v * R_SUN_KM / REAL_PER_WALL)} km/s`]);
         }
         if (ctx.params.sdo) {
           const sv = sdoView(ctx.params.view), it = sv && sdo.img[sv], st = sv && sdo.status[sv];
-          if (!sv) rows.push(['Ảnh thật', 'không có ảnh Hα — đang hiện mô phỏng']);
+          if (!sv) rows.push([t('Ảnh thật', 'Real image'), t('không có ảnh Hα — đang hiện mô phỏng', 'no Hα image — showing the simulation')]);
           else if (it) {
             const isSdo = it.inst.startsWith('SDO');
-            rows.push([isSdo ? 'Ảnh SDO' : 'Ảnh thật', `Ảnh ${isSdo ? 'SDO' : it.inst} lúc ${fmtUTC(it.date)} UTC` + (isSdo ? ` · ${it.inst.slice(4)}` : '') + (it.live ? ' · mới nhất' : ' · đi kèm')
-              + (st === 'live-loading' ? ' (đang tải ảnh mới…)' : st === 'live-failed' ? ` (không tải được ảnh mới: ${sdo.err})` : '')]);
-            rows.push(['Nhìn từ Trái Đất', `B₀ = ${sdo.BP.B0 >= 0 ? '+' : ''}${sdo.BP.B0.toFixed(2).replace('.', ',')}° · P = ${sdo.BP.P >= 0 ? '+' : ''}${sdo.BP.P.toFixed(1).replace('.', ',')}° (ảnh đã xoay cho bắc lên trên)`]);
-          } else rows.push(['Ảnh thật', st === 'failed' ? 'không tải được ảnh đi kèm' : 'đang tải…']);
+            rows.push([isSdo ? t('Ảnh SDO', 'SDO image') : t('Ảnh thật', 'Real image'), t(`Ảnh ${isSdo ? 'SDO' : instName(it)} lúc ${fmtUTC(it.date)} UTC`, `${isSdo ? 'SDO' : instName(it)} image from ${fmtUTC(it.date)} UTC`) + (isSdo ? ` · ${it.inst.slice(4)}` : '') + (it.live ? t(' · mới nhất', ' · latest') : t(' · đi kèm', ' · bundled'))
+              + (st === 'live-loading' ? t(' (đang tải ảnh mới…)', ' (loading a newer image…)') : st === 'live-failed' ? t(` (không tải được ảnh mới: ${errText(sdo.err)})`, ` (could not load a newer image: ${errText(sdo.err)})`) : '')]);
+            rows.push([t('Nhìn từ Trái Đất', 'Seen from Earth'), `B₀ = ${sdo.BP.B0 >= 0 ? '+' : ''}${dec(sdo.BP.B0, 2)}° · P = ${sdo.BP.P >= 0 ? '+' : ''}${dec(sdo.BP.P, 1)}°` + t(' (ảnh đã xoay cho bắc lên trên)', ' (image rotated to put north up)')]);
+          } else rows.push([t('Ảnh thật', 'Real image'), st === 'failed' ? t('không tải được ảnh đi kèm', 'could not load the bundled image') : t('đang tải…', 'loading…')]);
           if (qs.has('sdodbg')) for (const k in sdo.img) rows.push(['sdodbg ' + k, `${sdo.img[k].inst} ${Math.round(sdo.img[k].ms)} ms · c=(${sdo.img[k].geo.x.toFixed(4)}, ${sdo.img[k].geo.y.toFixed(4)}) r=${sdo.img[k].geo.z.toFixed(4)} n=${sdo.img[k].geo.w}`]);
         }
-        rows.push([`Chu kỳ quay ở vĩ độ ${Math.abs(lat / D2R).toFixed(0)}°`, `${P.toFixed(1)} ngày`], ...starHud(ctx, 1, 5772, 1));
+        rows.push([t(`Chu kỳ quay ở vĩ độ ${Math.abs(lat / D2R).toFixed(0)}°`, `Rotation period at latitude ${Math.abs(lat / D2R).toFixed(0)}°`), `${P.toFixed(1)} ${t('ngày', 'days')}`], ...starHud(ctx, 1, 5772, 1));
         return rows;
       },
       onClick(info, ctx) {
@@ -2341,8 +2385,10 @@ const sun = {
         const P = 360 / (SUN_OMEGA_DEG[0] + SUN_OMEGA_DEG[1] * Math.sin(lat) ** 2 + SUN_OMEGA_DEG[2] * Math.sin(lat) ** 4);
         let inSpot = false;
         for (const sp of U.uSpot.value) if (sp.w > 0 && q.distanceTo(new THREE.Vector3(sp.x, sp.y, sp.z)) < sp.w) inSpot = true;
-        ctx.toast(`Vĩ độ <b>${(lat / D2R).toFixed(1)}°</b>: quay một vòng mất <b>${P.toFixed(1)} ngày</b> (vận tốc ${(2 * Math.PI * R_SUN_KM * Math.cos(lat) / (P * 86400)).toFixed(2)} km/s).` +
-          (inSpot ? ' Bạn chạm vào một <b>vết đen</b>: từ trường ~0,3 tesla chặn đối lưu, nhiệt độ chỉ ~4 000 K.' : ''));
+        const vRot = (2 * Math.PI * R_SUN_KM * Math.cos(lat) / (P * 86400)).toFixed(2);
+        ctx.toast(t(`Vĩ độ <b>${(lat / D2R).toFixed(1)}°</b>: quay một vòng mất <b>${P.toFixed(1)} ngày</b> (vận tốc ${vRot} km/s).`,
+          `Latitude <b>${(lat / D2R).toFixed(1)}°</b>: one rotation takes <b>${P.toFixed(1)} days</b> (speed ${vRot} km/s).`) +
+          (inSpot ? t(' Bạn chạm vào một <b>vết đen</b>: từ trường ~0,3 tesla chặn đối lưu, nhiệt độ chỉ ~4 000 K.', ' You touched a <b>sunspot</b>: a ~0.3 tesla magnetic field suppresses convection, so it is only ~4,000 K.') : ''));
       },
       exit(ctx) {
         // leave the shared camera controls as we found them
@@ -2383,17 +2429,34 @@ const redDwarf = {
     ['Siêu bùng nổ 3/2016', 'sáng gấp ~68 lần, thấy được bằng mắt thường'],
     ['Hành tinh', 'Proxima b — 11,2 ngày, trong vùng ở được'],
   ],
+  en: {
+    name: 'Red dwarf',
+    subtitle: 'Proxima Centauri · M5.5Ve · flare star',
+    blurb: 'The most common kind of star in the Milky Way. The whole star is convective, churning up a strong magnetic field: <b>starspots</b> cover vast areas, and <b>flares</b> can make the star brighten dozens of times within minutes — a hazard for planets such as Proxima b.',
+    intro: 'Press <b>B</b> to replay the March 2016 superflare, or <b>click</b> the surface to trigger a flare there.',
+    facts: [
+      ['Classification', 'M5.5Ve — red dwarf, flare star (UV Ceti type)'],
+      ['Distance', '4.246 light-years — the nearest star to the Sun'],
+      ['Radius', '0.154 R☉ (~107,000 km, about 1.5 Jupiters)'],
+      ['Mass', '0.122 M☉'],
+      ['Effective temperature', '~3,040 K'],
+      ['Luminosity', '0.0017 L☉ (mostly in the infrared)'],
+      ['Rotation', '~83 days'],
+      ['Superflare of March 2016', '~68 times brighter, visible to the naked eye'],
+      ['Planet', 'Proxima b — 11.2 days, in the habitable zone'],
+    ],
+  },
   unitKm: PROX.R * R_SUN_KM,
   camera: { distance: 3.5, polar: 80, azimuth: 30, min: 1.06, max: 30, fov: 45 },
   exposure: 1.0,
   bloom: 0.35,
   params: [
-    { key: 'spots', label: 'Vết sao', type: 'range', min: 0, max: 1, step: 0.01, default: 0.7, note: 'Vết sao trên sao lùn M lớn và có thể nằm ở mọi vĩ độ, kể cả gần cực.' },
-    { key: 'flareRate', label: 'Tần suất bùng nổ ngẫu nhiên', type: 'range', min: 0, max: 1, step: 0.01, default: 0.4 },
-    { key: 'granulation', label: 'Độ tương phản hạt', type: 'range', min: 0, max: 2, step: 0.01, default: 0.8 },
+    { key: 'spots', label: 'Vết sao', type: 'range', min: 0, max: 1, step: 0.01, default: 0.7, note: 'Vết sao trên sao lùn M lớn và có thể nằm ở mọi vĩ độ, kể cả gần cực.', en: { label: 'Starspots', note: 'Starspots on M dwarfs are large and can lie at any latitude, even near the poles.' } },
+    { key: 'flareRate', label: 'Tần suất bùng nổ ngẫu nhiên', type: 'range', min: 0, max: 1, step: 0.01, default: 0.4, en: { label: 'Random flare rate' } },
+    { key: 'granulation', label: 'Độ tương phản hạt', type: 'range', min: 0, max: 2, step: 0.01, default: 0.8, en: { label: 'Granulation contrast' } },
   ],
   actions: [
-    { label: 'Bùng nổ', key: 'b', title: 'Siêu bùng nổ (như 3/2016)', run: ctx => ctx.scene.__inst?.superflare(ctx) },
+    { label: 'Bùng nổ', key: 'b', title: 'Siêu bùng nổ (như 3/2016)', en: { label: 'Flare', title: 'Superflare (like March 2016)' }, run: ctx => ctx.scene.__inst?.superflare(ctx) },
   ],
   create(ctx) {
     const { U, material } = makeStar(ctx, 1, {
@@ -2424,7 +2487,8 @@ const redDwarf = {
         const w = camDir.clone().add(new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(0.7)).normalize();
         spawn(bodyFromWorld(w, ctx.time.sim), { peak: 1, size: 0.2, T: 9500, tauR: 1.5, tauD: 22, big: true });
         ctx.audio?.tone?.(70, 2.5, 0.25, 0, 'sawtooth');
-        ctx.toast('<b>Siêu bùng nổ!</b> Năng lượng từ trường tích tụ trên vết sao được giải phóng trong vài phút: hai <b>dải sáng</b> ~10 000 K, vòng plasma nóng phía trên, cả ngôi sao trắng lóa. Ngày 18/3/2016 Proxima sáng gấp ~<b>68 lần</b>.', 7000);
+        ctx.toast(t('<b>Siêu bùng nổ!</b> Năng lượng từ trường tích tụ trên vết sao được giải phóng trong vài phút: hai <b>dải sáng</b> ~10 000 K, vòng plasma nóng phía trên, cả ngôi sao trắng lóa. Ngày 18/3/2016 Proxima sáng gấp ~<b>68 lần</b>.',
+          '<b>Superflare!</b> Magnetic energy stored above a starspot is released within minutes: two ~10,000 K <b>flare ribbons</b>, hot plasma loops above them, and the whole star flashes white. On 18 March 2016 Proxima brightened ~<b>68-fold</b>.'), 7000);
       },
       update(dt, ctx) {
         const p = ctx.params, t = ctx.time.sim, sdt = ctx.time.dt;
@@ -2475,8 +2539,8 @@ const redDwarf = {
       },
       hud(ctx) {
         return [
-          ['Độ sáng dải g′ (so với lúc yên tĩnh)', `× ${boostShown.toFixed(boostShown < 10 ? 2 : 0)}`],
-          ['Số vụ bùng nổ đang diễn ra', `${flares.length}`],
+          [t('Độ sáng dải g′ (so với lúc yên tĩnh)', 'g′-band brightness (vs. quiescent)'), `× ${boostShown.toFixed(boostShown < 10 ? 2 : 0)}`],
+          [t('Số vụ bùng nổ đang diễn ra', 'Flares in progress'), `${flares.length}`],
           ...starHud(ctx, PROX.R, PROX.T, PROX.M),
         ];
       },
@@ -2484,7 +2548,8 @@ const redDwarf = {
         const q = hitUnit(info.origin, info.dir); if (!q) return;
         const b = bodyFromWorld(q, ctx.time.sim);
         spawn(b, { peak: 0.9, size: 0.08, T: 9000, tauR: 0.8, tauD: 8 });
-        ctx.toast('Bùng nổ nhỏ: các đường sức từ xoắn lại rồi <b>tái kết nối</b>, đốt nóng plasma lên ~10 000 K. Với sao lùn đỏ, chỉ một vùng nhỏ đã đủ làm cả ngôi sao sáng vọt.');
+        ctx.toast(t('Bùng nổ nhỏ: các đường sức từ xoắn lại rồi <b>tái kết nối</b>, đốt nóng plasma lên ~10 000 K. Với sao lùn đỏ, chỉ một vùng nhỏ đã đủ làm cả ngôi sao sáng vọt.',
+          'A small flare: magnetic field lines twist and then <b>reconnect</b>, heating plasma to ~10,000 K. On a red dwarf even a small region is enough to make the whole star flare up.'));
       },
     };
     return inst;
@@ -2517,18 +2582,35 @@ const betelgeuse = {
     ['Đại suy giảm', 'cấp sao V 0,5 → 1,6 (2/2020)'],
     ['Số phận', 'siêu tân tinh loại II, trong vòng ~100 000 năm'],
   ],
+  en: {
+    name: 'Red supergiant',
+    subtitle: 'Betelgeuse (α Orionis) · M1–2 Ia–ab',
+    blurb: 'Placed where the Sun is, Betelgeuse would swallow the orbit of Mars. Its envelope is so tenuous and its surface gravity so weak that the <b>pressure scale height</b> reaches about a tenth of its radius: just a few <b>giant convection cells</b> cover the whole surface, making the limb lumpy and the brightness vary erratically.',
+    intro: 'Press <b>G</b> to replay the <b>Great Dimming</b> of 2019–2020 — then try flying around behind the star.',
+    facts: [
+      ['Classification', 'M1–M2 Ia–ab — red supergiant'],
+      ['Distance', '~550 light-years (168 pc)'],
+      ['Radius', '~760 R☉ (≈ 3.5 AU)'],
+      ['Mass', '16–19 M☉'],
+      ['Effective temperature', '~3,600 K'],
+      ['Luminosity', '~10⁵ L☉'],
+      ['Angular diameter', '~42 milliarcseconds (measured by interferometry)'],
+      ['Great Dimming', 'V magnitude 0.5 → 1.6 (Feb 2020)'],
+      ['Fate', 'Type II supernova, within ~100,000 years'],
+    ],
+  },
   unitKm: BETEL.R * R_SUN_KM,
   camera: { distance: 3.6, polar: 85, azimuth: 20, min: 1.15, max: 40, fov: 45 },
   exposure: 1.0,
   bloom: 0.3,
   params: [
-    { key: 'cells', label: 'Tương phản tế bào đối lưu', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
-    { key: 'envelope', label: 'Vỏ khí phân tử & bụi', type: 'range', min: 0, max: 2, step: 0.01, default: 1, note: 'Sao siêu khổng lồ đỏ mất ~10⁻⁶ M☉ mỗi năm; khí nguội đi, ngưng tụ thành bụi silicat.' },
-    { key: 'dimming', label: 'Đại suy giảm 2019–20', type: 'toggle', default: false },
-    { key: 'orbits', label: 'Quỹ đạo các hành tinh', type: 'toggle', default: false, note: 'Kích thước Hệ Mặt Trời so với ngôi sao (nét đứt: bị che hoặc nằm bên trong sao).' },
+    { key: 'cells', label: 'Tương phản tế bào đối lưu', type: 'range', min: 0, max: 2, step: 0.01, default: 1, en: { label: 'Convection cell contrast' } },
+    { key: 'envelope', label: 'Vỏ khí phân tử & bụi', type: 'range', min: 0, max: 2, step: 0.01, default: 1, note: 'Sao siêu khổng lồ đỏ mất ~10⁻⁶ M☉ mỗi năm; khí nguội đi, ngưng tụ thành bụi silicat.', en: { label: 'Molecular gas & dust envelope', note: 'A red supergiant loses ~10⁻⁶ M☉ per year; the gas cools and condenses into silicate dust.' } },
+    { key: 'dimming', label: 'Đại suy giảm 2019–20', type: 'toggle', default: false, en: { label: 'Great Dimming 2019–20' } },
+    { key: 'orbits', label: 'Quỹ đạo các hành tinh', type: 'toggle', default: false, note: 'Kích thước Hệ Mặt Trời so với ngôi sao (nét đứt: bị che hoặc nằm bên trong sao).', en: { label: 'Planetary orbits', note: 'The Solar System to scale with the star (dashed: hidden behind or inside the star).' } },
   ],
   actions: [
-    { label: 'Đại suy giảm', key: 'g', title: 'Đám bụi che nửa nam (2019–2020)', run: ctx => { ctx.params.dimming = !ctx.params.dimming; ctx.toast(ctx.params.dimming ? 'Cuối 2019 một <b>bong bóng khí</b> phóng ra rồi nguội, ngưng tụ thành <b>đám bụi</b> che nửa nam ngôi sao; cùng lúc bề mặt có một vùng nguội. Betelgeuse mờ đi ~1,2 cấp sao — không phải dấu hiệu sắp nổ.' : 'Đám bụi tan dần — Betelgeuse sáng trở lại (giữa năm 2020).', 7000); } },
+    { label: 'Đại suy giảm', key: 'g', title: 'Đám bụi che nửa nam (2019–2020)', en: { label: 'Great Dimming', title: 'A dust cloud veils the southern half (2019–2020)' }, run: ctx => { ctx.params.dimming = !ctx.params.dimming; ctx.toast(ctx.params.dimming ? t('Cuối 2019 một <b>bong bóng khí</b> phóng ra rồi nguội, ngưng tụ thành <b>đám bụi</b> che nửa nam ngôi sao; cùng lúc bề mặt có một vùng nguội. Betelgeuse mờ đi ~1,2 cấp sao — không phải dấu hiệu sắp nổ.', 'In late 2019 a <b>gas bubble</b> was ejected, cooled and condensed into a <b>dust cloud</b> that veiled the southern half of the star, while a cool patch formed on the surface. Betelgeuse faded by ~1.2 magnitudes — not a sign that it is about to explode.') : t('Đám bụi tan dần — Betelgeuse sáng trở lại (giữa năm 2020).', 'The dust disperses — Betelgeuse brightens again (mid-2020).'), 7000); } },
   ],
   create(ctx) {
     const { U, material } = makeStar(ctx, 2, {
@@ -2542,10 +2624,11 @@ const betelgeuse = {
     // 1.3 R* in front of the star, offset so that from the default view it projects onto the southern half
     const dustC = earth.clone().multiplyScalar(1.3).add(new THREE.Vector3(0, -0.3, 0)).addScaledVector(new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), earth).normalize(), -0.08);
     U.uDust.value.set(dustC.x, dustC.y, dustC.z, 0.45);
-    const overlay = makeOrbits([['Trái Đất', 1, [0.35, 0.6, 1.0]], ['Sao Hỏa', 1.52, [1.0, 0.45, 0.3]], ['Sao Mộc', 5.2, [1.0, 0.8, 0.5]], ['Sao Thổ', 9.58, [0.95, 0.9, 0.6]]], BETEL.R);
+    const overlay = makeOrbits([[['Trái Đất', 'Earth'], 1, [0.35, 0.6, 1.0]], [['Sao Hỏa', 'Mars'], 1.52, [1.0, 0.45, 0.3]], [['Sao Mộc', 'Jupiter'], 5.2, [1.0, 0.8, 0.5]], [['Sao Thổ', 'Saturn'], 9.58, [0.95, 0.9, 0.6]]], BETEL.R);
     let orbOp = 0;
     return {
       material, overlay,
+      onLang() { overlay.userData.relabel(); },
       update(dt, ctx) {
         const p = ctx.params, t = ctx.time.sim;
         U.uGranT.value = t * 0.05;
@@ -2559,13 +2642,15 @@ const betelgeuse = {
       hud(ctx) {
         const V = 0.5 + 1.1 * U.uDim.value;
         return [
-          ['Cấp sao biểu kiến V (từ Trái Đất)', V.toFixed(2) + (U.uDim.value > 0.5 ? ' — mờ nhất từng ghi nhận' : '')],
+          [t('Cấp sao biểu kiến V (từ Trái Đất)', 'Apparent V magnitude (from Earth)'), V.toFixed(2) + (U.uDim.value > 0.5 ? t(' — mờ nhất từng ghi nhận', ' — the faintest ever recorded') : '')],
           ...starHud(ctx, BETEL.R, BETEL.T, BETEL.M),
         ];
       },
       onClick(info, ctx) {
         const q = hitUnit(info.origin, info.dir); if (!q) return;
-        ctx.toast(`Một tế bào đối lưu ở đây rộng ~${Math.round(0.6 * BETEL.R * R_SUN_KM / 1e6)} triệu km — lớn hơn khoảng cách Mặt Trời–Sao Thủy. Hấp dẫn bề mặt chỉ ~1 cm/s², nên plasma trồi lên rất cao trước khi rơi lại.`);
+        const w = Math.round(0.6 * BETEL.R * R_SUN_KM / 1e6);
+        ctx.toast(t(`Một tế bào đối lưu ở đây rộng ~${w} triệu km — lớn hơn khoảng cách Mặt Trời–Sao Thủy. Hấp dẫn bề mặt chỉ ~1 cm/s², nên plasma trồi lên rất cao trước khi rơi lại.`,
+          `A convection cell here is ~${w} million km across — more than the Sun–Mercury distance. Surface gravity is only ~1 cm/s², so plasma rises very high before falling back.`));
       },
     };
   },
@@ -2595,17 +2680,34 @@ const whiteDwarf = {
     ['Dịch đỏ hấp dẫn', '≈ 80 km/s (Hubble, 2018) — khớp thuyết tương đối rộng'],
     ['Quỹ đạo quanh Sirius A', '50,1 năm, cách 8–31,5 AU'],
   ],
+  en: {
+    name: 'White dwarf',
+    subtitle: 'Sirius B · DA2 · a dead stellar core',
+    blurb: 'The mass of the Sun packed into a sphere smaller than Earth: a teaspoon of its matter weighs several tonnes. With no nuclear fusion left, it holds itself up against gravity by <b>electron degeneracy pressure</b> (the Pauli exclusion principle) and simply cools over billions of years. Its hydrogen atmosphere is only a few tens of metres thick, so the limb is razor-sharp.',
+    intro: 'Earth is placed alongside for scale. Press <b>C</b> to watch the white dwarf <b>cool down</b> over time.',
+    facts: [
+      ['Classification', 'DA2 — white dwarf with a hydrogen atmosphere, C–O core'],
+      ['Distance', '8.6 light-years (companion of Sirius A)'],
+      ['Radius', '0.0084 R☉ ≈ 5,840 km (0.92 Earth)'],
+      ['Mass', '1.02 M☉'],
+      ['Effective temperature', '~25,000 K'],
+      ['Mean density', '~2.4 tonnes/cm³'],
+      ['Surface gravity', 'log g ≈ 8.6 (~400,000 times Earth\'s)'],
+      ['Gravitational redshift', '≈ 80 km/s (Hubble, 2018) — matches general relativity'],
+      ['Orbit around Sirius A', '50.1 years, 8–31.5 AU apart'],
+    ],
+  },
   unitKm: SIRB.R * R_SUN_KM,
   camera: { distance: 4.6, polar: 82, azimuth: 35, min: 1.1, max: 40, fov: 45, target: [0.9, 0, 0] },
   exposure: 1.0,
   bloom: 0.35,
   params: [
-    { key: 'temp', label: 'Nhiệt độ bề mặt', type: 'range', min: 4000, max: 100000, step: 100, default: 25000, fmt: v => Math.round(v).toLocaleString('vi-VN') + ' K', note: 'Mới sinh: > 100 000 K, xanh trắng. Nguội dần qua trắng, vàng, rồi đỏ cam. Phơi sáng giữ cố định.' },
-    { key: 'earth', label: 'Trái Đất để so sánh', type: 'toggle', default: true },
-    { key: 'siriusA', label: 'Sirius A trên bầu trời', type: 'toggle', default: true, note: 'Sao chủ A1V, sáng gấp ~25 lần Mặt Trời, cách ~20 AU.' },
+    { key: 'temp', label: 'Nhiệt độ bề mặt', type: 'range', min: 4000, max: 100000, step: 100, default: 25000, fmt: v => Math.round(v).toLocaleString(locale()) + ' K', note: 'Mới sinh: > 100 000 K, xanh trắng. Nguội dần qua trắng, vàng, rồi đỏ cam. Phơi sáng giữ cố định.', en: { label: 'Surface temperature', note: 'Newborn: > 100,000 K, blue-white. It cools through white and yellow to orange-red. The exposure stays fixed.' } },
+    { key: 'earth', label: 'Trái Đất để so sánh', type: 'toggle', default: true, en: { label: 'Earth for comparison' } },
+    { key: 'siriusA', label: 'Sirius A trên bầu trời', type: 'toggle', default: true, note: 'Sao chủ A1V, sáng gấp ~25 lần Mặt Trời, cách ~20 AU.', en: { label: 'Sirius A in the sky', note: 'The A1V primary, ~25 times as luminous as the Sun, ~20 AU away.' } },
   ],
   actions: [
-    { label: 'Nguội dần', key: 'c', title: 'Cho sao nguội từ 100 000 K xuống 4 000 K', run: ctx => { ctx.scene.__cool = { t0: ctx.time.wall }; ctx.params.temp = 100000; ctx.toast('Sao lùn trắng không có nguồn năng lượng: nó chỉ <b>tỏa nhiệt dư</b>. Càng nguội càng tỏa chậm (L ∝ T⁴) — nên phải mất hàng chục tỷ năm, lâu hơn tuổi vũ trụ, mới thành “sao lùn đen”.', 7000); } },
+    { label: 'Nguội dần', key: 'c', title: 'Cho sao nguội từ 100 000 K xuống 4 000 K', en: { label: 'Cool down', title: 'Cool the star from 100,000 K to 4,000 K' }, run: ctx => { ctx.scene.__cool = { t0: ctx.time.wall }; ctx.params.temp = 100000; ctx.toast(t('Sao lùn trắng không có nguồn năng lượng: nó chỉ <b>tỏa nhiệt dư</b>. Càng nguội càng tỏa chậm (L ∝ T⁴) — nên phải mất hàng chục tỷ năm, lâu hơn tuổi vũ trụ, mới thành “sao lùn đen”.', 'A white dwarf has no energy source: it only <b>radiates its leftover heat</b>. The cooler it gets, the more slowly it loses heat (L ∝ T⁴) — so it takes tens of billions of years, longer than the age of the Universe, to become a “black dwarf”.'), 7000); } },
   ],
   create(ctx) {
     const { U, material } = makeStar(ctx, 3, {
@@ -2636,14 +2738,14 @@ const whiteDwarf = {
         const tc = 8.8e6 * Math.pow(SIRB.M, 5 / 7) * Math.pow(L, -5 / 7);
         const vz = 0.6366 * SIRB.M / SIRB.R;   // GM/(Rc) in km/s
         return [
-          ['Tuổi nguội (định luật Mestel)', tc > 1e9 ? (tc / 1e9).toFixed(1) + ' tỷ năm' : (tc / 1e6).toFixed(tc < 1e7 ? 1 : 0) + ' triệu năm'],
-          ['Dịch đỏ hấp dẫn GM/Rc', `${vz.toFixed(0)} km/s`],
+          [t('Tuổi nguội (định luật Mestel)', 'Cooling age (Mestel\'s law)'), tc > 1e9 ? (tc / 1e9).toFixed(1) + t(' tỷ năm', ' Gyr') : (tc / 1e6).toFixed(tc < 1e7 ? 1 : 0) + t(' triệu năm', ' Myr')],
+          [t('Dịch đỏ hấp dẫn GM/Rc', 'Gravitational redshift GM/Rc'), `${vz.toFixed(0)} km/s`],
           ...starHud(ctx, SIRB.R, T, SIRB.M),
         ];
       },
       onClick(info, ctx) {
         const q = hitUnit(info.origin, info.dir); if (!q) return;
-        ctx.toast('Một mẩu vật chất cỡ hạt đường ở đây nặng ~<b>2–3 kg</b>; trên bề mặt nó nặng như ~<b>1 000 tấn</b> trên Trái Đất. Ánh sáng thoát ra mất ~0,03% năng lượng vì giếng hấp dẫn.');
+        ctx.toast(t('Một mẩu vật chất cỡ hạt đường ở đây nặng ~<b>2–3 kg</b>; trên bề mặt nó nặng như ~<b>1 000 tấn</b> trên Trái Đất. Ánh sáng thoát ra mất ~0,03% năng lượng vì giếng hấp dẫn.', 'A sugar-grain-sized piece of this matter has a mass of ~<b>2–3 kg</b>; on the surface it would weigh as much as ~<b>1,000 tonnes</b> do on Earth. Light climbing out loses ~0.03% of its energy to the gravitational well.'));
       },
     };
   },
@@ -2673,27 +2775,45 @@ const blueSupergiant = {
     ['Gió sao', 'cỡ 10⁻⁷ M☉/năm, vài trăm km/s'],
     ['Tuổi', '~8 triệu năm'],
   ],
+  en: {
+    name: 'Blue supergiant',
+    subtitle: 'Rigel (β Orionis) · B8 Ia · α Cygni variable',
+    blurb: 'Twice as hot as the Sun and ~80 times larger, Rigel shines like <b>120,000 Suns</b>. Radiation pressure on absorption lines drives gas off the surface as a <b>stellar wind</b> of several hundred km/s. The surface has no granulation, but the whole star “rings” in many non-radial pulsation modes.',
+    intro: 'Raise the <b>Pulsation amplitude</b> to see the oscillation modes on the surface; turn on <b>Planetary orbits</b> to compare with the Solar System.',
+    facts: [
+      ['Classification', 'B8 Ia — blue-white supergiant'],
+      ['Distance', '~860 light-years'],
+      ['Radius', '~79 R☉ (0.37 AU)'],
+      ['Mass', '~21 M☉'],
+      ['Effective temperature', '~12,100 K'],
+      ['Luminosity', '~120,000 L☉'],
+      ['Variability', 'α Cygni type, magnitude 0.05–0.18, periods of 1–75 days'],
+      ['Stellar wind', '~10⁻⁷ M☉/yr, several hundred km/s'],
+      ['Age', '~8 million years'],
+    ],
+  },
   unitKm: RIGEL.R * R_SUN_KM,
   camera: { distance: 3.6, polar: 84, azimuth: 25, min: 1.1, max: 40, fov: 45 },
   exposure: 1.0,
   bloom: 0.4,
   params: [
-    { key: 'wind', label: 'Gió sao', type: 'range', min: 0, max: 2, step: 0.01, default: 1, note: 'Tán xạ electron ánh sáng sao (∝ ρ) và phát xạ H-alpha (∝ ρ²) trong gió.' },
-    { key: 'pulse', label: 'Biên độ dao động', type: 'range', min: 0, max: 6, step: 0.1, default: 1, fmt: v => '×' + v.toFixed(1), note: '×1 ≈ thực tế (nhiệt độ dao động ~1–3%, độ sáng ~0,1 cấp sao); tăng lên để phóng đại.' },
-    { key: 'orbits', label: 'Quỹ đạo các hành tinh', type: 'toggle', default: false, note: 'Sao Thủy sẽ lướt sát bề mặt Rigel.' },
+    { key: 'wind', label: 'Gió sao', type: 'range', min: 0, max: 2, step: 0.01, default: 1, note: 'Tán xạ electron ánh sáng sao (∝ ρ) và phát xạ H-alpha (∝ ρ²) trong gió.', en: { label: 'Stellar wind', note: 'Electron scattering of starlight (∝ ρ) and H-alpha emission (∝ ρ²) in the wind.' } },
+    { key: 'pulse', label: 'Biên độ dao động', type: 'range', min: 0, max: 6, step: 0.1, default: 1, fmt: v => '×' + v.toFixed(1), note: '×1 ≈ thực tế (nhiệt độ dao động ~1–3%, độ sáng ~0,1 cấp sao); tăng lên để phóng đại.', en: { label: 'Pulsation amplitude', note: '×1 ≈ realistic (temperature varies by ~1–3%, brightness by ~0.1 mag); raise it to exaggerate.' } },
+    { key: 'orbits', label: 'Quỹ đạo các hành tinh', type: 'toggle', default: false, note: 'Sao Thủy sẽ lướt sát bề mặt Rigel.', en: { label: 'Planetary orbits', note: 'Mercury would skim Rigel\'s surface.' } },
   ],
   actions: [
-    { label: 'Phóng đại dao động', key: 'p', run: ctx => { ctx.params.pulse = ctx.params.pulse > 2 ? 1 : 5; ctx.toast(ctx.params.pulse > 2 ? 'Dao động phóng đại ×5: các vùng nóng/lạnh xen kẽ là <b>mode phi xuyên tâm</b> (l = 2, 3) chạy quanh sao.' : 'Biên độ thực tế: dao động chỉ làm Rigel thay đổi ~0,1 cấp sao.'); } },
+    { label: 'Phóng đại dao động', key: 'p', en: { label: 'Exaggerate pulsations' }, run: ctx => { ctx.params.pulse = ctx.params.pulse > 2 ? 1 : 5; ctx.toast(ctx.params.pulse > 2 ? t('Dao động phóng đại ×5: các vùng nóng/lạnh xen kẽ là <b>mode phi xuyên tâm</b> (l = 2, 3) chạy quanh sao.', 'Pulsations exaggerated ×5: the alternating hot and cool patches are <b>non-radial modes</b> (l = 2, 3) travelling around the star.') : t('Biên độ thực tế: dao động chỉ làm Rigel thay đổi ~0,1 cấp sao.', 'Realistic amplitude: the pulsations change Rigel\'s brightness by only ~0.1 magnitude.')); } },
   ],
   create(ctx) {
     const { U, material } = makeStar(ctx, 4, {
       T: RIGEL.T, Iexp: 3, bright: 0.36, stretch: 2.2, sky: 0.4,
       ldA: [0.24, 0.28, 0.33], ldB: [0.16, 0.16, 0.15],
     });
-    const overlay = makeOrbits([['Sao Thủy', 0.387, [0.8, 0.75, 0.7]], ['Sao Kim', 0.723, [1.0, 0.85, 0.55]], ['Trái Đất', 1, [0.35, 0.6, 1.0]]], RIGEL.R);
+    const overlay = makeOrbits([[['Sao Thủy', 'Mercury'], 0.387, [0.8, 0.75, 0.7]], [['Sao Kim', 'Venus'], 0.723, [1.0, 0.85, 0.55]], [['Trái Đất', 'Earth'], 1, [0.35, 0.6, 1.0]]], RIGEL.R);
     let orbOp = 0;
     return {
       material, overlay,
+      onLang() { overlay.userData.relabel(); },
       update(dt, ctx) {
         const p = ctx.params, t = ctx.time.sim;
         U.uGranT.value = t * 0.1;
@@ -2705,7 +2825,7 @@ const blueSupergiant = {
       },
       hud(ctx) {
         const dm = 0.07 * Math.min(ctx.params.pulse, 6) * Math.sin(ctx.time.sim * 0.09);
-        return [['Cấp sao V (dao động)', (0.12 + dm * 0.6).toFixed(2)], ...starHud(ctx, RIGEL.R, RIGEL.T, RIGEL.M)];
+        return [[t('Cấp sao V (dao động)', 'V magnitude (pulsating)'), (0.12 + dm * 0.6).toFixed(2)], ...starHud(ctx, RIGEL.R, RIGEL.T, RIGEL.M)];
       },
     };
   },
@@ -2736,17 +2856,34 @@ const wolfRayet = {
     ['Vận tốc riêng', '~180 km/s — một ngôi sao “chạy trốn”'],
     ['Số phận', 'siêu tân tinh loại Ib/c, hoặc sụp thẳng thành hố đen'],
   ],
+  en: {
+    name: 'Wolf–Rayet star',
+    subtitle: 'WR 124 · WN8h · nebula M1-67',
+    blurb: 'A ~30 M☉ star near the end of its life that has blown away its hydrogen envelope: a stellar wind of ~10⁻⁵ M☉ per year at ~700 km/s lays bare a ~45,000 K core. Gas ejected earlier has broken up into thousands of <b>gas-and-dust clumps</b> with outward-pointing tails, ionised by the star\'s ultraviolet light and glowing pinkish-red in H-alpha.',
+    intro: 'Switch <b>Wavelength</b> to infrared (key <b>W</b>) to see the nebula as the James Webb Space Telescope saw it (2023) — complete with its characteristic six-pointed diffraction spikes.',
+    facts: [
+      ['Classification', 'WN8h — nitrogen-rich Wolf–Rayet star'],
+      ['Distance', '~15,000 light-years (in Sagitta)'],
+      ['Mass', '~30 M☉'],
+      ['Temperature', '~45,000 K'],
+      ['Stellar wind', '~700 km/s, ~10⁻⁵ M☉/yr'],
+      ['Nebula M1-67', '~8 light-years across, expanding at ~46 km/s'],
+      ['Mass ejected', '~10 M☉ (JWST, 2023)'],
+      ['Peculiar velocity', '~180 km/s — a “runaway” star'],
+      ['Fate', 'Type Ib/c supernova, or direct collapse to a black hole'],
+    ],
+  },
   unitKm: LY_KM,
   camera: { distance: 13, polar: 80, azimuth: 30, min: 1.5, max: 40, fov: 45 },
   exposure: 1.0,
   bloom: 0.6,
   params: [
-    { key: 'band', label: 'Bước sóng', type: 'seg', options: [['ha', 'H-alpha (Hubble)'], ['ir', 'Hồng ngoại (JWST)']], default: 'ha', note: 'H-alpha: khí hydro ion hóa. Hồng ngoại: bụi ấm tự phát nhiệt (màu giả).' },
-    { key: 'nebula', label: 'Độ sáng tinh vân', type: 'range', min: 0, max: 2, step: 0.01, default: 1 },
-    { key: 'knots', label: 'Độ vón cục', type: 'range', min: 0, max: 1, step: 0.01, default: 0.8, note: 'Bất ổn định Rayleigh–Taylor: gió nhanh đẩy vào lớp vỏ chậm và xé nó thành các cục khí.' },
+    { key: 'band', label: 'Bước sóng', type: 'seg', options: [['ha', 'H-alpha (Hubble)'], ['ir', 'Hồng ngoại (JWST)']], default: 'ha', note: 'H-alpha: khí hydro ion hóa. Hồng ngoại: bụi ấm tự phát nhiệt (màu giả).', en: { label: 'Wavelength', options: ['H-alpha (Hubble)', 'Infrared (JWST)'], note: 'H-alpha: ionised hydrogen. Infrared: warm dust glowing thermally (false colour).' } },
+    { key: 'nebula', label: 'Độ sáng tinh vân', type: 'range', min: 0, max: 2, step: 0.01, default: 1, en: { label: 'Nebula brightness' } },
+    { key: 'knots', label: 'Độ vón cục', type: 'range', min: 0, max: 1, step: 0.01, default: 0.8, note: 'Bất ổn định Rayleigh–Taylor: gió nhanh đẩy vào lớp vỏ chậm và xé nó thành các cục khí.', en: { label: 'Clumpiness', note: 'Rayleigh–Taylor instability: the fast wind ploughs into the slower shell and tears it into clumps of gas.' } },
   ],
   actions: [
-    { label: 'Đổi bước sóng', key: 'w', run: ctx => { ctx.params.band = ctx.params.band === 'ir' ? 'ha' : 'ir'; ctx.toast(ctx.params.band === 'ir' ? 'Hồng ngoại: <b>bụi</b> ấm phát sáng; các gai sáu cánh là nhiễu xạ của gương lục giác JWST, không phải của ngôi sao.' : 'H-alpha: hydro bị ion hóa rồi tái hợp, phát ánh sáng đỏ 656 nm.'); } },
+    { label: 'Đổi bước sóng', key: 'w', en: { label: 'Switch wavelength' }, run: ctx => { ctx.params.band = ctx.params.band === 'ir' ? 'ha' : 'ir'; ctx.toast(ctx.params.band === 'ir' ? t('Hồng ngoại: <b>bụi</b> ấm phát sáng; các gai sáu cánh là nhiễu xạ của gương lục giác JWST, không phải của ngôi sao.', 'Infrared: warm <b>dust</b> glows; the six-pointed spikes are diffraction from JWST\'s hexagonal mirror segments, not a feature of the star.') : t('H-alpha: hydro bị ion hóa rồi tái hợp, phát ánh sáng đỏ 656 nm.', 'H-alpha: ionised hydrogen recombines and emits red light at 656 nm.')); } },
   ],
   create(ctx) {
     const { U, material } = makeStar(ctx, 5, { T: 45000, bright: 1, sky: 0.6, ldA: [0, 0, 0], ldB: [0, 0, 0] });
@@ -2760,9 +2897,9 @@ const wolfRayet = {
       hud(ctx) {
         const age = 3.4 * LY_KM / 46 / 3.156e7;   // shell radius / expansion speed, years
         return [
-          ['Tuổi động học (R / v)', `~${(Math.round(age / 1000) * 1000).toLocaleString('vi-VN')} năm`],
-          ['Ánh sáng sao tới vỏ tinh vân', '~3,4 năm'],
-          ['Công suất', '~2×10⁵ L☉ (chủ yếu tử ngoại)'],
+          [t('Tuổi động học (R / v)', 'Kinematic age (R / v)'), `~${(Math.round(age / 1000) * 1000).toLocaleString(locale())} ${t('năm', 'years')}`],
+          [t('Ánh sáng sao tới vỏ tinh vân', 'Starlight travel time to the shell'), t('~3,4 năm', '~3.4 years')],
+          [t('Công suất', 'Luminosity'), t('~2×10⁵ L☉ (chủ yếu tử ngoại)', '~2×10⁵ L☉ (mostly ultraviolet)')],
         ];
       },
     };

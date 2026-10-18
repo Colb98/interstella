@@ -22,6 +22,7 @@
 // (display = aces(c · exposure)^(1/2.2)), so the projected radiance displays as the original image.
 import * as THREE from 'three';
 import { COMMON_GLSL, FULLSCREEN_VERT } from '../../glsl/common.js';
+import { t, dec, locale } from '../../i18n.js';
 
 const ASSET = f => new URL(`../../../assets/ring/${f}`, import.meta.url).href;
 const DIST_LY = 2570;                                  // Gaia DR3 parallax distance (≈ 790 pc)
@@ -463,7 +464,7 @@ function loadTex(url, mip = true) {
     t.minFilter = mip ? THREE.LinearMipmapLinearFilter : THREE.LinearFilter; t.magFilter = THREE.LinearFilter;
     t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; t.anisotropy = 4;
     res(t);
-  }, undefined, () => rej(new Error('không tải được ' + url))));
+  }, undefined, () => rej(new Error(t('không tải được ', 'could not load ') + url))));
   return attempt().catch(() => attempt());
 }
 
@@ -495,8 +496,8 @@ function makeFlyer() {
   };
 }
 
-const vi = (x, d = 1) => x.toFixed(d).replace('.', ',');
-const ly = (x, d = 1) => vi(x, d) + ' năm ánh sáng';
+const vi = (x, d = 1) => dec(x, d);
+const ly = (x, d = 1) => vi(x, d) + t(' năm ánh sáng', ' light-years');
 const qualSteps = q => (q.steps <= 200 ? [40, 8] : q.steps <= 320 ? [52, 10] : q.steps <= 480 ? [68, 12] : [88, 14]);
 
 // ------------------------------------------------------------------------------------------
@@ -519,31 +520,56 @@ const ring = {
     ['Cung đồng tâm', '~10 cung, cách nhau ≈ 1,5″ ↔ sao đồng hành chu kỳ ≈ 280 năm'],
     ['Ảnh gốc (CC BY 4.0)', 'Hubble: NASA, ESA, C. R. O’Dell · JWST: ESA/Webb, NASA, CSA, M. Barlow, N. Cox, R. Wesson · LBT: D. Thompson'],
   ],
+  en: {
+    name: 'Ring Nebula',
+    subtitle: 'Planetary nebula M57 (NGC 6720) · 3D rebuilt from Hubble & JWST images',
+    blurb: 'A Sun-like star at the end of its life blew off its outer layers; the exposed core became a ~120,000 K white dwarf whose UV light ionizes the shell. The shell is shaped like a <b>barrel</b> that we see almost end-on, so it looks like a ring. The ions are <b>stratified</b> by energy: He II and [O III] (blue-green) inside, Hα and [N II] (red) at the outer edge, home to ~20,000 dense <b>knots</b>. Here the real Hubble and JWST images are spread out in depth with a 3D model of the shell.',
+    intro: 'This is exactly the <b>Hubble</b>/<b>JWST</b> image, seen along the axis. Press <b>V</b> to turn it side-on — the ring is really a hollow barrel — or <b>N</b> to fly in close to the gas knots.',
+    facts: [
+      ['Distance', '≈ 2,570 light-years (Gaia)'], ['Constellation', 'Lyra'],
+      ['Main ring', '≈ 1.3 × 1.0 light-years (≈ 100″ × 80″)'], ['Outer halo', '≈ 2.9 light-years (radius ≈ 115″)'],
+      ['Central star', 'white dwarf ≈ 120,000 – 135,000 K, ≈ 300 L☉'], ['Expansion speed', '≈ 20 – 35 km/s'],
+      ['Age', '≈ 4,000 years'], ['Gas knots (JWST)', '≈ 20,000 · diameter ≈ 0.2″ (150 AU)'],
+      ['Concentric arcs', '~10 arcs, ≈ 1.5″ apart ↔ a companion star with a ≈ 280-year period'],
+      ['Source images (CC BY 4.0)', 'Hubble: NASA, ESA, C. R. O’Dell · JWST: ESA/Webb, NASA, CSA, M. Barlow, N. Cox, R. Wesson · LBT: D. Thompson'],
+    ],
+  },
   camera: { distance: D0, polar: 90, azimuth: 0, min: 0.25, max: 40, fov: FOV0, target: [0, 0, 0] },
   exposure: EXPO,
   bloom: 0.22,
   params: [
     { key: 'palette', label: 'Ảnh nguồn', type: 'seg', options: [[0, 'Hubble 2013'], [1, 'JWST NIRCam'], [2, 'JWST MIRI']], default: 0,
-      note: 'Màu là màu gán cho từng bộ lọc trong ảnh công bố. Hubble: He II → lam, [O III] → lục, [N II]/Hα → đỏ. NIRCam: H₂, PAH 3,3 µm. MIRI: bụi nóng, [O IV] 25,9 µm.' },
+      note: 'Màu là màu gán cho từng bộ lọc trong ảnh công bố. Hubble: He II → lam, [O III] → lục, [N II]/Hα → đỏ. NIRCam: H₂, PAH 3,3 µm. MIRI: bụi nóng, [O IV] 25,9 µm.',
+      en: { label: 'Source image', note: 'Colours are the ones assigned to each filter in the published images. Hubble: He II → blue, [O III] → green, [N II]/Hα → red. NIRCam: H₂, PAH 3.3 µm. MIRI: hot dust, [O IV] 25.9 µm.', options: ['Hubble 2013', 'JWST NIRCam', 'JWST MIRI'] } },
     { key: 'elong', label: 'Độ dài theo trục', type: 'range', min: 0.6, max: 2.6, step: 0.01, default: 1.6, fmt: v => '×' + vi(v, 2),
-      note: 'Từ Trái Đất không đo được chiều sâu: mọi giá trị đều cho cùng một tấm ảnh khi nhìn dọc trục. Phổ vận tốc (O’Dell 2013) cho thấy trục cực dài hơn vòng xích đạo.' },
+      note: 'Từ Trái Đất không đo được chiều sâu: mọi giá trị đều cho cùng một tấm ảnh khi nhìn dọc trục. Phổ vận tốc (O’Dell 2013) cho thấy trục cực dài hơn vòng xích đạo.',
+      en: { label: 'Length along the axis', note: 'Depth can’t be measured from Earth: every value gives the same image when seen along the axis. Velocity spectra (O’Dell 2013) show the polar axis is longer than the equatorial ring.' } },
     { key: 'thick', label: 'Độ dày vỏ', type: 'range', min: 0.5, max: 2, step: 0.01, default: 1, fmt: v => '×' + vi(v, 2),
-      note: 'Độ dày các tầng ion hóa — chỉ thấy khác khi nhìn nghiêng.' },
+      note: 'Độ dày các tầng ion hóa — chỉ thấy khác khi nhìn nghiêng.',
+      en: { label: 'Shell thickness', note: 'Thickness of the ionization layers — only visible when seen at an angle.' } },
     { key: 'knots', label: 'Nút khí', type: 'range', min: 0, max: 1, step: 0.01, default: 0.6, fmt: v => Math.round(v * 100) + '%',
-      note: 'Khối khí trung hòa đặc ở mặt ion hóa: đầu tối, viền sáng hướng về sao, đuôi bóng hướng ra ngoài. Hiện khi đủ gần.' },
-    { key: 'age', label: 'Tuổi (giãn nở)', type: 'range', min: 1500, max: 8000, step: 50, default: 4000, fmt: v => Math.round(v).toLocaleString('vi-VN') + ' năm',
-      note: 'Vỏ nở đồng dạng; mật độ giảm nên độ sáng bề mặt giảm, sau ~20 000 năm tinh vân tan vào môi trường liên sao.' },
+      note: 'Khối khí trung hòa đặc ở mặt ion hóa: đầu tối, viền sáng hướng về sao, đuôi bóng hướng ra ngoài. Hiện khi đủ gần.',
+      en: { label: 'Gas knots', note: 'Dense neutral clumps at the ionization front: dark heads, bright rims facing the star, shadow tails pointing outward. Visible when close enough.' } },
+    { key: 'age', label: 'Tuổi (giãn nở)', type: 'range', min: 1500, max: 8000, step: 50, default: 4000, fmt: v => Math.round(v).toLocaleString(locale()) + t(' năm', ' years'),
+      note: 'Vỏ nở đồng dạng; mật độ giảm nên độ sáng bề mặt giảm, sau ~20 000 năm tinh vân tan vào môi trường liên sao.',
+      en: { label: 'Age (expansion)', note: 'The shell expands self-similarly; as its density drops so does its surface brightness, and after ~20,000 years the nebula dissolves into the interstellar medium.' } },
   ],
   actions: [
-    { label: 'Nhìn dọc trục', key: 'r', title: 'Hướng nhìn từ Trái Đất: chiếc nhẫn', run: ctx => ring._fly?.(ctx, 0) },
-    { label: 'Nhìn ngang', key: 'v', title: 'Nhìn vuông góc trục: cái thùng', run: ctx => ring._fly?.(ctx, 1) },
-    { label: 'Cận cảnh nút khí', key: 'n', title: 'Bay sát mép trong của vòng', run: ctx => ring._fly?.(ctx, 2) },
+    { label: 'Nhìn dọc trục', key: 'r', title: 'Hướng nhìn từ Trái Đất: chiếc nhẫn', run: ctx => ring._fly?.(ctx, 0),
+      en: { label: 'Along the axis', title: 'The view from Earth: a ring' } },
+    { label: 'Nhìn ngang', key: 'v', title: 'Nhìn vuông góc trục: cái thùng', run: ctx => ring._fly?.(ctx, 1),
+      en: { label: 'Side view', title: 'Seen perpendicular to the axis: a barrel' } },
+    { label: 'Cận cảnh nút khí', key: 'n', title: 'Bay sát mép trong của vòng', run: ctx => ring._fly?.(ctx, 2),
+      en: { label: 'Knot close-up', title: 'Fly in close to the inner edge of the ring' } },
     { label: 'Đổi ảnh', key: 'p', title: 'Hubble → NIRCam → MIRI', run: ctx => {
       ctx.params.palette = (ctx.params.palette + 1) % 3;
-      ctx.toast(['<b>Hubble 2013</b> (ánh sáng khả kiến): lõi lam-lục là He II và [O III]; vòng đỏ-cam là [N II] và Hα; chấm tối là nút khí.',
-        '<b>JWST NIRCam</b> (1,6 – 3,4 µm): nút khí sáng vì H₂; viền đỏ ngoài cùng là PAH; các “gai” toả ra trong quầng.',
-        '<b>JWST MIRI</b> (5,6 – 25,5 µm): lõi đỏ-cam là bụi nóng và [O IV]; quầng xanh là PAH và H₂ — lộ rõ các cung đồng tâm.'][ctx.params.palette]);
-    } },
+      ctx.toast([t('<b>Hubble 2013</b> (ánh sáng khả kiến): lõi lam-lục là He II và [O III]; vòng đỏ-cam là [N II] và Hα; chấm tối là nút khí.',
+          '<b>Hubble 2013</b> (visible light): the blue-green core is He II and [O III]; the red-orange ring is [N II] and Hα; the dark specks are gas knots.'),
+        t('<b>JWST NIRCam</b> (1,6 – 3,4 µm): nút khí sáng vì H₂; viền đỏ ngoài cùng là PAH; các “gai” toả ra trong quầng.',
+          '<b>JWST NIRCam</b> (1.6 – 3.4 µm): the knots glow in H₂; the outermost red rim is PAH; “spikes” radiate through the halo.'),
+        t('<b>JWST MIRI</b> (5,6 – 25,5 µm): lõi đỏ-cam là bụi nóng và [O IV]; quầng xanh là PAH và H₂ — lộ rõ các cung đồng tâm.',
+          '<b>JWST MIRI</b> (5.6 – 25.5 µm): the red-orange core is hot dust and [O IV]; the green halo is PAH and H₂ — the concentric arcs stand out clearly.')][ctx.params.palette]);
+    }, en: { label: 'Switch image' } },
   ],
   create(ctx) {
     const [nin, nout] = qualSteps(ctx.quality);
@@ -665,12 +691,12 @@ const ring = {
     const flyer = makeFlyer();
     ring._fly = (c, mode) => {
       const d = c.camera.position.distanceTo(c.controls.target);
-      if (mode === 0) { flyer.to(c, Math.max(d, 4), 90, 0, new THREE.Vector3()); c.toast('Nhìn dọc trục — đúng hướng ta thấy từ Trái Đất: thành thùng chồng lên nhau theo đường nhìn → một chiếc nhẫn.'); }
-      else if (mode === 1) { flyer.to(c, Math.max(d, 7), 90, 90, new THREE.Vector3()); c.toast('Nhìn ngang trục: hai bức tường sáng của “cái thùng”; hai đầu mỏng và lam vì chứa khí bị ion hóa cao (He II).'); }
+      if (mode === 0) { flyer.to(c, Math.max(d, 4), 90, 0, new THREE.Vector3()); c.toast(t('Nhìn dọc trục — đúng hướng ta thấy từ Trái Đất: thành thùng chồng lên nhau theo đường nhìn → một chiếc nhẫn.', 'Looking along the axis — just as we see it from Earth: the barrel walls stack up along the line of sight → a ring.')); }
+      else if (mode === 1) { flyer.to(c, Math.max(d, 7), 90, 90, new THREE.Vector3()); c.toast(t('Nhìn ngang trục: hai bức tường sáng của “cái thùng”; hai đầu mỏng và lam vì chứa khí bị ion hóa cao (He II).', 'Side-on: the two bright walls of the “barrel”; the ends are thin and blue because they hold highly ionized gas (He II).')); }
       else {
         const sc = c.params.age / 4000, R = 31 * AS * sc;
         flyer.to(c, 0.55 * sc, 72, 18, new THREE.Vector3(-R * 0.93, R * 0.36, 0), 3.2);
-        c.toast('Mép trong của vòng: các nút khí đặc có đầu tối, viền sáng phía sao lùn trắng và đuôi bóng tối hướng ra ngoài.');
+        c.toast(t('Mép trong của vòng: các nút khí đặc có đầu tối, viền sáng phía sao lùn trắng và đuôi bóng tối hướng ra ngoài.', 'Inner edge of the ring: dense gas knots with dark heads, bright rims facing the white dwarf and dark shadow tails pointing outward.'));
       }
     };
 
@@ -710,12 +736,12 @@ const ring = {
         const R = 33 * AS * sc, v = R * 9.461e12 / (p.age * 3.156e7);
         const pal = PALETTES[curPal < 0 ? 0 : curPal];
         return [
-          ['Camera cách sao lùn trắng', ly(d, 2)],
-          ['Góc giữa đường nhìn và trục', ang.toFixed(0) + '° ' + (ang < 25 ? '(thấy nhẫn)' : ang > 60 ? '(thấy thùng)' : '')],
-          ['Bán kính vòng sáng', ly(R, 2) + ' (' + Math.round(33 * sc) + '″)'],
-          ['Tốc độ giãn nở trung bình', '≈ ' + Math.round(v) + ' km/s'],
-          ['Ảnh ' + pal.name, pal.filters],
-          ['Nguồn ảnh', pal.credit],
+          [t('Camera cách sao lùn trắng', 'Camera to white dwarf'), ly(d, 2)],
+          [t('Góc giữa đường nhìn và trục', 'Angle between sightline and axis'), ang.toFixed(0) + '° ' + (ang < 25 ? t('(thấy nhẫn)', '(ring)') : ang > 60 ? t('(thấy thùng)', '(barrel)') : '')],
+          [t('Bán kính vòng sáng', 'Bright ring radius'), ly(R, 2) + ' (' + Math.round(33 * sc) + '″)'],
+          [t('Tốc độ giãn nở trung bình', 'Mean expansion speed'), '≈ ' + Math.round(v) + ' km/s'],
+          [t('Ảnh ', 'Image ') + pal.name, pal.filters],
+          [t('Nguồn ảnh', 'Image credit'), pal.credit],
         ];
       },
     };

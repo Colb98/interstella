@@ -9,6 +9,7 @@
 //  interstellar-object 1 unit = 100 m. 'Oumuamua as a tumbling cigar or pancake with a live light curve.
 import * as THREE from 'three';
 import { COMMON_GLSL, FULLSCREEN_VERT } from '../glsl/common.js';
+import { t, t as tt } from '../i18n.js';  // tt: for scopes where a local `t` shadows t()
 
 const HELPERS = /* glsl */`
 float smin(float a, float b, float k){ float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0); return mix(b, a, h) - k * h * (1.0 - h); }
@@ -426,6 +427,20 @@ const comet = {
     ['Đuôi bụi Hale–Bopp', '≈ 4×10⁷ km'],
     ['Rosetta', 'quay quanh 67P 2014–2016; Philae đáp ngày 12/11/2014'],
   ],
+  en: {
+    name: 'Comet',
+    subtitle: 'Dirty-ice nucleus · coma · ion and dust tails',
+    blurb: 'A dirty ice ball a few km across, darker than charcoal (albedo ~4%). Near the Sun its ice sublimates into a coma hundreds of thousands of km wide and two tails: a blue <b>ion tail</b> blown straight away from the Sun by the solar wind, and a pale yellow <b>dust tail</b> gently pushed by radiation pressure, so it curves and lags behind along the orbit.',
+    intro: 'The two tails do <b>not</b> simply trail behind the motion: the blue ion tail always points straight away from the Sun (☀ is on the right), while the dust tail curves back along the path already travelled. Drag <b>Distance from the Sun</b> out to 3–4 AU to watch the comet “switch off”, then pick the <b>Nucleus</b> view.',
+    facts: [
+      ['67P nucleus', '4.1 × 3.3 × 1.8 km (large lobe), two lobes'],
+      ['67P albedo', '0.06 (geometric)'],
+      ['67P rotation period', '12.4 h'],
+      ['Halley nucleus', '15 × 8 × 8 km, orbital period 76 years'],
+      ['Hale–Bopp dust tail', '≈ 4×10⁷ km'],
+      ['Rosetta', 'orbited 67P 2014–2016; Philae landed on 12 November 2014'],
+    ],
+  },
   unitKm: 1e4,
   camera: {
     get distance() { const p = cometParams; return cometViewDist(COMET_VIEW[p?.view || 'all'], p?.preset || '67p'); },
@@ -437,15 +452,20 @@ const comet = {
   exposure: 1.0,
   bloom: 0.7,
   params: [
-    { key: 'r', label: 'Khoảng cách tới Mặt Trời', type: 'range', min: 0.3, max: 5, step: 0.01, default: 0.9, fmt: v => v.toFixed(2) + ' AU', note: 'Băng nước chỉ thăng hoa mạnh trong khoảng ~3 AU; ngoài đó sao chổi gần như ngủ yên.' },
-    { key: 'psi', label: 'Hướng bay so với Mặt Trời', type: 'range', min: 0, max: 180, step: 1, default: 105, fmt: v => v.toFixed(0) + '°', note: '0° = lao thẳng vào Mặt Trời, 90° = tại điểm cận nhật, 180° = bay ra xa. Thành phần ngang càng lớn, đuôi bụi càng cong.' },
-    { key: 'preset', label: 'Sao chổi', type: 'seg', options: [['67p', '67P'], ['halley', 'Halley'], ['halebopp', 'Hale–Bopp']], default: 'halley', note: 'Hạt nhân lớn hơn ⇒ diện tích hoạt động lớn hơn ⇒ đầu và đuôi sáng hơn.' },
-    { key: 'view', label: 'Khung nhìn', type: 'seg', options: [['all', 'Toàn cảnh'], ['head', 'Đầu'], ['nucleus', 'Hạt nhân']], default: 'all' },
-    { key: 'ion', label: 'Đuôi ion', type: 'toggle', default: true },
+    { key: 'r', label: 'Khoảng cách tới Mặt Trời', type: 'range', min: 0.3, max: 5, step: 0.01, default: 0.9, fmt: v => v.toFixed(2) + ' AU', note: 'Băng nước chỉ thăng hoa mạnh trong khoảng ~3 AU; ngoài đó sao chổi gần như ngủ yên.',
+      en: { label: 'Distance from the Sun', note: 'Water ice only sublimates strongly within ~3 AU; beyond that the comet is almost dormant.' } },
+    { key: 'psi', label: 'Hướng bay so với Mặt Trời', type: 'range', min: 0, max: 180, step: 1, default: 105, fmt: v => v.toFixed(0) + '°', note: '0° = lao thẳng vào Mặt Trời, 90° = tại điểm cận nhật, 180° = bay ra xa. Thành phần ngang càng lớn, đuôi bụi càng cong.',
+      en: { label: 'Direction of travel relative to the Sun', note: '0° = plunging straight toward the Sun, 90° = at perihelion, 180° = heading away. The larger the sideways component, the more the dust tail curves.' } },
+    { key: 'preset', label: 'Sao chổi', type: 'seg', options: [['67p', '67P'], ['halley', 'Halley'], ['halebopp', 'Hale–Bopp']], default: 'halley', note: 'Hạt nhân lớn hơn ⇒ diện tích hoạt động lớn hơn ⇒ đầu và đuôi sáng hơn.',
+      en: { label: 'Comet', options: ['67P', 'Halley', 'Hale–Bopp'], note: 'A bigger nucleus ⇒ more active area ⇒ a brighter coma and tails.' } },
+    { key: 'view', label: 'Khung nhìn', type: 'seg', options: [['all', 'Toàn cảnh'], ['head', 'Đầu'], ['nucleus', 'Hạt nhân']], default: 'all', en: { label: 'View', options: ['Overview', 'Coma', 'Nucleus'] } },
+    { key: 'ion', label: 'Đuôi ion', type: 'toggle', default: true, en: { label: 'Ion tail' } },
   ],
   actions: [
-    { label: 'Hạt nhân', key: 'n', title: 'Bay tới hạt nhân', run: ctx => { ctx.params.view = 'nucleus'; ctx.scene.params.find(p => p.key === 'view').onChange?.('nucleus', ctx); } },
-    { label: 'Toàn cảnh', key: 'v', title: 'Lùi ra xem toàn bộ sao chổi', run: ctx => { ctx.params.view = 'all'; ctx.scene.params.find(p => p.key === 'view').onChange?.('all', ctx); } },
+    { label: 'Hạt nhân', key: 'n', title: 'Bay tới hạt nhân', run: ctx => { ctx.params.view = 'nucleus'; ctx.scene.params.find(p => p.key === 'view').onChange?.('nucleus', ctx); },
+      en: { label: 'Nucleus', title: 'Fly to the nucleus' } },
+    { label: 'Toàn cảnh', key: 'v', title: 'Lùi ra xem toàn bộ sao chổi', run: ctx => { ctx.params.view = 'all'; ctx.scene.params.find(p => p.key === 'view').onChange?.('all', ctx); },
+      en: { label: 'Overview', title: 'Pull back to see the whole comet' } },
   ],
   create(ctx) {
     cometParams = ctx.params;
@@ -570,18 +590,18 @@ const comet = {
         const p = c.params;
         const kgs = st.Q * 18 * 1.6605e-27;
         return [
-          ['Cách hạt nhân', c.fmt.dist(c.camera.position.length() * 1e7)],
-          ['Cách Mặt Trời', p.r.toFixed(2) + ' AU · ' + c.fmt.sci(p.r * 1.496e8) + ' km'],
-          ['Tốc độ quỹ đạo', st.vc.toFixed(1) + ' km/s'],
-          ['Sinh khí H₂O', c.fmt.sci(st.Q) + ' phân tử/s (' + (kgs >= 1000 ? (kgs / 1000).toFixed(1) + ' tấn/s' : kgs.toFixed(kgs < 1 ? 2 : 0) + ' kg/s') + ')'],
-          ['Afρ (độ bụi)', (st.afrho * 100).toFixed(0) + ' cm'],
-          ['Đuôi ion', p.ion ? (st.Lion * 1e4 / 1e6).toFixed(1) + ' triệu km' : 'tắt'],
-          ['Đuôi bụi', (st.dustLen * 1e4 / 1e6).toFixed(1) + ' triệu km (hạt bụi già ' + st.tauMax.toFixed(0) + ' ngày)'],
+          [t('Cách hạt nhân', 'Distance from nucleus'), c.fmt.dist(c.camera.position.length() * 1e7)],
+          [t('Cách Mặt Trời', 'Distance from the Sun'), p.r.toFixed(2) + ' AU · ' + c.fmt.sci(p.r * 1.496e8) + ' km'],
+          [t('Tốc độ quỹ đạo', 'Orbital speed'), st.vc.toFixed(1) + ' km/s'],
+          [t('Sinh khí H₂O', 'H₂O production'), c.fmt.sci(st.Q) + t(' phân tử/s (', ' molecules/s (') + (kgs >= 1000 ? (kgs / 1000).toFixed(1) + t(' tấn/s', ' t/s') : kgs.toFixed(kgs < 1 ? 2 : 0) + ' kg/s') + ')'],
+          [t('Afρ (độ bụi)', 'Afρ (dust activity)'), (st.afrho * 100).toFixed(0) + ' cm'],
+          [t('Đuôi ion', 'Ion tail'), p.ion ? (st.Lion * 1e4 / 1e6).toFixed(1) + t(' triệu km', ' million km') : t('tắt', 'off')],
+          [t('Đuôi bụi', 'Dust tail'), t((st.dustLen * 1e4 / 1e6).toFixed(1) + ' triệu km (hạt bụi già ' + st.tauMax.toFixed(0) + ' ngày)', (st.dustLen * 1e4 / 1e6).toFixed(1) + ' million km (dust up to ' + st.tauMax.toFixed(0) + ' days old)')],
         ];
       },
       onParam(key, v, c) {
         if (key === 'preset' && c.params.view === 'nucleus') startFly('nucleus', c);
-        if (key === 'r' && v > 3.2 && (this._lastR ?? 0) <= 3.2) c.toast('Ngoài ~3 AU, băng nước gần như không thăng hoa: chỉ còn chút CO và CO₂ — sao chổi trông như một tiểu hành tinh.');
+        if (key === 'r' && v > 3.2 && (this._lastR ?? 0) <= 3.2) c.toast(t('Ngoài ~3 AU, băng nước gần như không thăng hoa: chỉ còn chút CO và CO₂ — sao chổi trông như một tiểu hành tinh.', 'Beyond ~3 AU water ice barely sublimates: only a little CO and CO₂ is left — the comet looks like an asteroid.'));
         if (key === 'r') this._lastR = v;
       },
     };
@@ -825,8 +845,8 @@ function rockBaseJS(shape) {
 const ROCKS = {
   bennu:    { shape: 0, alb: 0.044, tint: [0.93, 0.96, 1.0], br: 1.3, period: 4.296, GM: 6.674e-11 * 7.329e10, Rm: 245, Req: 282, dims: '565 × 535 × 508 m', name: '101955 Bennu' },
   itokawa:  { shape: 1, alb: 0.29, tint: [1.0, 0.9, 0.78], br: 1.2, period: 12.132, GM: 6.674e-11 * 3.51e10, Rm: 165, Req: 267, dims: '535 × 294 × 209 m', name: '25143 Itokawa' },
-  cigar:    { shape: 2, alb: 0.1, tint: [1.0, 0.76, 0.6], br: 1.8, period: 8.67, GM: 6.674e-11 * 5e8, Rm: 44, Req: 170, dims: '≈ 340 × 42 × 46 m', name: "1I/ʻOumuamua (hình điếu xì gà)" },
-  pancake:  { shape: 3, alb: 0.1, tint: [1.0, 0.76, 0.6], br: 0.65, period: 8.67, GM: 6.674e-11 * 2e8, Rm: 31, Req: 57, dims: '≈ 115 × 111 × 19 m', name: "1I/ʻOumuamua (hình đĩa)" },
+  cigar:    { shape: 2, alb: 0.1, tint: [1.0, 0.76, 0.6], br: 1.8, period: 8.67, GM: 6.674e-11 * 5e8, Rm: 44, Req: 170, dims: '≈ 340 × 42 × 46 m', name: "1I/ʻOumuamua (hình điếu xì gà)", nameEn: '1I/ʻOumuamua (cigar shape)' },
+  pancake:  { shape: 3, alb: 0.1, tint: [1.0, 0.76, 0.6], br: 0.65, period: 8.67, GM: 6.674e-11 * 2e8, Rm: 31, Req: 57, dims: '≈ 115 × 111 × 19 m', name: "1I/ʻOumuamua (hình đĩa)", nameEn: '1I/ʻOumuamua (pancake shape)' },
 };
 
 // Tileable smooth value noise baked into a 128³ half-float 3D texture (period 16, 8 voxels per lattice
@@ -949,7 +969,7 @@ function makeRockInstance(ctx, mode) {
         if (ti > 0 && !dart.toasted) {
           dart.toasted = true;
           c.audio.tone(70, 1.6, 0.25, 0, 'sine'); c.audio.click(0.5, 0, 0.3);
-          c.toast('<b>Va chạm!</b> Ngày 26/9/2022 tàu DART (570 kg, 6,1 km/s) đâm vào Dimorphos. Chùm vật chất bắn ra mang thêm động lượng — gấp ~3,6 lần động lượng của chính con tàu — nên chu kỳ quỹ đạo của Dimorphos quanh Didymos ngắn đi <b>32 phút</b> (11 giờ 55 → 11 giờ 23). Lần đầu tiên loài người dịch chuyển một thiên thể.', 12000);
+          c.toast(t('<b>Va chạm!</b> Ngày 26/9/2022 tàu DART (570 kg, 6,1 km/s) đâm vào Dimorphos. Chùm vật chất bắn ra mang thêm động lượng — gấp ~3,6 lần động lượng của chính con tàu — nên chu kỳ quỹ đạo của Dimorphos quanh Didymos ngắn đi <b>32 phút</b> (11 giờ 55 → 11 giờ 23). Lần đầu tiên loài người dịch chuyển một thiên thể.', '<b>Impact!</b> On 26 September 2022 the DART spacecraft (570 kg, 6.1 km/s) slammed into Dimorphos. The ejecta plume added extra momentum — about 3.6 times the spacecraft\'s own — so Dimorphos\'s orbital period around Didymos shrank by <b>32 minutes</b> (11 h 55 min → 11 h 23 min). The first time humanity has changed the motion of a celestial body.'), 12000);
         }
         if (ti > 60) { dart = null; U.uTi.value = -100; }
       } else U.uTi.value = -100;
@@ -978,22 +998,22 @@ function makeRockInstance(ctx, mode) {
     hud(c) {
       const p = c.params, rk = rockOf(p);
       const rows = [
-        ['Thiên thể', rk.name],
-        ['Kích thước', rk.dims],
-        ['Chu kỳ tự quay', p.period.toFixed(2) + ' giờ' + (p.tumble > 0.02 ? ' · lộn nhào (NPA)' : '')],
-        ['Vận tốc thoát', (st.vesc * 100).toFixed(0) + ' cm/s'],
+        [t('Thiên thể', 'Object'), t(rk.name, rk.nameEn)],
+        [t('Kích thước', 'Size'), rk.dims],
+        [t('Chu kỳ tự quay', 'Rotation period'), p.period.toFixed(2) + t(' giờ', ' h') + (p.tumble > 0.02 ? t(' · lộn nhào (NPA)', ' · tumbling (NPA)') : '')],
+        [t('Vận tốc thoát', 'Escape velocity'), (st.vesc * 100).toFixed(0) + ' cm/s'],
       ];
       if (mode !== 'oumuamua') {
-        rows.push(['Trọng lực hiệu dụng ở xích đạo', st.geff > 0 ? (st.geff * 1e6).toFixed(1) + ' µm/s²' : '<span style="color:#ff8a6a">âm — đá văng khỏi xích đạo!</span>']);
-        rows.push(['Chu kỳ giới hạn (vỡ do quay)', st.crit.toFixed(2) + ' giờ']);
+        rows.push([t('Trọng lực hiệu dụng ở xích đạo', 'Effective gravity at the equator'), st.geff > 0 ? (st.geff * 1e6).toFixed(1) + ' µm/s²' : t('<span style="color:#ff8a6a">âm — đá văng khỏi xích đạo!</span>', '<span style="color:#ff8a6a">negative — rocks fly off the equator!</span>')]);
+        rows.push([t('Chu kỳ giới hạn (vỡ do quay)', 'Critical period (spin breakup)'), st.crit.toFixed(2) + t(' giờ', ' h')]);
       } else if (lc.length) {
         const mx = Math.max(...lc), mn = Math.min(...lc);
         const bars = '▁▂▃▄▅▆▇█';
         const spark = lc.filter((_, i) => i % 2 === 0).map(v => bars[Math.min(7, Math.floor((v - mn) / Math.max(mx - mn, 1e-6) * 7.99))]).join('');
-        rows.push(['Biên độ quang biến', (2.5 * Math.log10(mx / Math.max(mn, 1e-6))).toFixed(1) + ' cấp sao (×' + (mx / Math.max(mn, 1e-6)).toFixed(0) + ')']);
-        rows.push(['Đường cong ánh sáng (2 vòng quay tới)', '<span style="font-family:monospace;letter-spacing:-1px">' + spark + '</span>']);
+        rows.push([t('Biên độ quang biến', 'Light-curve amplitude'), (2.5 * Math.log10(mx / Math.max(mn, 1e-6))).toFixed(1) + t(' cấp sao (×', ' mag (×') + (mx / Math.max(mn, 1e-6)).toFixed(0) + ')']);
+        rows.push([t('Đường cong ánh sáng (2 vòng quay tới)', 'Light curve (next 2 rotations)'), '<span style="font-family:monospace;letter-spacing:-1px">' + spark + '</span>']);
       }
-      rows.push(['Góc pha', p.sunAngle.toFixed(0) + '°']);
+      rows.push([t('Góc pha', 'Phase angle'), p.sunAngle.toFixed(0) + '°']);
       return rows;
     },
     onClick(info, c) {
@@ -1013,9 +1033,11 @@ function makeRockInstance(ctx, mode) {
       const gl = rk.GM / (r * r);
       const hop = 0.05 * 0.05 / (2 * gl);   // height of a 5 cm/s hop
       if (mode === 'oumuamua') {
-        c.toast(`Cách tâm ${r.toFixed(0)} m. Trọng lực ~${(gl * 1e6).toFixed(1)} µm/s² — nhỏ hơn Trái Đất hàng triệu lần. ʻOumuamua bay qua Hệ Mặt Trời với vận tốc dư 26 km/s và sẽ không bao giờ quay lại.`, 7000);
+        c.toast(tt(`Cách tâm ${r.toFixed(0)} m. Trọng lực ~${(gl * 1e6).toFixed(1)} µm/s² — nhỏ hơn Trái Đất hàng triệu lần. ʻOumuamua bay qua Hệ Mặt Trời với vận tốc dư 26 km/s và sẽ không bao giờ quay lại.`,
+          `${r.toFixed(0)} m from the center. Gravity ~${(gl * 1e6).toFixed(1)} µm/s² — millions of times weaker than on Earth. ʻOumuamua swept through the Solar System with a hyperbolic excess speed of 26 km/s and will never return.`), 7000);
       } else {
-        c.toast(`Cách tâm ${r.toFixed(0)} m · trọng lực ≈ ${(gl * 1e6).toFixed(0)} µm/s² (≈ ${(gl / 9.81 * 1e6).toFixed(0)} phần triệu g). Vận tốc thoát chỉ ${(st.vesc * 100).toFixed(0)} cm/s: một bước nhảy nhẹ (~1 m/s) đưa bạn vĩnh viễn rời khỏi ${rk.name.split(' ').pop()}; một cú nhón chân 5 cm/s bay cao ${hop.toFixed(0)} m và mất ${(2 * 0.05 / gl / 60).toFixed(0)} phút mới rơi xuống.`, 9000);
+        c.toast(tt(`Cách tâm ${r.toFixed(0)} m · trọng lực ≈ ${(gl * 1e6).toFixed(0)} µm/s² (≈ ${(gl / 9.81 * 1e6).toFixed(0)} phần triệu g). Vận tốc thoát chỉ ${(st.vesc * 100).toFixed(0)} cm/s: một bước nhảy nhẹ (~1 m/s) đưa bạn vĩnh viễn rời khỏi ${rk.name.split(' ').pop()}; một cú nhón chân 5 cm/s bay cao ${hop.toFixed(0)} m và mất ${(2 * 0.05 / gl / 60).toFixed(0)} phút mới rơi xuống.`,
+          `${r.toFixed(0)} m from the center · gravity ≈ ${(gl * 1e6).toFixed(0)} µm/s² (≈ ${(gl / 9.81 * 1e6).toFixed(0)} millionths of a g). The escape velocity is only ${(st.vesc * 100).toFixed(0)} cm/s: a gentle jump (~1 m/s) would send you away from ${rk.name.split(' ').pop()} forever; a 5 cm/s tiptoe hop rises ${hop.toFixed(0)} m and takes ${(2 * 0.05 / gl / 60).toFixed(0)} minutes to come back down.`), 9000);
       }
     },
   };
@@ -1038,19 +1060,38 @@ const asteroid = {
     ['OSIRIS-REx', 'lấy 121,6 g mẫu Bennu, về Trái Đất 24/9/2023'],
     ['DART → Dimorphos', '26/9/2022, chu kỳ quỹ đạo giảm 32–33 phút'],
   ],
+  en: {
+    name: 'Asteroid',
+    subtitle: 'Rubble pile · Bennu, Itokawa',
+    blurb: 'Not a solid rock but a loose <b>rubble pile</b> held together by feeble gravity — the escape velocity is only ~20 cm/s, so you could jump off it. Bennu\'s surface is as dark as asphalt and covered in boulders; Itokawa has a “sea” of fine gravel between its two lobes.',
+    intro: 'Press <b>J</b> to launch the <b>DART</b> spacecraft at the asteroid. Drag the <b>rotation period</b> below ~3.7 h to see why Bennu is shaped like a spinning top: at the equator, centrifugal force beats gravity.',
+    facts: [
+      ['Bennu: diameter', '490 m (565 × 535 × 508 m)'],
+      ['Bennu: mass', '7.33×10¹⁰ kg · density 1.19 g/cm³ (porosity ~50%)'],
+      ['Bennu: albedo', '0.044 — as dark as asphalt'],
+      ['Itokawa', '535 × 294 × 209 m · albedo 0.29 (S-type)'],
+      ['OSIRIS-REx', 'collected 121.6 g of Bennu samples, returned to Earth on 24 September 2023'],
+      ['DART → Dimorphos', '26 September 2022, orbital period shortened by 32–33 minutes'],
+    ],
+  },
   unitKm: 0.25,
   camera: { distance: 3.6, polar: 78, azimuth: 25, min: 1.25, max: 40, fov: 40 },
   exposure: 1.1,
   bloom: 0.3,
   params: [
     { key: 'shape', label: 'Hình dạng', type: 'seg', options: [['bennu', 'Bennu (con quay)'], ['itokawa', 'Itokawa (hạt lạc)']], default: 'bennu',
+      en: { label: 'Shape', options: ['Bennu (spinning top)', 'Itokawa (peanut)'] },
       onChange: (v, ctx) => { ctx.params.period = v === 'bennu' ? 4.296 : 12.132; } },
-    { key: 'period', label: 'Chu kỳ tự quay', type: 'range', min: 2.0, max: 20, step: 0.01, default: 4.296, fmt: v => v.toFixed(2) + ' h', note: 'Hiệu ứng YORP (ánh nắng tái bức xạ) làm tiểu hành tinh quay nhanh dần; quá giới hạn, đá trượt về xích đạo và văng ra.' },
-    { key: 'tumble', label: 'Lộn nhào (quay không quanh trục chính)', type: 'range', min: 0, max: 1, step: 0.01, default: 0.35, note: '0 = quay đều quanh trục chính. Thực tế Bennu và Itokawa quay quanh trục chính; Toutatis và ʻOumuamua thì lộn nhào.' },
-    { key: 'sunAngle', label: 'Góc pha (Mặt Trời)', type: 'range', min: 0, max: 165, step: 1, default: 55, fmt: v => v.toFixed(0) + '°', note: '0°: hiệu ứng đối pha — bề mặt sáng bừng khi mọi bóng đổ bị che khuất.' },
+    { key: 'period', label: 'Chu kỳ tự quay', type: 'range', min: 2.0, max: 20, step: 0.01, default: 4.296, fmt: v => v.toFixed(2) + ' h', note: 'Hiệu ứng YORP (ánh nắng tái bức xạ) làm tiểu hành tinh quay nhanh dần; quá giới hạn, đá trượt về xích đạo và văng ra.',
+      en: { label: 'Rotation period', note: 'The YORP effect (re-radiated sunlight) gradually spins asteroids up; past the limit, rocks slide toward the equator and are flung off.' } },
+    { key: 'tumble', label: 'Lộn nhào (quay không quanh trục chính)', type: 'range', min: 0, max: 1, step: 0.01, default: 0.35, note: '0 = quay đều quanh trục chính. Thực tế Bennu và Itokawa quay quanh trục chính; Toutatis và ʻOumuamua thì lộn nhào.',
+      en: { label: 'Tumbling (non-principal-axis rotation)', note: '0 = steady rotation about the principal axis. In reality Bennu and Itokawa spin about their principal axes, while Toutatis and ʻOumuamua tumble.' } },
+    { key: 'sunAngle', label: 'Góc pha (Mặt Trời)', type: 'range', min: 0, max: 165, step: 1, default: 55, fmt: v => v.toFixed(0) + '°', note: '0°: hiệu ứng đối pha — bề mặt sáng bừng khi mọi bóng đổ bị che khuất.',
+      en: { label: 'Phase angle (Sun)', note: '0°: the opposition effect — the surface brightens sharply as every shadow hides behind the rock that casts it.' } },
   ],
   actions: [
-    { label: 'DART', key: 'j', title: 'Tàu va chạm DART lao vào tiểu hành tinh', run: ctx => { const inst = ctx.scene._inst; if (inst) { inst.triggerDart(ctx); ctx.toast('DART đang lao tới với vận tốc 6,1 km/s… (chiếu chậm)', 2500); } } },
+    { label: 'DART', key: 'j', title: 'Tàu va chạm DART lao vào tiểu hành tinh', run: ctx => { const inst = ctx.scene._inst; if (inst) { inst.triggerDart(ctx); ctx.toast(t('DART đang lao tới với vận tốc 6,1 km/s… (chiếu chậm)', 'DART closing in at 6.1 km/s… (slow motion)'), 2500); } },
+      en: { title: 'The DART impactor crashes into the asteroid' } },
   ],
   create(ctx) { const inst = makeRockInstance(ctx, 'asteroid'); asteroid._inst = inst; return inst; },
 };
@@ -1072,15 +1113,30 @@ const interstellar = {
     ['Chu kỳ lộn nhào', '≈ 8,67 giờ (không quanh trục chính)'],
     ['Gia tốc phi hấp dẫn', '~5×10⁻⁶ m/s² ở 1 AU, không thấy đuôi khí'],
   ],
+  en: {
+    name: 'ʻOumuamua',
+    subtitle: 'The first interstellar object ever detected (1I/2017 U1)',
+    blurb: 'A visitor from another star system that swept through the Solar System in 2017 on a hyperbolic orbit (e ≈ 1.20). Its brightness varied by up to ~10 times every 8 hours: an extremely flat or elongated body <b>tumbling</b> through space.',
+    intro: 'Watch the <b>light curve</b> in the info panel: its large amplitude is the only evidence we have of ʻOumuamua\'s shape. Switch between the <b>cigar</b> and <b>pancake</b> shapes — both fit the data.',
+    facts: [
+      ['Discovered', '19 October 2017, Pan-STARRS (Haleakalā)'],
+      ['Hyperbolic excess speed (v∞)', '26.3 km/s'],
+      ['Orbital eccentricity', '1.20 (hyperbolic)'],
+      ['Light-curve amplitude', '~2.5 mag (≈ 10×)'],
+      ['Tumbling period', '≈ 8.67 h (non-principal-axis)'],
+      ['Non-gravitational acceleration', '~5×10⁻⁶ m/s² at 1 AU, no gas tail seen'],
+    ],
+  },
   unitKm: 0.1,
   camera: { distance: 5.2, polar: 75, azimuth: 30, min: 0.9, max: 60, fov: 40 },
   exposure: 1.2,
   bloom: 0.3,
   params: [
-    { key: 'shape', label: 'Hình dạng', type: 'seg', options: [['cigar', 'Điếu xì gà'], ['pancake', 'Cái đĩa']], default: 'cigar' },
-    { key: 'period', label: 'Chu kỳ quay', type: 'range', min: 2, max: 20, step: 0.01, default: 8.67, fmt: v => v.toFixed(2) + ' h' },
-    { key: 'tumble', label: 'Lộn nhào', type: 'range', min: 0, max: 1, step: 0.01, default: 0.6 },
-    { key: 'sunAngle', label: 'Góc pha (Mặt Trời)', type: 'range', min: 0, max: 165, step: 1, default: 25, fmt: v => v.toFixed(0) + '°', note: 'Khi phát hiện, góc pha của ʻOumuamua khoảng 20–25°.' },
+    { key: 'shape', label: 'Hình dạng', type: 'seg', options: [['cigar', 'Điếu xì gà'], ['pancake', 'Cái đĩa']], default: 'cigar', en: { label: 'Shape', options: ['Cigar', 'Pancake'] } },
+    { key: 'period', label: 'Chu kỳ quay', type: 'range', min: 2, max: 20, step: 0.01, default: 8.67, fmt: v => v.toFixed(2) + ' h', en: { label: 'Rotation period' } },
+    { key: 'tumble', label: 'Lộn nhào', type: 'range', min: 0, max: 1, step: 0.01, default: 0.6, en: { label: 'Tumbling' } },
+    { key: 'sunAngle', label: 'Góc pha (Mặt Trời)', type: 'range', min: 0, max: 165, step: 1, default: 25, fmt: v => v.toFixed(0) + '°', note: 'Khi phát hiện, góc pha của ʻOumuamua khoảng 20–25°.',
+      en: { label: 'Phase angle (Sun)', note: 'At discovery, ʻOumuamua\'s phase angle was about 20–25°.' } },
   ],
   actions: [],
   create(ctx) { return makeRockInstance(ctx, 'oumuamua'); },

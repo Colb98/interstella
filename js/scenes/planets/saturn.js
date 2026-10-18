@@ -42,6 +42,7 @@
 // Enceladus' plumes): backlit from inside Saturn's shadow the dusty rings glow while the B ring goes dark.
 import * as THREE from 'three';
 import { COMMON_GLSL, FULLSCREEN_VERT } from '../../glsl/common.js';
+import { t, dec, int } from '../../i18n.js';
 
 const V3 = THREE.Vector3;
 const D2R = Math.PI / 180, R2D = 180 / Math.PI, TAU = Math.PI * 2;
@@ -84,10 +85,10 @@ function lerpTab(pts, x) {
   for (let i = 1; i < pts.length; i++) if (x < pts[i][0]) return pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * (x - pts[i - 1][0]) / (pts[i][0] - pts[i - 1][0]);
   return pts[pts.length - 1][1];
 }
-const vn = (x, d = 1) => x.toFixed(d).replace('.', ',');
-const latStr = d => `${vn(Math.abs(d))}° ${d >= 0 ? 'B' : 'N'}`;
+const vn = (x, d = 1) => dec(x, d);
+const latStr = d => `${vn(Math.abs(d))}° ${d >= 0 ? t('B', 'N') : t('N', 'S')}`;
 const wrap = a => ((a % TAU) + TAU) % TAU;
-const fmtInt = n => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+const fmtInt = n => int(n);
 const E2 = 1 - (RPOL / RKM) ** 2;
 // distance from the spin axis (m) at planetographic latitude (deg)
 const rhoAxis = latD => { const p = latD * D2R; return RKM * 1e3 * Math.cos(p) / Math.sqrt(1 - E2 * Math.sin(p) ** 2); };
@@ -683,9 +684,9 @@ function loadImageTex(url, aniso, maxSize) {
     tex.generateMipmaps = true; tex.anisotropy = aniso;
     tex.needsUpdate = true;
     resolve(tex);
-  }, undefined, () => reject(new Error(`không tải được ${url}`))));
+  }, undefined, () => reject(new Error(t(`không tải được ${url}`, `could not load ${url}`)))));
 }
-const fetchBin = url => fetch(url).then(r => { if (!r.ok) throw new Error(`không tải được ${url}`); return r.arrayBuffer(); });
+const fetchBin = url => fetch(url).then(r => { if (!r.ok) throw new Error(t(`không tải được ${url}`, `could not load ${url}`)); return r.arrayBuffer(); });
 const retry = (fn, url, ...a) => fn(url, ...a).catch(() => new Promise(r => setTimeout(r, 500)).then(() => fn(url + '?r=' + Date.now(), ...a)));
 const H2F = THREE.DataUtils.fromHalfFloat, F2H = THREE.DataUtils.toHalfFloat;
 // ring profile: RGBA16F 16384×1 with a CPU mip chain (τ averaged in transmission, colour linearly)
@@ -777,9 +778,9 @@ function subLon(st, dirW) {
   const k = 1 / (1 - FLAT), sc = 1 / Math.sqrt(d.x * d.x + d.y * d.y * k * k + d.z * d.z);
   return bodyLatLon(d.multiplyScalar(sc), k, st.spin);
 }
-const zoneName = rk => rk < 74490 ? 'vành D' : rk < 92000 ? 'vành C' : rk < 117580 ? 'vành B' : rk < 122050 ? 'khe Cassini'
-  : Math.abs(rk - 133589) < 165 ? 'khe Encke (vệ tinh Pan)' : Math.abs(rk - 136505) < 25 ? 'khe Keeler (vệ tinh Daphnis)' : rk < 136775 ? 'vành A'
-  : Math.abs(rk - 140221) < 500 ? 'vành F' : rk < 160000 ? 'khoảng trống giữa vành A và G' : rk < 176000 ? 'vành G' : 'vành E';
+const zoneName = rk => rk < 74490 ? t('vành D', 'D ring') : rk < 92000 ? t('vành C', 'C ring') : rk < 117580 ? t('vành B', 'B ring') : rk < 122050 ? t('khe Cassini', 'Cassini Division')
+  : Math.abs(rk - 133589) < 165 ? t('khe Encke (vệ tinh Pan)', 'Encke Gap (moon Pan)') : Math.abs(rk - 136505) < 25 ? t('khe Keeler (vệ tinh Daphnis)', 'Keeler Gap (moon Daphnis)') : rk < 136775 ? t('vành A', 'A ring')
+  : Math.abs(rk - 140221) < 500 ? t('vành F', 'F ring') : rk < 160000 ? t('khoảng trống giữa vành A và G', 'gap between the A and G rings') : rk < 176000 ? t('vành G', 'G ring') : t('vành E', 'E ring');
 
 /* ------------------------------------------------------------------------------------------------ */
 /* scene                                                                                              */
@@ -806,28 +807,60 @@ const SATURN = {
     ['Bão Trắng Lớn 2010–11', 'bùng ở 37,7° B ngày 5/12/2010, quấn quanh hành tinh sau ~55 ngày'],
     ['Dữ liệu', 'Bản đồ Cassini ISS RGB 11/8/2011 (NASA PDS), cực Bắc PIA17652, vành: Cassini RSS Rev 7 + PIA11142 (NASA/JPL/SSI)'],
   ],
+  en: {
+    name: 'Saturn',
+    subtitle: 'Ringed gas giant · Cassini data',
+    blurb: "Saturn is less dense than water and the most oblate planet in the Solar System. The cloud tops here are a <b>real Cassini map</b> (August 2011), carried along by the measured jet streams — the equatorial jet runs at ~450 m/s, four times faster than Jupiter's. The rings are billions of ice particles orbiting by Kepler's laws (inner ringlets faster than outer ones); their optical depth comes from Cassini radio occultations.",
+    intro: "Key <b>W</b>: the 2010–11 Great White Spot (fast-forward). <b>X</b>: the north polar hexagon. <b>R</b>: skim the rings to see spokes and sheared clumps. <b>B</b>: look back toward the Sun from inside Saturn's shadow, as Cassini did in 2013.",
+    facts: [
+      ['Equatorial / polar radius', '60,268 km / 54,364 km · oblateness 0.098'],
+      ['Mass · density', '5.683×10²⁶ kg (95 Earths) · 0.69 g/cm³'],
+      ['Rotation period', '10 h 33 m 38 s (interior, from ring seismology — Mankovich 2019); System III 10 h 39 m 22 s'],
+      ['Axial tilt', '26.73° · one Saturn year = 29.46 years'],
+      ['Equatorial wind', '~450 m/s (System III) ≈ 1,600 km/h'],
+      ['North polar hexagon', 'jet stream ~120 m/s at 77.5° N, each side ~14,500 km'],
+      ['Main rings (C → A)', '74,500 – 136,780 km, ~10 m thick'],
+      ['B ring', 'optical depth > 5 (nearly opaque)'],
+      ['Great White Spot 2010–11', 'erupted at 37.7° N on 5 Dec 2010, wrapped around the planet after ~55 days'],
+      ['Data', 'Cassini ISS RGB map 11 Aug 2011 (NASA PDS), north pole PIA17652, rings: Cassini RSS Rev 7 + PIA11142 (NASA/JPL/SSI)'],
+    ],
+  },
   unitKm: RKM,
   camera: { distance: 5.5, polar: 66, azimuth: 20, min: 1.04, max: 60, fov: 45 },
   exposure: 1.0, bloom: 0.35,
   params: [
-    { key: 'season', label: 'Mặt Trời trên mặt phẳng vành (B′)', type: 'range', min: -26.7, max: 26.7, step: 0.1, default: 16, fmt: v => v.toFixed(1) + '°', note: '0° = điểm phân (2009, 2025): vành tối, bóng vành co thành một vạch, nan hoa xuất hiện. ±26,7° = điểm chí (Bắc: 2017).' },
-    { key: 'sunAz', label: 'Hướng Mặt Trời', type: 'range', min: 0, max: 360, step: 1, default: 45, fmt: v => v.toFixed(0) + '°', note: 'Phương vị của Mặt Trời. Xoay camera ra phía sau hành tinh để nhìn ngược sáng.' },
-    { key: 'lapse', label: 'Tua nhanh thời tiết', type: 'range', min: 0, max: 200, step: 0.5, default: 4, fmt: v => '×' + v.toFixed(1), note: 'Nhân thêm tốc độ của gió (so với đồng hồ tự quay). ×1 = gió và tự quay cùng nhịp thời gian thật đã tua.' },
-    { key: 'gws', label: 'Bão Trắng Lớn — ngày thứ', type: 'range', min: -1, max: 300, step: 0.5, default: -1, fmt: v => v < 0 ? 'tắt' : vn(v, 0), note: 'Số ngày kể từ khi bão bùng phát (5/12/2010). Nhấn W để xem tua nhanh.' },
-    { key: 'track', label: 'Bám theo đầu bão', type: 'toggle', default: false, note: 'Quay hành tinh theo đầu cơn bão (như phim time-lapse của Cassini).' },
-    { key: 'spokes', label: 'Nan hoa trên vành B', type: 'toggle', default: true, note: 'Bụi mịn bị nhiễm điện bay lên khỏi vành; thường gặp gần điểm phân.' },
-    { key: 'dust', label: 'Phóng đại vành bụi (D, G, E)', type: 'range', min: 1, max: 200, step: 1, default: 1, fmt: v => '×' + v.toFixed(0), note: 'Vành E có độ dày quang học ~10⁻⁵: chỉ thấy khi nhìn ngược sáng với phơi sáng rất dài.' },
-    { key: 'moons', label: 'Vệ tinh', type: 'toggle', default: true },
-    { key: 'spin', label: 'Tự quay', type: 'toggle', default: true },
-    { key: 'axis', label: 'Trục quay', type: 'toggle', default: false },
+    { key: 'season', label: 'Mặt Trời trên mặt phẳng vành (B′)', type: 'range', min: -26.7, max: 26.7, step: 0.1, default: 16, fmt: v => v.toFixed(1) + '°', note: '0° = điểm phân (2009, 2025): vành tối, bóng vành co thành một vạch, nan hoa xuất hiện. ±26,7° = điểm chí (Bắc: 2017).',
+      en: { label: 'Sun above the ring plane (B′)', note: '0° = equinox (2009, 2025): the rings go dark, their shadow shrinks to a line and spokes appear. ±26.7° = solstice (northern: 2017).' } },
+    { key: 'sunAz', label: 'Hướng Mặt Trời', type: 'range', min: 0, max: 360, step: 1, default: 45, fmt: v => v.toFixed(0) + '°', note: 'Phương vị của Mặt Trời. Xoay camera ra phía sau hành tinh để nhìn ngược sáng.',
+      en: { label: 'Sun direction', note: "The Sun's azimuth. Orbit the camera behind the planet for a backlit view." } },
+    { key: 'lapse', label: 'Tua nhanh thời tiết', type: 'range', min: 0, max: 200, step: 0.5, default: 4, fmt: v => '×' + v.toFixed(1), note: 'Nhân thêm tốc độ của gió (so với đồng hồ tự quay). ×1 = gió và tự quay cùng nhịp thời gian thật đã tua.',
+      en: { label: 'Weather fast-forward', note: 'Extra speed-up of the winds (relative to the rotation clock). ×1 = winds and rotation share the same accelerated real time.' } },
+    { key: 'gws', label: 'Bão Trắng Lớn — ngày thứ', type: 'range', min: -1, max: 300, step: 0.5, default: -1, fmt: v => v < 0 ? t('tắt', 'off') : vn(v, 0), note: 'Số ngày kể từ khi bão bùng phát (5/12/2010). Nhấn W để xem tua nhanh.',
+      en: { label: 'Great White Spot — day', note: 'Days since the storm erupted (5 Dec 2010). Press W to watch it fast-forwarded.' } },
+    { key: 'track', label: 'Bám theo đầu bão', type: 'toggle', default: false, note: 'Quay hành tinh theo đầu cơn bão (như phim time-lapse của Cassini).',
+      en: { label: 'Track the storm head', note: "Turn the planet to follow the head of the storm (like Cassini's time-lapse movies)." } },
+    { key: 'spokes', label: 'Nan hoa trên vành B', type: 'toggle', default: true, note: 'Bụi mịn bị nhiễm điện bay lên khỏi vành; thường gặp gần điểm phân.',
+      en: { label: 'Spokes on the B ring', note: 'Fine, electrically charged dust levitating above the rings; most common near equinox.' } },
+    { key: 'dust', label: 'Phóng đại vành bụi (D, G, E)', type: 'range', min: 1, max: 200, step: 1, default: 1, fmt: v => '×' + v.toFixed(0), note: 'Vành E có độ dày quang học ~10⁻⁵: chỉ thấy khi nhìn ngược sáng với phơi sáng rất dài.',
+      en: { label: 'Boost dusty rings (D, G, E)', note: 'The E ring has an optical depth of ~10⁻⁵: it only shows up backlit, in very long exposures.' } },
+    { key: 'moons', label: 'Vệ tinh', type: 'toggle', default: true, en: { label: 'Moons' } },
+    { key: 'spin', label: 'Tự quay', type: 'toggle', default: true, en: { label: 'Rotation' } },
+    { key: 'axis', label: 'Trục quay', type: 'toggle', default: false, en: { label: 'Spin axis' } },
   ],
   actions: [
-    { label: 'Bão Trắng Lớn', key: 'w', title: 'Bão Trắng Lớn 2010–11, tua nhanh (1 ngày ≈ 2,5 giây)', run: ctx => instOf(SATURN)?.gwsShot(ctx) },
-    { label: 'Lục giác', key: 'x', title: 'Bay lên trên cực Bắc', run: ctx => instOf(SATURN)?.hexShot(ctx) },
-    { label: 'Cận cảnh vành', key: 'r', title: 'Bay sát vành B–A (bấm lần nữa để quay lại)', run: ctx => instOf(SATURN)?.ringShot(ctx) },
-    { label: 'Ngược sáng', key: 'b', title: 'Vào bóng Sao Thổ, nhìn về phía Mặt Trời (Cassini 19/7/2013)', run: ctx => instOf(SATURN)?.backlitShot(ctx) },
-    { label: 'Điểm phân', key: 'e', title: 'Mặt Trời nằm trong mặt phẳng vành', run: ctx => { ctx.params.season = 0.6; ctx.toast('Gần điểm phân (8/2009, 5/2025): Mặt Trời chiếu ngang mép vành, vành tối hẳn, bóng vành co thành một vạch. Lúc này nan hoa hiện rõ nhất trên vành B.', 7000); } },
-    { label: 'Enceladus', key: 'n', title: 'Bám theo Enceladus và các mạch phun ở cực Nam (bấm lần nữa để quay lại)', run: ctx => instOf(SATURN)?.enceladusShot(ctx) },
+    { label: 'Bão Trắng Lớn', key: 'w', title: 'Bão Trắng Lớn 2010–11, tua nhanh (1 ngày ≈ 2,5 giây)', run: ctx => instOf(SATURN)?.gwsShot(ctx),
+      en: { label: 'Great White Spot', title: 'The 2010–11 Great White Spot, fast-forwarded (1 day ≈ 2.5 seconds)' } },
+    { label: 'Lục giác', key: 'x', title: 'Bay lên trên cực Bắc', run: ctx => instOf(SATURN)?.hexShot(ctx),
+      en: { label: 'Hexagon', title: 'Fly up over the north pole' } },
+    { label: 'Cận cảnh vành', key: 'r', title: 'Bay sát vành B–A (bấm lần nữa để quay lại)', run: ctx => instOf(SATURN)?.ringShot(ctx),
+      en: { label: 'Ring close-up', title: 'Skim the B–A rings (press again to return)' } },
+    { label: 'Ngược sáng', key: 'b', title: 'Vào bóng Sao Thổ, nhìn về phía Mặt Trời (Cassini 19/7/2013)', run: ctx => instOf(SATURN)?.backlitShot(ctx),
+      en: { label: 'Backlit', title: "Into Saturn's shadow, looking toward the Sun (Cassini, 19 July 2013)" } },
+    { label: 'Điểm phân', key: 'e', title: 'Mặt Trời nằm trong mặt phẳng vành', run: ctx => { ctx.params.season = 0.6; ctx.toast(t('Gần điểm phân (8/2009, 5/2025): Mặt Trời chiếu ngang mép vành, vành tối hẳn, bóng vành co thành một vạch. Lúc này nan hoa hiện rõ nhất trên vành B.',
+      'Near equinox (Aug 2009, May 2025): sunlight grazes the rings edge-on, they go dark and their shadow shrinks to a line. This is when spokes show best on the B ring.'), 7000); },
+      en: { label: 'Equinox', title: 'The Sun in the ring plane' } },
+    { label: 'Enceladus', key: 'n', title: 'Bám theo Enceladus và các mạch phun ở cực Nam (bấm lần nữa để quay lại)', run: ctx => instOf(SATURN)?.enceladusShot(ctx),
+      en: { label: 'Enceladus', title: 'Follow Enceladus and its south-polar plumes (press again to return)' } },
   ],
   create(ctx) {
     const R = ctx.renderer, caps = R.capabilities;
@@ -957,28 +990,30 @@ const SATURN = {
         const cam = ctx.camera.position.clone();
         const sc = subLon(st, cam);
         const u3 = windS3(sc.lat), ui = u3 + DOM3 * rhoAxis(sc.lat);
-        const rows = [['Vĩ độ dưới camera', latStr(sc.lat)],
-          ['Gió tại đó', `${u3 >= 0 ? '+' : '−'}${Math.abs(u3).toFixed(0)} m/s (System III) · ${ui >= 0 ? '+' : '−'}${Math.abs(ui).toFixed(0)} m/s so với lõi`]];
+        const rows = [[t('Vĩ độ dưới camera', 'Latitude below the camera'), latStr(sc.lat)],
+          [t('Gió tại đó', 'Wind there'), `${u3 >= 0 ? '+' : '−'}${Math.abs(u3).toFixed(0)} m/s (System III) · ${ui >= 0 ? '+' : '−'}${Math.abs(ui).toFixed(0)} ${t('m/s so với lõi', 'm/s relative to the interior')}`]];
         const cb = cam.clone().normalize().applyMatrix3(st.W2B);
-        rows.push(['Độ mở vành nhìn từ camera', vn(Math.asin(cb.y) * R2D) + '°'], ['Mặt Trời trên mặt phẳng vành', vn(p.season) + '°']);
+        rows.push([t('Độ mở vành nhìn từ camera', 'Ring opening seen from the camera'), vn(Math.asin(cb.y) * R2D) + '°'], [t('Mặt Trời trên mặt phẳng vành', 'Sun above the ring plane'), vn(p.season) + '°']);
         const real = SECS * (ctx.bhGlobals?.timeScale ?? 6);
-        rows.push(['Tua nhanh', `tự quay ×${fmtInt(real)} · thời tiết ×${fmtInt(real * (p.lapse ?? 4))}`]);
+        rows.push([t('Tua nhanh', 'Fast-forward'), t(`tự quay ×${fmtInt(real)} · thời tiết ×${fmtInt(real * (p.lapse ?? 4))}`, `rotation ×${fmtInt(real)} · weather ×${fmtInt(real * (p.lapse ?? 4))}`)]);
         if (p.gws >= 0) {
           const d0 = new Date(Date.UTC(2010, 11, 5) + p.gws * 86400e3);
-          rows.push(['Bão Trắng Lớn', `ngày ${vn(p.gws, 0)} (${d0.getUTCDate()}/${d0.getUTCMonth() + 1}/${d0.getUTCFullYear()})${p.gws < 55 ? ' — đuôi đang lan' : p.gws < 200 ? ' — đã quấn quanh hành tinh' : ' — đầu bão đã tan'}`]);
+          rows.push([t('Bão Trắng Lớn', 'Great White Spot'), t(`ngày ${vn(p.gws, 0)} (${d0.getUTCDate()}/${d0.getUTCMonth() + 1}/${d0.getUTCFullYear()})${p.gws < 55 ? ' — đuôi đang lan' : p.gws < 200 ? ' — đã quấn quanh hành tinh' : ' — đầu bão đã tan'}`,
+            `day ${vn(p.gws, 0)} (${d0.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })})${p.gws < 55 ? ' — tail spreading' : p.gws < 200 ? ' — wrapped around the planet' : ' — storm head has dissipated'}`)]);
         }
         return rows;
       },
       onClick(info, ctx) {
         const h = hitBody(info.origin, info.dir, st.W2B);
         if (Math.abs(h.rd.y) > 1e-6) {
-          const t = -h.ro.y / h.rd.y;
-          if (t > 0 && (h.t === null || t < h.t)) {
-            const pr = h.ro.clone().addScaledVector(h.rd, t), r = Math.hypot(pr.x, pr.z), rk = r * RKM;
+          const tc = -h.ro.y / h.rd.y;
+          if (tc > 0 && (h.t === null || tc < h.t)) {
+            const pr = h.ro.clone().addScaledVector(h.rd, tc), r = Math.hypot(pr.x, pr.z), rk = r * RKM;
             if (rk > 66900 && rk < 141500) {
               const T = TAU / kepler(r) / 3600, v = Math.sqrt(GM / (rk * 1e3)) / 1000;
               const dTdr = 1.5 * T / rk * 100 * 60;   // minutes per 100 km
-              ctx.toast(`<b>${zoneName(rk)}</b>, cách tâm ${fmtInt(rk)} km. Hạt băng ở đây bay ${vn(v)} km/s, hết một vòng trong <b>${vn(T)} giờ</b> — ${T < P_INT / 3600 ? 'nhanh hơn' : 'chậm hơn'} một vòng tự quay (10,56 giờ). Dịch ra ngoài 100 km, chu kỳ dài thêm ${vn(dTdr, 1)} phút: vì vậy mọi cục vật chất đều bị kéo xiên.`, 8000);
+              ctx.toast(t(`<b>${zoneName(rk)}</b>, cách tâm ${fmtInt(rk)} km. Hạt băng ở đây bay ${vn(v)} km/s, hết một vòng trong <b>${vn(T)} giờ</b> — ${T < P_INT / 3600 ? 'nhanh hơn' : 'chậm hơn'} một vòng tự quay (10,56 giờ). Dịch ra ngoài 100 km, chu kỳ dài thêm ${vn(dTdr, 1)} phút: vì vậy mọi cục vật chất đều bị kéo xiên.`,
+                `<b>${zoneName(rk)}</b>, ${fmtInt(rk)} km from the centre. Ice particles here move at ${vn(v)} km/s and complete an orbit in <b>${vn(T)} h</b> — ${T < P_INT / 3600 ? 'faster' : 'slower'} than one rotation of the planet (10.56 h). Move 100 km outward and the period grows by ${vn(dTdr, 1)} min: that is why every clump gets sheared.`), 8000);
               ctx.audio.ping(300 + 600 / r, 0.05, info.ndcX);
               return;
             }
@@ -988,7 +1023,8 @@ const SATURN = {
         const p = h.ro.clone().addScaledVector(h.rd, h.t);
         const ll = bodyLatLon(p, h.k, st.spin);
         const u = windS3(ll.lat);
-        ctx.toast(`Vĩ độ <b>${latStr(ll.lat)}</b>: gió ${u >= 0 ? '+' : '−'}${Math.abs(u).toFixed(0)} m/s ${u >= 0 ? '(về đông)' : '(về tây)'}${Math.abs(ll.lat) < 20 ? ' — dòng tia xích đạo nhanh gấp 4 lần của Sao Mộc' : ll.lat > 74 ? ' — dòng tia lục giác' : Math.abs(ll.lat - 37.7) < 4 ? ' — vĩ độ của Bão Trắng Lớn 2010–11' : ''}.`);
+        ctx.toast(t(`Vĩ độ <b>${latStr(ll.lat)}</b>: gió ${u >= 0 ? '+' : '−'}${Math.abs(u).toFixed(0)} m/s ${u >= 0 ? '(về đông)' : '(về tây)'}${Math.abs(ll.lat) < 20 ? ' — dòng tia xích đạo nhanh gấp 4 lần của Sao Mộc' : ll.lat > 74 ? ' — dòng tia lục giác' : Math.abs(ll.lat - 37.7) < 4 ? ' — vĩ độ của Bão Trắng Lớn 2010–11' : ''}.`,
+          `Latitude <b>${latStr(ll.lat)}</b>: wind ${u >= 0 ? '+' : '−'}${Math.abs(u).toFixed(0)} m/s ${u >= 0 ? '(eastward)' : '(westward)'}${Math.abs(ll.lat) < 20 ? " — the equatorial jet, four times faster than Jupiter's" : ll.lat > 74 ? ' — the hexagon jet' : Math.abs(ll.lat - 37.7) < 4 ? ' — the latitude of the 2010–11 Great White Spot' : ''}.`));
       },
       gwsShot(ctx, _unused, quiet) {
         const p = ctx.params; clock(ctx);
@@ -1002,7 +1038,8 @@ const SATURN = {
         orient(st, 26.73, p.season, p.sunAz);
         const sc = subLon(st, ctx.camera.position);
         st.gwsLon0 = sc.lonE; st.avLon0 = wrap(sc.lonE - 0.35);
-        if (!quiet) ctx.toast('Bão Trắng Lớn (5/12/2010): một cột đối lưu khổng lồ trồi lên ở 37,7° B, phun băng amoniac trắng lên đỉnh mây. Đầu bão trôi về tây ~28 m/s; vật chất nó thả ra bị dòng tia cuốn về đông, sau ~55 ngày đuôi quấn kín hành tinh. Thời tiết đang tua: 1 ngày ≈ 2,5 giây; camera bám theo đầu bão.', 11000);
+        if (!quiet) ctx.toast(t('Bão Trắng Lớn (5/12/2010): một cột đối lưu khổng lồ trồi lên ở 37,7° B, phun băng amoniac trắng lên đỉnh mây. Đầu bão trôi về tây ~28 m/s; vật chất nó thả ra bị dòng tia cuốn về đông, sau ~55 ngày đuôi quấn kín hành tinh. Thời tiết đang tua: 1 ngày ≈ 2,5 giây; camera bám theo đầu bão.',
+          'Great White Spot (5 Dec 2010): a giant convective plume punched up at 37.7° N, spraying white ammonia ice onto the cloud tops. The storm head drifted west at ~28 m/s; the material it shed was swept east by the jet, and after ~55 days the tail had wrapped all the way around the planet. Weather is fast-forwarded: 1 day ≈ 2.5 seconds; the camera tracks the storm head.'), 11000);
       },
       hexShot(ctx, _u, quiet) {
         const p = ctx.params; if (p.season < 8) p.season = 20; p.track = false;
@@ -1011,7 +1048,8 @@ const SATURN = {
         const side = new V3().crossVectors(st.pole, st.sun).normalize();
         const dir = st.pole.clone().multiplyScalar(0.96).addScaledVector(st.sun, 0.25).addScaledVector(side, 0.05).normalize();
         ctx.camera.position.copy(dir.multiplyScalar(d)); ctx.controls.target.set(0, 0, 0); ctx.camera.lookAt(0, 0, 0); ctx.controls.update();
-        if (!quiet) ctx.toast('Lục giác cực Bắc: dòng tia ~120 m/s uốn khúc thành sóng đứng 6 cạnh, rộng gấp hơn 2 lần Trái Đất. Hình lục giác quay đúng chu kỳ System III (10 h 39 m 22 s) — chậm hơn lõi ~6 phút mỗi vòng. Ở tâm là xoáy thuận với mắt bão rộng ~2 000 km, gió ~150 m/s. Màu xanh xám bên trong: sương mù hạt nhỏ, bị dòng tia ngăn lại như "lỗ thủng ôzôn".', 10000);
+        if (!quiet) ctx.toast(t('Lục giác cực Bắc: dòng tia ~120 m/s uốn khúc thành sóng đứng 6 cạnh, rộng gấp hơn 2 lần Trái Đất. Hình lục giác quay đúng chu kỳ System III (10 h 39 m 22 s) — chậm hơn lõi ~6 phút mỗi vòng. Ở tâm là xoáy thuận với mắt bão rộng ~2 000 km, gió ~150 m/s. Màu xanh xám bên trong: sương mù hạt nhỏ, bị dòng tia ngăn lại như "lỗ thủng ôzôn".',
+          'North polar hexagon: a ~120 m/s jet stream meanders into a six-sided standing wave more than twice as wide as Earth. The hexagon rotates with exactly the System III period (10 h 39 m 22 s) — about 6 minutes per turn slower than the interior. At its centre sits a cyclone with an eye ~2,000 km wide and ~150 m/s winds. The blue-grey colour inside is fine-particle haze held back by the jet, like an "ozone hole".'), 10000);
       },
       ringShot(ctx, _u, quiet) {
         const p = ctx.params;
@@ -1034,7 +1072,8 @@ const SATURN = {
         ctx.controls.minDistance = 0.01;
         ctx.controls.target.copy(tgt.applyMatrix3(Bw)); ctx.camera.position.copy(cam.applyMatrix3(Bw));
         ctx.camera.lookAt(ctx.controls.target); ctx.controls.update();
-        if (!quiet) ctx.toast('Lơ lửng 4 500 km phía trên vành A (khe Encke ở dưới), nhìn vào vành B ngay sau rìa bình minh — nơi nan hoa hình thành. Các cục vật chất và "sóng thức" (wake) bị kéo xiên vì hạt ở vòng trong quay nhanh hơn; nan hoa (bụi tích điện) hiện lên rồi bị kéo nghiêng trong vài giờ. Nhấp vào vành để xem chu kỳ quỹ đạo tại đó.', 9000);
+        if (!quiet) ctx.toast(t('Lơ lửng 4 500 km phía trên vành A (khe Encke ở dưới), nhìn vào vành B ngay sau rìa bình minh — nơi nan hoa hình thành. Các cục vật chất và "sóng thức" (wake) bị kéo xiên vì hạt ở vòng trong quay nhanh hơn; nan hoa (bụi tích điện) hiện lên rồi bị kéo nghiêng trong vài giờ. Nhấp vào vành để xem chu kỳ quỹ đạo tại đó.',
+          'Hovering 4,500 km above the A ring (the Encke Gap below), looking at the B ring just past the dawn ansa — where spokes form. Clumps and self-gravity wakes are sheared because inner particles orbit faster; spokes (charged dust) appear and are tilted over within hours. Click the rings to see the orbital period there.'), 9000);
       },
       // (verification view) straight down onto the A ring from 3 000 km: clumps drifting and shearing at Ω_K(r)
       ringTop(ctx) {
@@ -1056,7 +1095,8 @@ const SATURN = {
         const dir = st.sun.clone().negate().addScaledVector(perp, -sgn * 0.04).normalize();
         ctx.camera.position.copy(dir.multiplyScalar(15)); ctx.controls.target.set(0, 0, 0); ctx.camera.lookAt(0, 0, 0); ctx.controls.update();
         if (ctx.bhGlobals) ctx.bhGlobals.exposure = Math.max(ctx.bhGlobals.exposure, 1.5);
-        if (!quiet) ctx.toast('Trong bóng Sao Thổ, nhìn về phía Mặt Trời (Cassini, 19/7/2013 — "ngày Trái Đất mỉm cười"): bụi mịn tán xạ về phía trước nên vành C, khe Cassini, vành F, G và E sáng rực (vành bụi đang phóng đại ×80, như ảnh ghép đã kéo sáng của NASA), còn vành B dày đặc lại tối. Chấm xanh nhạt cạnh Sao Thổ là Trái Đất.', 11000);
+        if (!quiet) ctx.toast(t('Trong bóng Sao Thổ, nhìn về phía Mặt Trời (Cassini, 19/7/2013 — "ngày Trái Đất mỉm cười"): bụi mịn tán xạ về phía trước nên vành C, khe Cassini, vành F, G và E sáng rực (vành bụi đang phóng đại ×80, như ảnh ghép đã kéo sáng của NASA), còn vành B dày đặc lại tối. Chấm xanh nhạt cạnh Sao Thổ là Trái Đất.',
+          'Inside Saturn\'s shadow, looking toward the Sun (Cassini, 19 July 2013 — "The Day the Earth Smiled"): fine dust forward-scatters sunlight, so the C ring, the Cassini Division and the F, G and E rings blaze (dusty rings boosted ×80, like NASA\'s stretched mosaic), while the dense B ring goes dark. The pale blue dot beside Saturn is Earth.'), 11000);
       },
       enceladusShot(ctx, leave, quiet) {
         if (st.follow) {
@@ -1075,7 +1115,8 @@ const SATURN = {
         const dir = st.sun.clone().negate().addScaledVector(st.pole, -0.35).normalize();
         ctx.controls.minDistance = Rm * 1.5;
         ctx.controls.target.copy(m); ctx.camera.position.copy(m.clone().addScaledVector(dir, Rm * 14)); ctx.camera.lookAt(m); ctx.controls.update();
-        if (!quiet) ctx.toast('Enceladus (đường kính 504 km): hơn 100 mạch phun hơi nước và hạt băng thoát ra từ các "vết hổ" ở cực Nam, nuôi vành E. Đại dương lỏng nằm dưới lớp băng. Mạch phun sáng nhất khi nhìn ngược sáng.', 9000);
+        if (!quiet) ctx.toast(t('Enceladus (đường kính 504 km): hơn 100 mạch phun hơi nước và hạt băng thoát ra từ các "vết hổ" ở cực Nam, nuôi vành E. Đại dương lỏng nằm dưới lớp băng. Mạch phun sáng nhất khi nhìn ngược sáng.',
+          'Enceladus (504 km across): more than 100 jets of water vapour and ice grains escape from the south-polar "tiger stripes", feeding the E ring. A liquid ocean lies beneath the ice shell. The plumes are brightest when backlit.'), 9000);
       },
     };
     SATURN.__inst = inst;

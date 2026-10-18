@@ -30,6 +30,7 @@
 //    turned into a cloud map on the GPU against the Blue Marble surface; falls back to the bundled map.
 import * as THREE from 'three';
 import { COMMON_GLSL, FULLSCREEN_VERT } from '../../glsl/common.js';
+import { t, locale } from '../../i18n.js';
 
 const D2R = Math.PI / 180;
 const SIDEREAL_H = 23.9344696;                 // hours per rotation relative to the stars
@@ -788,17 +789,17 @@ function hitSphere(o, d, R = 1) {
   return t > 0 ? t : null;
 }
 const hhmm = h => { h = wrap24(h); return `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')}`; };
-const latStr = v => `${Math.abs(v).toFixed(1)}°${v >= 0 ? 'B' : 'N'}`;
-const lonStr = v => `${Math.abs(v).toFixed(1)}°${v >= 0 ? 'Đ' : 'T'}`;
+const latStr = v => `${Math.abs(v).toFixed(1)}°${v >= 0 ? t('B', 'N') : t('N', 'S')}`;
+const lonStr = v => `${Math.abs(v).toFixed(1)}°${v >= 0 ? t('Đ', 'E') : t('T', 'W')}`;
 function orbitRows(ctx, Rkm, refR = 1) {
   const d = ctx.camera.position.length(), hKm = (d - refR) * Rkm;
   const horizon = Math.sqrt(Math.max(d * d - refR * refR, 0)) * Rkm;
-  return [['Độ cao', ctx.fmt.dist(hKm * 1000)], ['Khoảng cách tới đường chân trời', ctx.fmt.dist(horizon * 1000)]];
+  return [[t('Độ cao', 'Altitude'), ctx.fmt.dist(hKm * 1000)], [t('Khoảng cách tới đường chân trời', 'Distance to the horizon'), ctx.fmt.dist(horizon * 1000)]];
 }
 function sunElevStr(n, L) {
   const e = Math.asin(Math.max(-1, Math.min(1, n.dot(L)))) / D2R;
-  const tag = e > 6 ? 'ban ngày' : e > -0.8 ? 'bình minh/hoàng hôn' : e > -18 ? 'chạng vạng' : 'ban đêm';
-  return `Mặt Trời cao <b>${e.toFixed(1)}°</b> (${tag})`;
+  const tag = e > 6 ? t('ban ngày', 'daytime') : e > -0.8 ? t('bình minh/hoàng hôn', 'sunrise/sunset') : e > -18 ? t('chạng vạng', 'twilight') : t('ban đêm', 'night');
+  return t(`Mặt Trời cao <b>${e.toFixed(1)}°</b> (${tag})`, `Sun elevation <b>${e.toFixed(1)}°</b> (${tag})`);
 }
 // Right-handed geography (east = counter-clockwise seen from the north, like the real planet and the
 // NASA maps): body = rotY(−spin)·world, east longitude = atan2(x, z). Afternoon puts the Sun west.
@@ -812,7 +813,7 @@ const localHourE = (p, L) => wrap24(12 + (Math.atan2(p.x, p.z) - Math.atan2(L.x,
 // ---- calendar & ephemerides (2026; low-precision formulas from the Astronomical Almanac / Meeus) ----
 const YEAR = 2026, J2000_YEAR0 = 9496.5;      // days from J2000.0 to 2026-01-01 00:00 UT
 const dateOf = doy => new Date(Date.UTC(YEAR, 0, 1) + (Math.round(doy) - 1) * 864e5);
-const dateStr = doy => { const d = dateOf(doy); return `${d.getUTCDate()}/${d.getUTCMonth() + 1}`; };
+const dateStr = doy => { const d = dateOf(doy); return t(`${d.getUTCDate()}/${d.getUTCMonth() + 1}`, d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })); };
 function solar(d) {
   const g = (357.529 + 0.98560028 * d) * D2R, q = 280.459 + 0.98564736 * d;
   const lam = (q + 1.915 * Math.sin(g) + 0.020 * Math.sin(2 * g)) * D2R, eps = (23.439 - 3.6e-7 * d) * D2R;
@@ -849,7 +850,7 @@ function decodeImage(url) {
       g.drawImage(img, 0, 0);
       resolve({ W, H, px: g.getImageData(0, 0, W, H).data });
     };
-    img.onerror = () => reject(new Error(`không tải được ${url}`));
+    img.onerror = () => reject(new Error(t(`không tải được ${url}`, `failed to load ${url}`)));
     img.src = url;
   });
 }
@@ -906,7 +907,7 @@ function loadImageTex(url, { srgb = false, red = false, aniso = 1, maxSize = 163
     tex.generateMipmaps = true; tex.anisotropy = aniso;
     tex.needsUpdate = true;
     resolve(tex);
-  }, undefined, () => reject(new Error(`không tải được ${url}`))));
+  }, undefined, () => reject(new Error(t(`không tải được ${url}`, `failed to load ${url}`)))));
 }
 const retry = (fn, url, ...a) => fn(url, ...a).catch(() => new Promise(r => setTimeout(r, 500)).then(() => fn(url + '?r=' + Date.now(), ...a)));
 function solidTex(data, format, type) {
@@ -965,20 +966,20 @@ function bakeClimate(cloudImg, elevCPU) {
    The atlas earth_storms.jpg holds four real storms (2×2 cells, storm-centred azimuthal-equidistant,
    north up). half = half-size of the cell in degrees of arc; hemi = hemisphere the image comes from. */
 const STAMPS = [
-  { cell: 0, hemi: 1, half: 8, name: 'bão Irma (5/9/2017, cấp 5)' },
-  { cell: 1, hemi: 1, half: 8, name: 'bão Florence (11/9/2018, cấp 4)' },
-  { cell: 2, hemi: 1, half: 13, name: 'xoáy thuận Bắc Thái Bình Dương (1/2/2022)' },
-  { cell: 3, hemi: -1, half: 13, name: 'xoáy thuận Nam Ấn Độ Dương (16/10/2026)' },
-  { cell: 4, hemi: 1, half: 8, name: 'một bão nhiệt đới đang mạnh lên ở Tây Thái Bình Dương (16/10/2026)' },
-  { cell: 5, hemi: -1, half: 11, name: 'xoáy thuận Đông Nam Thái Bình Dương ngoài khơi Chile (16/10/2026)' },
-  { cell: 6, hemi: 1, half: 11, name: 'xoáy thuận Bắc Đại Tây Dương (10/3/2023)' },
+  { cell: 0, hemi: 1, half: 8, name: 'bão Irma (5/9/2017, cấp 5)', en: 'Hurricane Irma (Sep 5, 2017, Category 5)' },
+  { cell: 1, hemi: 1, half: 8, name: 'bão Florence (11/9/2018, cấp 4)', en: 'Hurricane Florence (Sep 11, 2018, Category 4)' },
+  { cell: 2, hemi: 1, half: 13, name: 'xoáy thuận Bắc Thái Bình Dương (1/2/2022)', en: 'a North Pacific cyclone (Feb 1, 2022)' },
+  { cell: 3, hemi: -1, half: 13, name: 'xoáy thuận Nam Ấn Độ Dương (16/10/2026)', en: 'a South Indian Ocean cyclone (Oct 16, 2026)' },
+  { cell: 4, hemi: 1, half: 8, name: 'một bão nhiệt đới đang mạnh lên ở Tây Thái Bình Dương (16/10/2026)', en: 'an intensifying tropical storm in the western Pacific (Oct 16, 2026)' },
+  { cell: 5, hemi: -1, half: 11, name: 'xoáy thuận Đông Nam Thái Bình Dương ngoài khơi Chile (16/10/2026)', en: 'a southeast Pacific cyclone off Chile (Oct 16, 2026)' },
+  { cell: 6, hemi: 1, half: 11, name: 'xoáy thuận Bắc Đại Tây Dương (10/3/2023)', en: 'a North Atlantic cyclone (Mar 10, 2023)' },
 ];
 // tropical-cyclone basins per slot: genesis box [lat0, lat1], [lon0, lon1], hemisphere
 const TC_BASINS = [
-  [{ h: 1, lat: [8, 17], lon: [128, 160], name: 'Tây Bắc Thái Bình Dương' }],
-  [{ h: 1, lat: [10, 16], lon: [-55, -25], name: 'Bắc Đại Tây Dương' }, { h: 1, lat: [10, 15], lon: [-112, -95], name: 'Đông Bắc Thái Bình Dương' }],
-  [{ h: -1, lat: [-15, -8], lon: [58, 95], name: 'Nam Ấn Độ Dương' }, { h: -1, lat: [-18, -11], lon: [150, 175], name: 'Nam Thái Bình Dương' }, { h: -1, lat: [-16, -11], lon: [108, 125], name: 'Tây Bắc Úc' }],
-  [{ h: 1, lat: [11, 17], lon: [86, 91], name: 'vịnh Bengal' }, { h: 1, lat: [9, 15], lon: [135, 165], name: 'Tây Bắc Thái Bình Dương' }],
+  [{ h: 1, lat: [8, 17], lon: [128, 160], name: 'Tây Bắc Thái Bình Dương', en: 'the northwest Pacific' }],
+  [{ h: 1, lat: [10, 16], lon: [-55, -25], name: 'Bắc Đại Tây Dương', en: 'the North Atlantic' }, { h: 1, lat: [10, 15], lon: [-112, -95], name: 'Đông Bắc Thái Bình Dương', en: 'the northeast Pacific' }],
+  [{ h: -1, lat: [-15, -8], lon: [58, 95], name: 'Nam Ấn Độ Dương', en: 'the South Indian Ocean' }, { h: -1, lat: [-18, -11], lon: [150, 175], name: 'Nam Thái Bình Dương', en: 'the South Pacific' }, { h: -1, lat: [-16, -11], lon: [108, 125], name: 'Tây Bắc Úc', en: 'northwest Australia' }],
+  [{ h: 1, lat: [11, 17], lon: [86, 91], name: 'vịnh Bengal', en: 'the Bay of Bengal' }, { h: 1, lat: [9, 15], lon: [135, 165], name: 'Tây Bắc Thái Bình Dương', en: 'the northwest Pacific' }],
 ];
 const ETC_GEN_N = [142, 160, -72, -58, -175, -100, -42];   // NH lows: off Japan/Kuroshio, Gulf Stream, Aleutians, lee of the Rockies…
 function smoothLife(a, a0, a1, b0, b1) { return sstep(a0, a1, a) * (1 - sstep(b0, b1, a)); }
@@ -987,8 +988,8 @@ function smoothLife(a, a0, a1, b0, b1) { return sstep(a0, a1, a) * (1 - sstep(b0
    Scene definition
    ================================================================================================ */
 const SATS = {
-  g19: { lon: -75.2, name: 'GOES-19 (GOES-East, 75,2°T)' }, g18: { lon: -137.0, name: 'GOES-18 (GOES-West, 137°T)' },
-  h9: { lon: 140.7, name: 'Himawari-9 (140,7°Đ)' }, m0: { lon: 0, name: 'Meteosat (0°)' }, iodc: { lon: 45.5, name: 'Meteosat IODC (45,5°Đ)' },
+  g19: { lon: -75.2, name: 'GOES-19 (GOES-East, 75,2°T)', en: 'GOES-19 (GOES-East, 75.2°W)' }, g18: { lon: -137.0, name: 'GOES-18 (GOES-West, 137°T)', en: 'GOES-18 (GOES-West, 137°W)' },
+  h9: { lon: 140.7, name: 'Himawari-9 (140,7°Đ)', en: 'Himawari-9 (140.7°E)' }, m0: { lon: 0, name: 'Meteosat (0°)', en: 'Meteosat (0°)' }, iodc: { lon: 45.5, name: 'Meteosat IODC (45,5°Đ)', en: 'Meteosat IODC (45.5°E)' },
 };
 const R_GEO = 42164 / R_KM;
 
@@ -1010,37 +1011,69 @@ export default [{
     ['Đỉnh cao nhất / điểm sâu nhất', 'Everest 8 849 m / vực Challenger −10 935 m'],
     ['Dữ liệu', 'NASA Blue Marble NG (6 & 1/2004), NOAA ETOPO 2022, NASA Black Marble 2016, mây NASA Blue Marble, bão từ NASA GIBS/VIIRS, Mặt Trăng LRO'],
   ],
+  en: {
+    name: 'Earth',
+    subtitle: 'Rocky planet · our home',
+    blurb: 'The only planet known to host life, with oceans covering 71 % of its surface. The surface is <b>real data</b> (Blue Marble, ETOPO 2022, Black Marble) and Earth <b>moves for real</b>: it turns once every 23 h 56 min relative to the stars, the seasons follow its 23.44° axial tilt, and the clouds ride the general circulation — trade winds, the meandering mid-latitude westerlies, cyclones spinning counter-clockwise in the Northern Hemisphere and clockwise in the Southern (the Coriolis force), tropical storms with eyes, and convective clouds billowing up every afternoon over the tropical continents.',
+    intro: '<b>O</b>: view from geostationary orbit like a GOES/Himawari time-lapse · <b>B</b>: follow a storm · <b>L</b>: find the Moon · <b>Y</b>: the Himalaya at dawn.',
+    facts: [
+      ['Mean radius', '6,371 km'], ['Mass', '5.97×10²⁴ kg'], ['Surface gravity', '9.81 m/s²'],
+      ['Axial tilt', '23.44°'], ['Solar day / sidereal day', '24 h / 23 h 56 min 4 s'],
+      ['Equatorial rotation speed', '1,674 km/h'],
+      ['Bond albedo', '0.30'], ['Atmosphere', 'N₂ 78 %, O₂ 21 %, Ar 0.9 % · 1,013 hPa'],
+      ['Scale height (Rayleigh / Mie)', '8 km / 1.2 km'],
+      ['Highest peak / deepest point', 'Everest 8,849 m / Challenger Deep −10,935 m'],
+      ['Data', 'NASA Blue Marble NG (Jun & Jan 2004), NOAA ETOPO 2022, NASA Black Marble 2016, NASA Blue Marble clouds, storms from NASA GIBS/VIIRS, Moon from LRO'],
+    ],
+  },
   unitKm: 6371,
   camera: { distance: 3.2, polar: 72, azimuth: 20, min: 1.03, max: 30, fov: 45 },
   exposure: 1.0,
   bloom: 0.3,
   params: [
     { key: 'hour', label: 'Giờ địa phương (dưới camera)', type: 'range', min: 0, max: 24, step: 0.1, default: 13.5, fmt: v => hhmm(v),
-      note: '12:00 = Mặt Trời sau lưng bạn (Trái Đất tròn đầy); 18:00 = đường phân chia đi qua giữa đĩa; 00:00 = mặt đêm. Khi nhìn từ vệ tinh địa tĩnh, thanh này chạy như đồng hồ.' },
+      note: '12:00 = Mặt Trời sau lưng bạn (Trái Đất tròn đầy); 18:00 = đường phân chia đi qua giữa đĩa; 00:00 = mặt đêm. Khi nhìn từ vệ tinh địa tĩnh, thanh này chạy như đồng hồ.',
+      en: { label: 'Local time (below camera)', note: '12:00 = the Sun behind you (full Earth); 18:00 = the terminator crosses the middle of the disc; 00:00 = the night side. In the geostationary view this slider runs like a clock.' } },
     { key: 'date', label: 'Ngày trong năm (mùa)', type: 'range', min: 1, max: 365, step: 1, default: 213, fmt: v => `${dateStr(v)} · δ ${declOf(v).toFixed(1)}°`,
-      note: 'Trục quay nghiêng 23,44° nên điểm Mặt Trời đứng bóng dời từ 23,4°N (21/12) lên 23,4°B (21/6). Theo ngày: vĩ độ Mặt Trời, mép băng biển, tuyết mùa đông (ảnh Blue Marble tháng 1 và 6), mùa bão, dải hội tụ nhiệt đới và vị trí Mặt Trăng.' },
+      note: 'Trục quay nghiêng 23,44° nên điểm Mặt Trời đứng bóng dời từ 23,4°N (21/12) lên 23,4°B (21/6). Theo ngày: vĩ độ Mặt Trời, mép băng biển, tuyết mùa đông (ảnh Blue Marble tháng 1 và 6), mùa bão, dải hội tụ nhiệt đới và vị trí Mặt Trăng.',
+      en: { label: 'Day of year (season)', note: 'The spin axis is tilted 23.44°, so the subsolar point moves from 23.4°S (Dec 21) up to 23.4°N (Jun 21). Following the date: the Sun\'s latitude, the sea-ice edge, winter snow (Blue Marble January and June images), the storm season, the Intertropical Convergence Zone and the Moon\'s position.' } },
     { key: 'pace', label: 'Tua nhanh thời gian Trái Đất', type: 'seg', options: [[0, 'Dừng'], [1, 'Thật'], [120, '×120'], [360, '×360'], [1200, '×1200']], default: 120,
-      note: 'Số giây Trái Đất trôi qua trong một giây mô phỏng (nhân thêm thanh Tốc độ thời gian chung, mặc định 6×). ×1200 ở 6×: một ngày trong 12 giây, như phim tua nhanh ảnh vệ tinh.' },
+      note: 'Số giây Trái Đất trôi qua trong một giây mô phỏng (nhân thêm thanh Tốc độ thời gian chung, mặc định 6×). ×1200 ở 6×: một ngày trong 12 giây, như phim tua nhanh ảnh vệ tinh.',
+      en: { label: 'Earth time-lapse', options: ['Stop', 'Real', '×120', '×360', '×1200'], note: 'Earth seconds elapsed per simulated second (multiplied again by the global Time speed slider, 6× by default). ×1200 at 6×: one day in 12 seconds, like a satellite time-lapse movie.' } },
     { key: 'sat', label: 'Nhìn từ vệ tinh địa tĩnh', type: 'seg', options: [['off', 'Tự do'], ['g19', 'GOES-E'], ['m0', 'Meteosat'], ['iodc', 'IODC'], ['h9', 'Himawari'], ['g18', 'GOES-W']], default: 'off',
-      note: 'Camera đứng yên trên xích đạo ở độ cao 35 786 km, quay cùng Trái Đất — đúng góc nhìn của các vệ tinh khí tượng. Ngày và đêm lướt qua đĩa, mây chuyển động. Cuộn chuột để phóng to.' },
-    { key: 'exag', label: 'Phóng đại địa hình', type: 'range', min: 1, max: 40, step: 0.5, default: 8, fmt: v => '×' + v.toFixed(1), note: '×1 = tỉ lệ thật: Everest chỉ cao 0,14 % bán kính, gần như vô hình từ quỹ đạo.' },
-    { key: 'clouds', label: 'Độ che phủ mây', type: 'range', min: 0, max: 1, step: 0.01, default: 0.5, note: '0,5 = đúng như ảnh mây thật.' },
-    { key: 'wx', label: 'Thời tiết chuyển động', type: 'toggle', default: true, note: 'Tắt: ảnh mây tổng hợp đứng yên (như ảnh chụp một thời điểm).' },
-    { key: 'live', label: 'Mây thật (NASA GIBS, hôm qua)', type: 'toggle', default: false, note: 'Tải ảnh toàn cầu VIIRS (NOAA-20) của ngày hôm qua từ NASA GIBS và tách lớp mây. Cần mạng; nếu không tải được sẽ dùng ảnh mây đi kèm.' },
-    { key: 'atmo', label: 'Mật độ khí quyển', type: 'range', min: 0, max: 3, step: 0.01, default: 1, fmt: v => '×' + v.toFixed(2), note: 'Nhân hệ số tán xạ Rayleigh, Mie và hấp thụ ozone.' },
-    { key: 'cities', label: 'Đèn thành phố', type: 'toggle', default: true },
-    { key: 'moon', label: 'Mặt Trăng', type: 'toggle', default: true, note: 'Đúng vị trí, khoảng cách (~60 bán kính Trái Đất) và pha theo ngày giờ.' },
-    { key: 'kp', label: 'Bão địa từ (chỉ số Kp)', type: 'range', min: 0, max: 9, step: 0.1, default: 4, fmt: v => 'Kp ' + v.toFixed(1), note: 'Kp càng lớn, vành cực quang càng mở rộng về phía xích đạo.' },
-    { key: 'aurora', label: 'Cực quang', type: 'toggle', default: true },
+      note: 'Camera đứng yên trên xích đạo ở độ cao 35 786 km, quay cùng Trái Đất — đúng góc nhìn của các vệ tinh khí tượng. Ngày và đêm lướt qua đĩa, mây chuyển động. Cuộn chuột để phóng to.',
+      en: { label: 'View from geostationary satellite', options: ['Free', 'GOES-E', 'Meteosat', 'IODC', 'Himawari', 'GOES-W'], note: 'The camera hangs still above the equator at 35,786 km, turning with Earth — exactly the viewpoint of the weather satellites. Day and night sweep across the disc and the clouds move. Scroll to zoom in.' } },
+    { key: 'exag', label: 'Phóng đại địa hình', type: 'range', min: 1, max: 40, step: 0.5, default: 8, fmt: v => '×' + v.toFixed(1), note: '×1 = tỉ lệ thật: Everest chỉ cao 0,14 % bán kính, gần như vô hình từ quỹ đạo.',
+      en: { label: 'Terrain exaggeration', note: '×1 = true scale: Everest is only 0.14 % of the radius, practically invisible from orbit.' } },
+    { key: 'clouds', label: 'Độ che phủ mây', type: 'range', min: 0, max: 1, step: 0.01, default: 0.5, note: '0,5 = đúng như ảnh mây thật.', en: { label: 'Cloud cover', note: '0.5 = as in the real cloud imagery.' } },
+    { key: 'wx', label: 'Thời tiết chuyển động', type: 'toggle', default: true, note: 'Tắt: ảnh mây tổng hợp đứng yên (như ảnh chụp một thời điểm).',
+      en: { label: 'Moving weather', note: 'Off: the cloud composite stands still (like a snapshot of a single moment).' } },
+    { key: 'live', label: 'Mây thật (NASA GIBS, hôm qua)', type: 'toggle', default: false, note: 'Tải ảnh toàn cầu VIIRS (NOAA-20) của ngày hôm qua từ NASA GIBS và tách lớp mây. Cần mạng; nếu không tải được sẽ dùng ảnh mây đi kèm.',
+      en: { label: 'Real clouds (NASA GIBS, yesterday)', note: 'Downloads yesterday\'s global VIIRS (NOAA-20) image from NASA GIBS and extracts the cloud layer. Needs a network connection; if it fails to load, the bundled cloud map is used.' } },
+    { key: 'atmo', label: 'Mật độ khí quyển', type: 'range', min: 0, max: 3, step: 0.01, default: 1, fmt: v => '×' + v.toFixed(2), note: 'Nhân hệ số tán xạ Rayleigh, Mie và hấp thụ ozone.',
+      en: { label: 'Atmospheric density', note: 'Scales the Rayleigh and Mie scattering and ozone absorption coefficients.' } },
+    { key: 'cities', label: 'Đèn thành phố', type: 'toggle', default: true, en: { label: 'City lights' } },
+    { key: 'moon', label: 'Mặt Trăng', type: 'toggle', default: true, note: 'Đúng vị trí, khoảng cách (~60 bán kính Trái Đất) và pha theo ngày giờ.',
+      en: { label: 'Moon', note: 'True position, distance (~60 Earth radii) and phase for the date and time.' } },
+    { key: 'kp', label: 'Bão địa từ (chỉ số Kp)', type: 'range', min: 0, max: 9, step: 0.1, default: 4, fmt: v => 'Kp ' + v.toFixed(1), note: 'Kp càng lớn, vành cực quang càng mở rộng về phía xích đạo.',
+      en: { label: 'Geomagnetic storm (Kp index)', note: 'The higher the Kp, the further the auroral oval expands towards the equator.' } },
+    { key: 'aurora', label: 'Cực quang', type: 'toggle', default: true, en: { label: 'Aurora' } },
   ],
   actions: [
-    { label: 'Himalaya', key: 'y', title: 'Bay tới dãy Himalaya lúc bình minh (bấm lần nữa để quay lại)', run: ctx => ctx.scene._earth?.himalaya(ctx) },
-    { label: 'Vệ tinh', key: 'o', title: 'Lần lượt các vệ tinh khí tượng địa tĩnh', run: ctx => ctx.scene._earth?.nextSat(ctx) },
-    { label: 'Theo bão', key: 'b', title: 'Bay tới và bám theo một cơn bão', run: ctx => ctx.scene._earth?.storm(ctx) },
-    { label: 'Mặt Trăng', key: 'l', title: 'Xoay giờ và góc nhìn để thấy Mặt Trăng sau Trái Đất', run: ctx => ctx.scene._earth?.moon(ctx) },
-    { label: 'Ban đêm', key: 'n', title: 'Nhìn mặt đêm: đèn thành phố và cực quang', run: ctx => { ctx.params.hour = 0.5; ctx.scene._earth?.reSun(); ctx.toast('Nửa đêm dưới camera: ánh đèn đô thị (Black Marble 2016) bám theo bờ biển, sông ngòi và đường sá; vành cực quang xanh lục (oxy 557,7 nm) bao quanh cực từ.'); } },
-    { label: 'Hoàng hôn', key: 'j', title: 'Đặt đường phân chia ngày–đêm vào giữa đĩa', run: ctx => { ctx.params.hour = 17.8; ctx.scene._earth?.reSun(); ctx.toast('Ánh nắng chiều đi xuyên qua ~40 lần bề dày khí quyển: ánh xanh bị tán xạ hết, chỉ còn đỏ cam.'); } },
-    { label: 'Bão địa từ', key: 'g', title: 'Bão địa từ cực mạnh (Kp 8,7 như tháng 5/2024)', run: ctx => { ctx.params.kp = 8.7; ctx.params.aurora = true; ctx.params.hour = 0.5; ctx.scene._earth?.reSun(); ctx.toast('Bão địa từ G5 (5/2024, Kp ≈ 9): vành cực quang mở rộng xuống vĩ độ ~45°, ánh đỏ oxy 630 nm ở độ cao lớn hiện rõ.'); } },
+    { label: 'Himalaya', key: 'y', title: 'Bay tới dãy Himalaya lúc bình minh (bấm lần nữa để quay lại)', run: ctx => ctx.scene._earth?.himalaya(ctx),
+      en: { label: 'Himalaya', title: 'Fly to the Himalaya at dawn (press again to go back)' } },
+    { label: 'Vệ tinh', key: 'o', title: 'Lần lượt các vệ tinh khí tượng địa tĩnh', run: ctx => ctx.scene._earth?.nextSat(ctx),
+      en: { label: 'Satellite', title: 'Cycle through the geostationary weather satellites' } },
+    { label: 'Theo bão', key: 'b', title: 'Bay tới và bám theo một cơn bão', run: ctx => ctx.scene._earth?.storm(ctx),
+      en: { label: 'Follow a storm', title: 'Fly to a storm and track it' } },
+    { label: 'Mặt Trăng', key: 'l', title: 'Xoay giờ và góc nhìn để thấy Mặt Trăng sau Trái Đất', run: ctx => ctx.scene._earth?.moon(ctx),
+      en: { label: 'Moon', title: 'Turn the clock and the view to see the Moon beyond Earth' } },
+    { label: 'Ban đêm', key: 'n', title: 'Nhìn mặt đêm: đèn thành phố và cực quang', run: ctx => { ctx.params.hour = 0.5; ctx.scene._earth?.reSun(); ctx.toast(t('Nửa đêm dưới camera: ánh đèn đô thị (Black Marble 2016) bám theo bờ biển, sông ngòi và đường sá; vành cực quang xanh lục (oxy 557,7 nm) bao quanh cực từ.', 'Midnight below the camera: city lights (Black Marble 2016) trace coastlines, rivers and roads; the green auroral oval (oxygen 557.7 nm) rings the magnetic pole.')); },
+      en: { label: 'Night', title: 'Look at the night side: city lights and aurora' } },
+    { label: 'Hoàng hôn', key: 'j', title: 'Đặt đường phân chia ngày–đêm vào giữa đĩa', run: ctx => { ctx.params.hour = 17.8; ctx.scene._earth?.reSun(); ctx.toast(t('Ánh nắng chiều đi xuyên qua ~40 lần bề dày khí quyển: ánh xanh bị tán xạ hết, chỉ còn đỏ cam.', 'Evening sunlight passes through ~40 times the thickness of the atmosphere: the blue is scattered away, leaving only red and orange.')); },
+      en: { label: 'Sunset', title: 'Put the day–night terminator across the middle of the disc' } },
+    { label: 'Bão địa từ', key: 'g', title: 'Bão địa từ cực mạnh (Kp 8,7 như tháng 5/2024)', run: ctx => { ctx.params.kp = 8.7; ctx.params.aurora = true; ctx.params.hour = 0.5; ctx.scene._earth?.reSun(); ctx.toast(t('Bão địa từ G5 (5/2024, Kp ≈ 9): vành cực quang mở rộng xuống vĩ độ ~45°, ánh đỏ oxy 630 nm ở độ cao lớn hiện rõ.', 'G5 geomagnetic storm (May 2024, Kp ≈ 9): the auroral oval expands down to ~45° latitude and the high-altitude red oxygen glow at 630 nm stands out.')); },
+      en: { label: 'Geomagnetic storm', title: 'An extreme geomagnetic storm (Kp 8.7, as in May 2024)' } },
   ],
   create(ctx) {
     const R = ctx.renderer, caps = R.capabilities;
@@ -1145,7 +1178,7 @@ export default [{
       const stamp = STAMPS[[0, 1, 4][Math.floor(h(10) * 3)]];
       return {
         kind: 'tc', lat, lon: wrap180(lon), I, stamp, mirror: basin.h * stamp.hemi, half: stamp.half * (0.85 + 0.4 * h(11)),
-        rot: h(12) * 6.283 + age * (2 * Math.PI / 15), wind: 0, basin: basin.name, age, stretch: -1,
+        rot: h(12) * 6.283 + age * (2 * Math.PI / 15), wind: 0, basin: basin.name, basinEn: basin.en, age, stretch: -1,
       };
     }
     function etcSlot(k, T, se, decl) {
@@ -1205,14 +1238,14 @@ export default [{
       const url = 'https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0'
         + '&LAYERS=VIIRS_NOAA20_CorrectedReflectance_TrueColor&CRS=EPSG:4326&BBOX=-90,-180,90,180&WIDTH=4096&HEIGHT=2048'
         + `&FORMAT=image/jpeg&TIME=${live.date}`;
-      c.toast?.(`Đang tải ảnh mây toàn cầu ngày ${live.date} từ NASA GIBS…`, 4000);
-      const timer = setTimeout(() => { if (live.state === 'loading') { live.state = 'failed'; live.err = 'timeout'; c.toast?.('Không tải được ảnh NASA GIBS (hết thời gian chờ) — dùng ảnh mây đi kèm.'); } }, 45000);
+      c.toast?.(t(`Đang tải ảnh mây toàn cầu ngày ${live.date} từ NASA GIBS…`, `Loading the global cloud image for ${live.date} from NASA GIBS…`), 4000);
+      const timer = setTimeout(() => { if (live.state === 'loading') { live.state = 'failed'; live.err = 'timeout'; c.toast?.(t('Không tải được ảnh NASA GIBS (hết thời gian chờ) — dùng ảnh mây đi kèm.', 'Could not load the NASA GIBS image (timed out) — using the bundled clouds.')); } }, 45000);
       new THREE.TextureLoader().load(url, tex => {
         clearTimeout(timer);
         if (live.state !== 'loading') return;
         tex.colorSpace = THREE.NoColorSpace; tex.generateMipmaps = false; tex.minFilter = THREE.LinearFilter;
         live.tex = tex; live.state = 'extract';
-      }, undefined, e => { clearTimeout(timer); live.state = 'failed'; live.err = 'error ' + (e && (e.message || e.type) || ''); c.toast?.('Không tải được ảnh NASA GIBS (ngoại tuyến?) — dùng ảnh mây đi kèm.'); });
+      }, undefined, e => { clearTimeout(timer); live.state = 'failed'; live.err = 'error ' + (e && (e.message || e.type) || ''); c.toast?.(t('Không tải được ảnh NASA GIBS (ngoại tuyến?) — dùng ảnh mây đi kèm.', 'Could not load the NASA GIBS image (offline?) — using the bundled clouds.')); });
     }
     function extractLive(c) {
       const rt = new THREE.WebGLRenderTarget(4096, 2048, { format: THREE.RedFormat, type: THREE.UnsignedByteType, depthBuffer: false,
@@ -1232,7 +1265,8 @@ export default [{
       // the season follows the picture
       const ld = new Date(live.date + 'T12:00:00Z');
       c.params.date = Math.min(365, Math.round((ld - Date.UTC(ld.getUTCFullYear(), 0, 1)) / 864e5) + 1);
-      c.toast?.(`Mây thật ngày <b>${live.date}</b>: ảnh ghép toàn cầu VIIRS (vệ tinh NOAA-20, mỗi nơi chụp lúc ~13:30 giờ địa phương), đã tách lớp mây khỏi bề mặt. Vùng đêm vùng cực và băng biển dùng ảnh mây đi kèm.`, 9000);
+      c.toast?.(t(`Mây thật ngày <b>${live.date}</b>: ảnh ghép toàn cầu VIIRS (vệ tinh NOAA-20, mỗi nơi chụp lúc ~13:30 giờ địa phương), đã tách lớp mây khỏi bề mặt. Vùng đêm vùng cực và băng biển dùng ảnh mây đi kèm.`,
+        `Real clouds for <b>${live.date}</b>: the global VIIRS mosaic (NOAA-20 satellite, each place imaged at ~13:30 local time), with the cloud layer separated from the surface. The polar night and sea ice use the bundled clouds.`), 9000);
     }
 
     /* ---- camera modes: free / Himalaya close-up / geostationary / storm-following (co-rotating) */
@@ -1280,7 +1314,8 @@ export default [{
       c.controls.minDistance = 0.004;
       if (instant) { applyFrame(c, himalayaFrame(), spinOf(clk.T ?? 0)); mode.tw = null; }
       else startTween(c, himalayaFrame(), 4.5);
-      c.toast?.(`Buổi sáng trên dãy Himalaya, nhìn từ độ cao ~330 km (như từ Trạm Vũ trụ Quốc tế) qua đồng bằng sông Hằng về phía cao nguyên Tây Tạng. <b>Everest cao 8 849 m — chỉ bằng 0,14 % bán kính Trái Đất</b>, nên địa hình được phóng đại <b>×${p.exag}</b> theo chiều đứng. Camera quay cùng Trái Đất; mây gió mùa trôi bên dưới các đỉnh tuyết.`, 11000);
+      c.toast?.(t(`Buổi sáng trên dãy Himalaya, nhìn từ độ cao ~330 km (như từ Trạm Vũ trụ Quốc tế) qua đồng bằng sông Hằng về phía cao nguyên Tây Tạng. <b>Everest cao 8 849 m — chỉ bằng 0,14 % bán kính Trái Đất</b>, nên địa hình được phóng đại <b>×${p.exag}</b> theo chiều đứng. Camera quay cùng Trái Đất; mây gió mùa trôi bên dưới các đỉnh tuyết.`,
+        `Morning over the Himalaya, seen from ~330 km up (as from the International Space Station) across the Ganges plain towards the Tibetan Plateau. <b>Everest is 8,849 m high — only 0.14 % of Earth's radius</b>, so the terrain is exaggerated <b>×${p.exag}</b> vertically. The camera turns with Earth; monsoon clouds drift below the snowy peaks.`), 11000);
     }
     function leaveShot(c) {
       c.params.exag = 8; c.params.hour = 13.5;
@@ -1295,11 +1330,12 @@ export default [{
       applyFrame(c, { pos: bodyDir(0, s.lon).multiplyScalar(+qs.get('earthGeoR') || R_GEO), tgt: new THREE.Vector3(), up: Y.clone() }, rot);
       c.setFov?.(+qs.get('earthGeoFov') || 19.5); mode.fovSet = true;                 // Earth spans 17.4° from GEO: frame it like the real imagers
       if (c.params.pace < 360) c.params.pace = 1200;
-      c.toast?.(`Nhìn từ <b>${s.name}</b>, 35 786 km trên xích đạo: vệ tinh quay đúng một vòng mỗi ngày sao nên đứng yên so với mặt đất. Thời gian tua ×${c.params.pace}: theo dõi xoáy thuận trôi về phía đông, bão nhiệt đới đi về phía tây rồi quặt lên, mây đối lưu bùng lên mỗi chiều trên lục địa.`, 9000);
+      c.toast?.(t(`Nhìn từ <b>${s.name}</b>, 35 786 km trên xích đạo: vệ tinh quay đúng một vòng mỗi ngày sao nên đứng yên so với mặt đất. Thời gian tua ×${c.params.pace}: theo dõi xoáy thuận trôi về phía đông, bão nhiệt đới đi về phía tây rồi quặt lên, mây đối lưu bùng lên mỗi chiều trên lục địa.`,
+        `Seen from <b>${s.en}</b>, 35,786 km above the equator: the satellite orbits exactly once per sidereal day, so it hangs still over the ground. Time-lapse ×${c.params.pace}: watch cyclones drift east, tropical storms head west and then recurve poleward, and convective clouds bloom every afternoon over the continents.`), 9000);
     }
     function goStorm(c, kind) {
       const list = st.storms.filter(s => !kind || s.kind === kind).sort((a, b) => (b.kind === 'tc') - (a.kind === 'tc') || b.I - a.I);
-      if (!list.length) { c.toast?.('Hiện không có cơn bão nào (bật “Thời tiết chuyển động”).'); return; }
+      if (!list.length) { c.toast?.(t('Hiện không có cơn bão nào (bật “Thời tiết chuyển động”).', 'There are no storms right now (turn on “Moving weather”).')); return; }
       const cur = mode.follow ? list.findIndex(s => s.stamp === mode.follow.stamp && Math.abs(s.lat - mode.follow.lat) < 3) : -1;
       const s = list[(cur + 1) % list.length];
       unFov(c);
@@ -1311,10 +1347,12 @@ export default [{
       const dirB = bodyDir(s.lat - Math.sign(s.lat) * 6, s.lon);
       startTween(c, { pos: dirB.multiplyScalar(dist), tgt: bodyDir(s.lat, s.lon).multiplyScalar(0.3), up: Y.clone() }, 3.5);
       if (c.params.pace < 360) c.params.pace = 1200;
-      const sense = s.lat > 0 ? 'ngược chiều kim đồng hồ (Bắc bán cầu)' : 'thuận chiều kim đồng hồ (Nam bán cầu)';
+      const sense = s.lat > 0 ? t('ngược chiều kim đồng hồ (Bắc bán cầu)', 'counter-clockwise (Northern Hemisphere)') : t('thuận chiều kim đồng hồ (Nam bán cầu)', 'clockwise (Southern Hemisphere)');
       c.toast?.(s.kind === 'tc'
-        ? `<b>Bão nhiệt đới</b> ở ${s.basin} (${latStr(s.lat)} ${lonStr(s.lon)}), xoáy ${sense}. Hình ảnh là cơn ${s.stamp.name} chụp bởi vệ tinh VIIRS. Bão đi về phía tây theo gió mậu dịch, trôi dần về phía cực (hiệu ứng β), rồi gặp gió tây ôn đới thì quặt về đông bắc; lên bờ hoặc gặp biển lạnh thì suy yếu.`
-        : `<b>Xoáy thuận ngoài nhiệt đới</b> (${latStr(s.lat)} ${lonStr(s.lon)}), xoáy ${sense}: “dấu phẩy” mây gồm đầu mây dày quanh tâm thấp và frông lạnh kéo dài về phía xích đạo. Ảnh thật: ${s.stamp.name}. Hệ thống trôi về phía đông theo gió tây và cuộn chặt dần khi già đi (cố tù).`, 11000);
+        ? t(`<b>Bão nhiệt đới</b> ở ${s.basin} (${latStr(s.lat)} ${lonStr(s.lon)}), xoáy ${sense}. Hình ảnh là cơn ${s.stamp.name} chụp bởi vệ tinh VIIRS. Bão đi về phía tây theo gió mậu dịch, trôi dần về phía cực (hiệu ứng β), rồi gặp gió tây ôn đới thì quặt về đông bắc; lên bờ hoặc gặp biển lạnh thì suy yếu.`,
+          `<b>Tropical cyclone</b> in ${s.basinEn} (${latStr(s.lat)} ${lonStr(s.lon)}), spinning ${sense}. The image is ${s.stamp.en}, captured by the VIIRS instrument. The storm moves west with the trade winds, drifts poleward (the beta effect), then recurves to the northeast when it meets the mid-latitude westerlies; it weakens over land or cold water.`)
+        : t(`<b>Xoáy thuận ngoài nhiệt đới</b> (${latStr(s.lat)} ${lonStr(s.lon)}), xoáy ${sense}: “dấu phẩy” mây gồm đầu mây dày quanh tâm thấp và frông lạnh kéo dài về phía xích đạo. Ảnh thật: ${s.stamp.name}. Hệ thống trôi về phía đông theo gió tây và cuộn chặt dần khi già đi (cố tù).`,
+          `<b>Extratropical cyclone</b> (${latStr(s.lat)} ${lonStr(s.lon)}), spinning ${sense}: a cloud “comma” made of a thick cloud head around the low-pressure centre and a cold front trailing towards the equator. Real image: ${s.stamp.en}. The system drifts east with the westerlies and wraps up tighter as it ages (occlusion).`), 11000);
     }
     function goMoon(c) {
       const m = st.moon; if (!m) return;
@@ -1329,7 +1367,8 @@ export default [{
       cam.setFromSphericalCoords(d, pol * D2R, azCam);
       c.camera.lookAt(c.controls.target);
       mode.lastHour = null;
-      c.toast?.(`Mặt Trăng: cách ${Math.round(m.dist).toLocaleString('vi-VN')} km (${(m.dist / R_KM).toFixed(1)} lần bán kính Trái Đất), pha ${m.phaseName}, ${Math.round(m.illum * 100)} % được chiếu sáng. Đường kính chỉ bằng 27 % Trái Đất và suất phản chiếu 0,12 — tối như nhựa đường so với mây.`, 9000);
+      c.toast?.(t(`Mặt Trăng: cách ${Math.round(m.dist).toLocaleString(locale())} km (${(m.dist / R_KM).toFixed(1)} lần bán kính Trái Đất), pha ${m.phaseName}, ${Math.round(m.illum * 100)} % được chiếu sáng. Đường kính chỉ bằng 27 % Trái Đất và suất phản chiếu 0,12 — tối như nhựa đường so với mây.`,
+        `The Moon: ${Math.round(m.dist).toLocaleString(locale())} km away (${(m.dist / R_KM).toFixed(1)} Earth radii), ${m.phaseName}, ${Math.round(m.illum * 100)} % illuminated. Its diameter is only 27 % of Earth's and its albedo is 0.12 — as dark as asphalt next to the clouds.`), 9000);
     }
     def._earth = {
       himalaya: c => { if (mode.tw) return; mode.kind === 'shot' ? leaveShot(c) : goHimalaya(c, false); },
@@ -1443,8 +1482,8 @@ export default [{
         U.uMoonE.value.crossVectors(U.uMoonN.value, U.uMoonF.value);
         const cosE = Math.sin(so.dec) * Math.sin(lu.dec) + Math.cos(so.dec) * Math.cos(lu.dec) * Math.cos(dRA);
         const illum = (1 - cosE) / 2, waxing = ((dRA % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI) < Math.PI;
-        const phaseName = illum < 0.03 ? 'trăng mới' : illum > 0.97 ? 'trăng tròn' : illum < 0.45 ? (waxing ? 'trăng lưỡi liềm đầu tháng' : 'trăng lưỡi liềm cuối tháng')
-          : illum < 0.55 ? (waxing ? 'thượng huyền' : 'hạ huyền') : (waxing ? 'trăng khuyết đầu tháng' : 'trăng khuyết cuối tháng');
+        const phaseName = illum < 0.03 ? t('trăng mới', 'new Moon') : illum > 0.97 ? t('trăng tròn', 'full Moon') : illum < 0.45 ? (waxing ? t('trăng lưỡi liềm đầu tháng', 'waxing crescent') : t('trăng lưỡi liềm cuối tháng', 'waning crescent'))
+          : illum < 0.55 ? (waxing ? t('thượng huyền', 'first quarter') : t('hạ huyền', 'last quarter')) : (waxing ? t('trăng khuyết đầu tháng', 'waxing gibbous') : t('trăng khuyết cuối tháng', 'waning gibbous'));
         st.moon = { dir: mDir, dist: lu.dist, dec: lu.dec, dRA, illum, phaseName };
         U.uMoon.value = p.moon ? 1 : 0;
 
@@ -1465,30 +1504,31 @@ export default [{
         const nTC = st.storms.filter(s => s.kind === 'tc').length, nE = st.storms.length - nTC;
         const rows = [
           ...orbitRows(c, R_KM),
-          ['Điểm dưới camera', `${latStr(ll2.lat)} ${lonStr(ll2.lon)}` + (e === null ? '' : e >= 0 ? ` · cao ${Math.round(e).toLocaleString('vi-VN')} m` : ` · biển sâu ${Math.round(-e).toLocaleString('vi-VN')} m`)],
-          ['Giờ Mặt Trời tại đó', hhmm(c.params.hour)],
-          ['Giờ quốc tế (≈ UTC) · ngày', `${hhmm(st.utc)} · ${dateStr(c.params.date)}/${YEAR}`],
-          ['Mặt Trời đứng bóng tại', `${latStr(st.sub.lat)} ${lonStr(wrap180(st.sub.lon))}`],
-          ['Thời gian Trái Đất đã trôi', c.fmt.time(T * 3600)],
-          ['Bão nhiệt đới / xoáy thuận ôn đới', c.params.wx ? `${nTC} / ${nE}` : 'tắt'],
+          [t('Điểm dưới camera', 'Point below camera'), `${latStr(ll2.lat)} ${lonStr(ll2.lon)}` + (e === null ? '' : e >= 0 ? t(' · cao ', ' · elevation ') + `${Math.round(e).toLocaleString(locale())} m` : t(' · biển sâu ', ' · ocean depth ') + `${Math.round(-e).toLocaleString(locale())} m`)],
+          [t('Giờ Mặt Trời tại đó', 'Local solar time there'), hhmm(c.params.hour)],
+          [t('Giờ quốc tế (≈ UTC) · ngày', 'Universal time (≈ UTC) · date'), t(`${hhmm(st.utc)} · ${dateStr(c.params.date)}/${YEAR}`, `${hhmm(st.utc)} · ${dateStr(c.params.date)}, ${YEAR}`)],
+          [t('Mặt Trời đứng bóng tại', 'Subsolar point'), `${latStr(st.sub.lat)} ${lonStr(wrap180(st.sub.lon))}`],
+          [t('Thời gian Trái Đất đã trôi', 'Earth time elapsed'), c.fmt.time(T * 3600)],
+          [t('Bão nhiệt đới / xoáy thuận ôn đới', 'Tropical / extratropical cyclones'), c.params.wx ? `${nTC} / ${nE}` : t('tắt', 'off')],
         ];
-        if (st.moon) rows.push(['Mặt Trăng', `${st.moon.phaseName}, ${Math.round(st.moon.illum * 100)} % sáng · ${Math.round(st.moon.dist).toLocaleString('vi-VN')} km`]);
+        if (st.moon) rows.push([t('Mặt Trăng', 'Moon'), t(`${st.moon.phaseName}, ${Math.round(st.moon.illum * 100)} % sáng · ${Math.round(st.moon.dist).toLocaleString(locale())} km`, `${st.moon.phaseName}, ${Math.round(st.moon.illum * 100)} % lit · ${Math.round(st.moon.dist).toLocaleString(locale())} km`)]);
         if (qs.has('earthInfo')) rows.push(['storms', st.storms.map(s => `${s.kind}:${s.stamp.cell} ${s.lat.toFixed(1)},${s.lon.toFixed(1)} I${s.I.toFixed(2)} h${s.half.toFixed(1)} a${s.age.toFixed(0)}`).join(' | ')]);
-        if (c.params.live) rows.push(['Mây thật NASA GIBS', live.state === 'ready' ? `ngày ${live.date}` : live.state === 'failed' ? `không tải được (${live.err}) — dùng ảnh đi kèm` : 'đang tải…']);
+        if (c.params.live) rows.push([t('Mây thật NASA GIBS', 'Real clouds NASA GIBS'), live.state === 'ready' ? t(`ngày ${live.date}`, live.date) : live.state === 'failed' ? t(`không tải được (${live.err}) — dùng ảnh đi kèm`, `failed to load (${live.err}) — using bundled image`) : t('đang tải…', 'loading…')]);
         return rows;
       },
       onClick(info, c) {
-        const t = hitSphere(info.origin, info.dir);
-        if (t === null) return;
-        const p = info.origin.clone().addScaledVector(info.dir, t).normalize(), L = U.uSunDir.value;
+        const th = hitSphere(info.origin, info.dir);
+        if (th === null) return;
+        const p = info.origin.clone().addScaledVector(info.dir, th).normalize(), L = U.uSunDir.value;
         const g = bodyLatLonE(p, spinOf(clk.T ?? 0));
         const e = elevAt(g.lat, g.lon);
-        const hs = e === null ? '' : e >= 0 ? ` · độ cao <b>${Math.round(e).toLocaleString('vi-VN')} m</b>` : ` · độ sâu đáy biển <b>${Math.round(-e).toLocaleString('vi-VN')} m</b>`;
+        const hs = e === null ? '' : e >= 0 ? t(' · độ cao <b>', ' · elevation <b>') + `${Math.round(e).toLocaleString(locale())} m</b>` : t(' · độ sâu đáy biển <b>', ' · sea-floor depth <b>') + `${Math.round(-e).toLocaleString(locale())} m</b>`;
         // a storm under the cursor?
         const pb = new THREE.Vector3(...llE(g.lat, g.lon));
         const s = st.storms.find(q => pb.dot(new THREE.Vector3(...llE(q.lat, q.lon))) > Math.cos(q.half * 0.5 * D2R) && q.I > 0.25);
-        const sm = s ? (s.kind === 'tc' ? ` · <b>bão nhiệt đới</b> (${s.basin}), ảnh thật của ${s.stamp.name}` : ` · <b>xoáy thuận ôn đới</b>, ảnh thật của ${s.stamp.name}`) : '';
-        c.toast(`Vĩ độ <b>${latStr(g.lat)}</b>, kinh độ <b>${lonStr(g.lon)}</b>${hs} · giờ địa phương <b>${hhmm(localHourE(p, L))}</b> · ${sunElevStr(p, L)}${sm}.`);
+        const sm = s ? (s.kind === 'tc' ? t(` · <b>bão nhiệt đới</b> (${s.basin}), ảnh thật của ${s.stamp.name}`, ` · <b>tropical cyclone</b> (${s.basinEn}), real image of ${s.stamp.en}`) : t(` · <b>xoáy thuận ôn đới</b>, ảnh thật của ${s.stamp.name}`, ` · <b>extratropical cyclone</b>, real image of ${s.stamp.en}`)) : '';
+        c.toast(t(`Vĩ độ <b>${latStr(g.lat)}</b>, kinh độ <b>${lonStr(g.lon)}</b>${hs} · giờ địa phương <b>${hhmm(localHourE(p, L))}</b> · ${sunElevStr(p, L)}${sm}.`,
+          `Latitude <b>${latStr(g.lat)}</b>, longitude <b>${lonStr(g.lon)}</b>${hs} · local time <b>${hhmm(localHourE(p, L))}</b> · ${sunElevStr(p, L)}${sm}.`));
       },
     };
   },

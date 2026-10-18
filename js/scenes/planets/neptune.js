@@ -28,6 +28,7 @@
 // (k = 0.50 / 0.80 / 0.88 for red / green / blue: red limb-brightens because of methane + haze).
 import * as THREE from 'three';
 import { COMMON_GLSL, FULLSCREEN_VERT } from '../../glsl/common.js';
+import { t, dec, int } from '../../i18n.js';
 
 const V3 = THREE.Vector3;
 const D2R = Math.PI / 180, R2D = 180 / Math.PI, TAU = Math.PI * 2;
@@ -43,9 +44,9 @@ const ASSET = f => new URL(`../../../assets/neptune/${f}`, import.meta.url).href
 /* ---------------------------------------------------------------------------------------------- */
 /* helpers                                                                                          */
 /* ---------------------------------------------------------------------------------------------- */
-const vn = (x, d = 1) => x.toFixed(d).replace('.', ',');
-const fmtInt = n => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-const latStr = d => `${vn(Math.abs(d))}° ${d >= 0 ? 'B' : 'N'}`;
+const vn = (x, d = 1) => dec(x, d);
+const fmtInt = n => int(n);
+const latStr = d => `${vn(Math.abs(d))}° ${d >= 0 ? t('B', 'N') : t('N', 'S')}`;
 const wrap = a => ((a % TAU) + TAU) % TAU;
 const wrapPi = a => wrap(a + Math.PI) - Math.PI;
 const sstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -60,7 +61,7 @@ const kidaOmega = (s, lam) => s * lam * lam / (lam * lam - 1);
 const relRate = Ph => TAU * (1 / (Ph * HOUR) - 1 / PROT);
 const latlonJS = (latD, lonE) => { const la = latD * D2R; return new V3(Math.cos(la) * Math.cos(lonE), Math.sin(la), -Math.cos(la) * Math.sin(lonE)); };
 const pad2 = n => String(n).padStart(2, '0');
-const dateStr = ms => { const d = new Date(ms); return `${pad2(d.getUTCDate())}/${pad2(d.getUTCMonth() + 1)}/${d.getUTCFullYear()} ${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())} UTC`; };
+const dateStr = ms => { const d = new Date(ms); return t(`${pad2(d.getUTCDate())}/${pad2(d.getUTCMonth() + 1)}/${d.getUTCFullYear()} ${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())} UTC`, `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())} ${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())} UTC`); };
 
 /* ---------------------------------------------------------------------------------------------- */
 /* features (measured)                                                                              */
@@ -456,6 +457,7 @@ function flyFrame(st) {
 /* ---------------------------------------------------------------------------------------------- */
 let hostSpeed = 6;   // host time-speed slider, for the time-lapse read-out
 const lapseNote = 'Giây trên Sao Hải Vương trôi qua trong mỗi giây thật (đã nhân với thanh “Tốc độ thời gian” của trình xem). Ở ×4 000 hành tinh quay một vòng trong ~15 s; ở ×50 000 thấy Vết Tối Lớn đổi dạng (chu kỳ 8 ngày) và Scooter vượt qua nó.';
+const lapseNoteEn = 'Seconds on Neptune per real second (already multiplied by the viewer\'s “Time speed” slider). At ×4,000 the planet turns once in ~15 s; at ×50,000 you can watch the Great Dark Spot change shape (8-day cycle) and the Scooter overtake it.';
 
 const NEPTUNE = {
   id: 'neptune', name: 'Sao Hải Vương', category: 'planets', order: 43,
@@ -475,23 +477,50 @@ const NEPTUNE = {
     ['Triton', 'R = 1 353 km · quỹ đạo nghịch hành 5,88 ngày, nghiêng 156,9°'],
     ['Ảnh & dữ liệu', 'Voyager 2 (NASA/JPL, 1989); Hubble OPAL 2018 (Simon, Wong et al., CC BY 4.0, doi:10.17909/T9G593); màu thật: Irwin et al. 2024 (MNRAS); gió: Sromovsky et al. 1993'],
   ],
+  en: {
+    name: 'Neptune',
+    subtitle: 'Ice giant · the strongest winds in the Solar System',
+    blurb: 'At 30 AU Neptune receives only 1/900 of the sunlight that reaches Earth, yet it has <b>the strongest winds in the Solar System</b>: the equatorial jet blows against the rotation at ~400 m/s, and some clouds have been clocked at ~600 m/s — close to the local speed of sound. Methane absorbs red light, giving the planet a pale azure color (not the deep blue of the contrast-enhanced 1989 Voyager images).',
+    intro: 'Key <b>G</b>: follow the Great Dark Spot and speed time up ×50,000 to watch it spin, change shape and get overtaken by the Scooter. Key <b>V</b>: fly past like Voyager 2. Change <b>Color</b> to compare true color (2024) with the enhanced Voyager images and JWST.',
+    facts: [
+      ['Equatorial / polar radius', '24,764 km / 24,341 km (3.9 Earths)'], ['Mass', '1.024×10²⁶ kg (17.1 Earths)'],
+      ['Rotation period', '16 h 6.6 min (radio, Voyager 2)'], ['Axial tilt', '28.32°'],
+      ['Distance from the Sun', '30.07 AU · 1 year = 164.8 Earth years'], ['Temperature at 1 bar', '72 K (−201 °C)'],
+      ['Equatorial wind', '≈ −400 m/s (1,440 km/h, westward); individual clouds up to ~600 m/s (≈ 2,100 km/h)'],
+      ['Speed of sound (1 bar)', '≈ 580 m/s'],
+      ['Great Dark Spot (1989)', '13,000 × 6,600 km · 18.3 h period · changes shape every 8 days · gone by 1994'],
+      ['Heat emitted', '2.6 times the energy received from the Sun'],
+      ['Adams ring & arcs', '62,932 km · Fraternité, Égalité, Liberté, Courage'],
+      ['Triton', 'R = 1,353 km · retrograde 5.88-day orbit, inclination 156.9°'],
+      ['Images & data', 'Voyager 2 (NASA/JPL, 1989); Hubble OPAL 2018 (Simon, Wong et al., CC BY 4.0, doi:10.17909/T9G593); true color: Irwin et al. 2024 (MNRAS); winds: Sromovsky et al. 1993'],
+    ],
+  },
   unitKm: RN / 1000,
   camera: { distance: 3.4, polar: 84, azimuth: 20, min: 1.05, max: 60, fov: 45 },
   exposure: 1.4, bloom: 0.3,
   params: [
-    { key: 'era', label: 'Thời điểm', type: 'seg', options: [['v89', 'Voyager 2 · 1989'], ['h18', 'Hubble · 2018']], default: 'v89', note: '1989: Vết Tối Lớn, Scooter, Vết Tối 2 (dựng lại theo ảnh Voyager 2). 2018: bản đồ toàn cầu thật của chương trình OPAL (Hubble) với Vết Tối Bắc NDS-2018 và mây đồng hành.' },
-    { key: 'color', label: 'Màu', type: 'seg', options: [['real', 'Màu thật (hiệu chỉnh 2024)'], ['voy', 'Voyager tăng cường'], ['jwst', 'JWST hồng ngoại gần']], default: 'real', note: 'Irwin et al. (2024) hiệu chỉnh lại ảnh Voyager bằng phổ Hubble/STIS và VLT/MUSE: Sao Hải Vương xanh lơ nhạt, gần giống Sao Thiên Vương. Ảnh 1989 đã bị tăng tương phản và đẩy màu xanh để làm nổi các đám mây. JWST (2022, 1–2 µm): mê-tan hấp thụ gần hết, chỉ mây băng cao, vạch sáng xích đạo và vành còn sáng.' },
-    { key: 'lapse', label: 'Tua nhanh thời gian', type: 'range', min: 1.5, max: 4.5, step: 0.05, default: 2.8, fmt: v => '×' + fmtInt(10 ** v * hostSpeed), note: lapseNote },
-    { key: 'frame', label: 'Khung nhìn', type: 'seg', options: [['iner', 'Quán tính'], ['gds', 'Bám theo vết tối']], default: 'iner', note: 'Bám theo vết tối: camera quay cùng xoáy (Vết Tối Lớn hoặc NDS-2018), nên thấy các dải mây trượt qua nó với tốc độ tương đối thật.' },
-    { key: 'sunAz', label: 'Hướng Mặt Trời', type: 'range', min: 0, max: 360, step: 1, default: 50, fmt: v => v.toFixed(0) + '°', note: 'Đưa đường phân chia ngày–đêm tới gần vùng mây ti để thấy chúng đổ bóng xuống tầng mây bên dưới (cao hơn ~50–100 km).' },
-    { key: 'rings', label: 'Vành & cung Adams', type: 'toggle', default: true },
-    { key: 'ringGain', label: 'Độ sáng vành (phóng đại)', type: 'range', min: 1, max: 200, step: 1, default: 60, fmt: v => '×' + v.toFixed(0), note: 'Vành Sao Hải Vương là bụi tối, độ dày quang học 10⁻⁴–0,1: gần như vô hình nếu không phóng đại; sáng nhất khi nhìn ngược sáng.' },
+    { key: 'era', label: 'Thời điểm', type: 'seg', options: [['v89', 'Voyager 2 · 1989'], ['h18', 'Hubble · 2018']], default: 'v89', note: '1989: Vết Tối Lớn, Scooter, Vết Tối 2 (dựng lại theo ảnh Voyager 2). 2018: bản đồ toàn cầu thật của chương trình OPAL (Hubble) với Vết Tối Bắc NDS-2018 và mây đồng hành.',
+      en: { label: 'Epoch', note: '1989: the Great Dark Spot, the Scooter and Dark Spot 2 (reconstructed from Voyager 2 images). 2018: the real global map from Hubble\'s OPAL program, with the northern dark spot NDS-2018 and its companion clouds.' } },
+    { key: 'color', label: 'Màu', type: 'seg', options: [['real', 'Màu thật (hiệu chỉnh 2024)'], ['voy', 'Voyager tăng cường'], ['jwst', 'JWST hồng ngoại gần']], default: 'real', note: 'Irwin et al. (2024) hiệu chỉnh lại ảnh Voyager bằng phổ Hubble/STIS và VLT/MUSE: Sao Hải Vương xanh lơ nhạt, gần giống Sao Thiên Vương. Ảnh 1989 đã bị tăng tương phản và đẩy màu xanh để làm nổi các đám mây. JWST (2022, 1–2 µm): mê-tan hấp thụ gần hết, chỉ mây băng cao, vạch sáng xích đạo và vành còn sáng.',
+      en: { label: 'Color', options: ['True color (2024 recalibration)', 'Enhanced Voyager', 'JWST near-infrared'], note: 'Irwin et al. (2024) recalibrated the Voyager images using Hubble/STIS and VLT/MUSE spectra: Neptune is a pale azure, much like Uranus. The 1989 images had their contrast stretched and their blue boosted to bring out the clouds. JWST (2022, 1–2 µm): methane absorbs almost everything, so only high ice clouds, the bright equatorial band and the rings stay bright.' } },
+    { key: 'lapse', label: 'Tua nhanh thời gian', type: 'range', min: 1.5, max: 4.5, step: 0.05, default: 2.8, fmt: v => '×' + fmtInt(10 ** v * hostSpeed), note: lapseNote,
+      en: { label: 'Time-lapse', note: lapseNoteEn } },
+    { key: 'frame', label: 'Khung nhìn', type: 'seg', options: [['iner', 'Quán tính'], ['gds', 'Bám theo vết tối']], default: 'iner', note: 'Bám theo vết tối: camera quay cùng xoáy (Vết Tối Lớn hoặc NDS-2018), nên thấy các dải mây trượt qua nó với tốc độ tương đối thật.',
+      en: { label: 'View frame', options: ['Inertial', 'Follow the dark spot'], note: 'Follow the dark spot: the camera turns with the vortex (the Great Dark Spot or NDS-2018), so you see the cloud bands slide past it at their true relative speeds.' } },
+    { key: 'sunAz', label: 'Hướng Mặt Trời', type: 'range', min: 0, max: 360, step: 1, default: 50, fmt: v => v.toFixed(0) + '°', note: 'Đưa đường phân chia ngày–đêm tới gần vùng mây ti để thấy chúng đổ bóng xuống tầng mây bên dưới (cao hơn ~50–100 km).',
+      en: { label: 'Sun direction', note: 'Bring the terminator close to the cirrus clouds to see them cast shadows on the cloud deck below (they float ~50–100 km higher).' } },
+    { key: 'rings', label: 'Vành & cung Adams', type: 'toggle', default: true, en: { label: 'Rings & Adams arcs' } },
+    { key: 'ringGain', label: 'Độ sáng vành (phóng đại)', type: 'range', min: 1, max: 200, step: 1, default: 60, fmt: v => '×' + v.toFixed(0), note: 'Vành Sao Hải Vương là bụi tối, độ dày quang học 10⁻⁴–0,1: gần như vô hình nếu không phóng đại; sáng nhất khi nhìn ngược sáng.',
+      en: { label: 'Ring brightness (exaggerated)', note: 'Neptune\'s rings are dark dust with an optical depth of 10⁻⁴–0.1: almost invisible unless exaggerated, and brightest when seen backlit.' } },
     { key: 'triton', label: 'Triton', type: 'toggle', default: true },
   ],
   actions: [
-    { label: 'Vết Tối Lớn', key: 'g', title: 'Bay tới Vết Tối Lớn, bám theo nó và tua nhanh', run: ctx => NEPTUNE.__inst?.gdsShot(ctx) },
-    { label: 'Voyager 2 bay qua', key: 'v', title: 'Tái hiện chuyến bay sát ngày 25/8/1989 (bấm lần nữa để dừng)', run: ctx => NEPTUNE.__inst?.flyby(ctx) },
-    { label: 'Vành ngược sáng', key: 'n', title: 'Ra sau Sao Hải Vương nhìn về phía Mặt Trời: vành bụi và các cung Adams', run: ctx => NEPTUNE.__inst?.backlit(ctx) },
+    { label: 'Vết Tối Lớn', key: 'g', title: 'Bay tới Vết Tối Lớn, bám theo nó và tua nhanh', run: ctx => NEPTUNE.__inst?.gdsShot(ctx),
+      en: { label: 'Great Dark Spot', title: 'Fly to the Great Dark Spot, follow it and speed up time' } },
+    { label: 'Voyager 2 bay qua', key: 'v', title: 'Tái hiện chuyến bay sát ngày 25/8/1989 (bấm lần nữa để dừng)', run: ctx => NEPTUNE.__inst?.flyby(ctx),
+      en: { label: 'Voyager 2 flyby', title: 'Recreate the close flyby of 25 August 1989 (press again to stop)' } },
+    { label: 'Vành ngược sáng', key: 'n', title: 'Ra sau Sao Hải Vương nhìn về phía Mặt Trời: vành bụi và các cung Adams', run: ctx => NEPTUNE.__inst?.backlit(ctx),
+      en: { label: 'Backlit rings', title: 'Go behind Neptune and look toward the Sun: the dusty rings and the Adams arcs' } },
   ],
   create(ctx) {
     const R = ctx.renderer;
@@ -518,7 +547,7 @@ const NEPTUNE = {
         tex.needsUpdate = true;
         U.uOpal.value = tex; R.initTexture(tex); U.uTexOK.value = 1;
         resolve();
-      }, undefined, () => again ? setTimeout(() => load(url + '?r=' + Date.now(), false), 500) : reject(new Error('không tải được bản đồ OPAL 2018')));
+      }, undefined, () => again ? setTimeout(() => load(url + '?r=' + Date.now(), false), 500) : reject(new Error(t('không tải được bản đồ OPAL 2018', 'could not load the 2018 OPAL map'))));
       load(ASSET('neptune_opal2018.webp'), true);
     });
 
@@ -649,7 +678,7 @@ const NEPTUNE = {
     const flyPos = h => { const o = hyper(h * HOUR); return st.fly.P.clone().multiplyScalar(o.x).addScaledVector(st.fly.Q, o.y); };
     function runFly(c) {
       const h = (st.T - st.fly.Tca) / HOUR;
-      if (h > st.fly.end) { st.fly = null; c.controls.minDistance = NEPTUNE.camera.min; c.controls.target.set(0, 0, 0); c.toast?.('Voyager 2 rời Sao Hải Vương, hướng về phía nam mặt phẳng hoàng đạo — đến nay nó đã cách Mặt Trời hơn 140 AU.', 6000); return; }
+      if (h > st.fly.end) { st.fly = null; c.controls.minDistance = NEPTUNE.camera.min; c.controls.target.set(0, 0, 0); c.toast?.(t('Voyager 2 rời Sao Hải Vương, hướng về phía nam mặt phẳng hoàng đạo — đến nay nó đã cách Mặt Trời hơn 140 AU.', 'Voyager 2 leaves Neptune, heading south of the ecliptic plane — it is now more than 140 AU from the Sun.'), 6000); return; }
       const pos = flyPos(h), vel = flyPos(h + 0.01).sub(pos).normalize(), r = pos.length();
       // near closest approach look down and back at the sunlit limb (as the CA images did); otherwise at the planet
       const w = 0.9 * sstep(3.5, 1.25, r);
@@ -711,32 +740,33 @@ const NEPTUNE = {
         const p = c.params, f = st.f, rows = [];
         const rateWall = lapseRate(p) * (c.bhGlobals?.timeScale ?? hostSpeed);
         const ms = (f.era ? OPAL_MS : CA_MS) + (f.era ? st.T : f.day * DAY) * 1000;
-        rows.push(['Thời điểm', dateStr(ms) + (f.era ? ' (Hubble OPAL)' : ` · ${f.day >= 0 ? '+' : '−'}${vn(Math.abs(f.day), 1)} ngày so với Voyager 2`)]);
-        rows.push(['Tua nhanh', `×${fmtInt(rateWall)} · 1 vòng quay = ${rateWall > 0 ? vn(PROT / Math.max(rateWall, 1e-6), 1) + ' s' : '∞'}`]);
+        rows.push([t('Thời điểm', 'Date'), dateStr(ms) + (f.era ? ' (Hubble OPAL)' : ` · ${f.day >= 0 ? '+' : '−'}${vn(Math.abs(f.day), 1)} ${t('ngày so với Voyager 2', 'days from the Voyager 2 flyby')}`)]);
+        rows.push([t('Tua nhanh', 'Time-lapse'), `×${fmtInt(rateWall)} · ${t('1 vòng quay', '1 rotation')} = ${rateWall > 0 ? vn(PROT / Math.max(rateWall, 1e-6), 1) + ' s' : '∞'}`]);
         const sc = st.subPoint(c.camera.position);
         const u = windU(sc.lat);
-        rows.push(['Vĩ độ dưới camera', latStr(sc.lat)]);
-        rows.push(['Gió tại đó', `${u >= 0 ? '+' : '−'}${fmtInt(Math.abs(u))} m/s = ${fmtInt(Math.abs(u) * 3.6)} km/h ${u >= 0 ? 'về đông' : 'về tây'} · Mach ${vn(Math.abs(u) / SOUND, 2)}`]);
+        rows.push([t('Vĩ độ dưới camera', 'Latitude below camera'), latStr(sc.lat)]);
+        rows.push([t('Gió tại đó', 'Wind there'), `${u >= 0 ? '+' : '−'}${fmtInt(Math.abs(u))} m/s = ${fmtInt(Math.abs(u) * 3.6)} km/h ${u >= 0 ? t('về đông', 'eastward') : t('về tây', 'westward')} · Mach ${vn(Math.abs(u) / SOUND, 2)}`]);
         const m = f.main;
         if (!f.era) {
-          rows.push(['Vết Tối Lớn', `${latStr(m.lat)} · tỉ lệ trục ${vn(f.lam, 2)} · hoàn lưu 1 vòng/${vn(TAU / m.Om / DAY, 1)} ngày`]);
+          rows.push([t('Vết Tối Lớn', 'Great Dark Spot'), t(`${latStr(m.lat)} · tỉ lệ trục ${vn(f.lam, 2)} · hoàn lưu 1 vòng/${vn(TAU / m.Om / DAY, 1)} ngày`, `${latStr(m.lat)} · axis ratio ${vn(f.lam, 2)} · one circulation every ${vn(TAU / m.Om / DAY, 1)} days`)]);
           const dl = wrapPi(f.sco.lon - m.lon), rel = f.sco.rate - m.rate;
           const tCatch = (dl < 0 ? -dl : TAU - dl) / rel;
-          rows.push(['Scooter so với Vết Tối Lớn', `${dl < 0 ? 'phía tây' : 'phía đông'} ${vn(Math.abs(dl) * R2D, 0)}° kinh độ · nhanh hơn ${vn(rel * DAY * R2D, 0)}°/ngày · ${dl < 0 ? 'vượt sau' : 'vượt lần tới sau'} ${vn(tCatch / HOUR, 0)} giờ`]);
+          rows.push([t('Scooter so với Vết Tối Lớn', 'Scooter vs Great Dark Spot'), t(`${dl < 0 ? 'phía tây' : 'phía đông'} ${vn(Math.abs(dl) * R2D, 0)}° kinh độ · nhanh hơn ${vn(rel * DAY * R2D, 0)}°/ngày · ${dl < 0 ? 'vượt sau' : 'vượt lần tới sau'} ${vn(tCatch / HOUR, 0)} giờ`,
+            `${vn(Math.abs(dl) * R2D, 0)}° of longitude ${dl < 0 ? 'west' : 'east'} · ${vn(rel * DAY * R2D, 0)}°/day faster · ${dl < 0 ? 'overtakes it in' : 'laps it again in'} ${vn(tCatch / HOUR, 0)} h`)]);
         } else {
-          rows.push(['Vết Tối Bắc NDS-2018', `${latStr(m.lat)} · trôi ${fmtInt(Math.abs(windU(m.lat)) * 3.6)} km/h về tây`]);
+          rows.push([t('Vết Tối Bắc NDS-2018', 'Northern dark spot NDS-2018'), t(`${latStr(m.lat)} · trôi ${fmtInt(Math.abs(windU(m.lat)) * 3.6)} km/h về tây`, `${latStr(m.lat)} · drifting westward at ${fmtInt(Math.abs(windU(m.lat)) * 3.6)} km/h`)]);
         }
         const cam = c.camera.position.clone().normalize();
-        rows.push(['Góc pha (Mặt Trời–hành tinh–bạn)', vn(Math.acos(THREE.MathUtils.clamp(cam.dot(st.sun), -1, 1)) * R2D, 0) + '°']);
+        rows.push([t('Góc pha (Mặt Trời–hành tinh–bạn)', 'Phase angle (Sun–planet–you)'), vn(Math.acos(THREE.MathUtils.clamp(cam.dot(st.sun), -1, 1)) * R2D, 0) + '°']);
         if (p.triton !== false) {
           const tw = tritonPos(st.T).applyMatrix3(st.B2W), cp = c.camera.position;
           const ang = Math.acos(THREE.MathUtils.clamp(tw.clone().sub(cp).normalize().dot(c.controls.target.clone().sub(cp).normalize()), -1, 1)) * R2D;
-          rows.push(['Triton', `cách camera ${fmtInt(tw.distanceTo(cp) * RN / 1000)} km · ${ang < 30 ? 'trong khung hình' : 'lệch ' + vn(ang, 0) + '° khỏi tâm nhìn'}`]);
+          rows.push(['Triton', t(`cách camera ${fmtInt(tw.distanceTo(cp) * RN / 1000)} km · ${ang < 30 ? 'trong khung hình' : 'lệch ' + vn(ang, 0) + '° khỏi tâm nhìn'}`, `${fmtInt(tw.distanceTo(cp) * RN / 1000)} km from the camera · ${ang < 30 ? 'in frame' : vn(ang, 0) + '° off the line of sight'}`)]);
         }
         if (st.fly) {
           const h = (st.T - st.fly.Tca) / HOUR, o = hyper(h * HOUR);
           const hh = Math.floor(Math.abs(h)), mm = Math.floor((Math.abs(h) - hh) * 60);
-          rows.push(['Voyager 2', `${h < 0 ? 'T−' : 'T+'}${hh}:${pad2(mm)} so với điểm gần nhất · cách tâm ${fmtInt(o.r / 1000)} km · ${vn(o.v / 1000, 1)} km/s`]);
+          rows.push(['Voyager 2', t(`${h < 0 ? 'T−' : 'T+'}${hh}:${pad2(mm)} so với điểm gần nhất · cách tâm ${fmtInt(o.r / 1000)} km · ${vn(o.v / 1000, 1)} km/s`, `${h < 0 ? 'T−' : 'T+'}${hh}:${pad2(mm)} from closest approach · ${fmtInt(o.r / 1000)} km from the center · ${vn(o.v / 1000, 1)} km/s`)]);
         }
         return rows;
       },
@@ -747,7 +777,8 @@ const NEPTUNE = {
         const pp = h.ro.clone().addScaledVector(h.rd, h.t);
         const ll = bodyLatLon(pp, st.spin), u = windU(ll.lat);
         const lapH = Math.abs(TAU / (u / (RN * Math.cos(ll.lat * D2R))) / HOUR);
-        c.toast(`Vĩ độ <b>${latStr(ll.lat)}</b>: gió ${u >= 0 ? 'về đông' : 'về tây'} <b>${fmtInt(Math.abs(u) * 3.6)} km/h</b> (${fmtInt(Math.abs(u))} m/s, Mach ${vn(Math.abs(u) / SOUND, 2)}). So với lõi hành tinh, mây ở đây đi hết một vòng vĩ tuyến trong ${vn(lapH, 0)} giờ${Math.abs(ll.lat) < 15 ? ' — dòng tia xích đạo thổi <b>ngược</b> chiều quay' : ''}.`, 7000);
+        c.toast(t(`Vĩ độ <b>${latStr(ll.lat)}</b>: gió ${u >= 0 ? 'về đông' : 'về tây'} <b>${fmtInt(Math.abs(u) * 3.6)} km/h</b> (${fmtInt(Math.abs(u))} m/s, Mach ${vn(Math.abs(u) / SOUND, 2)}). So với lõi hành tinh, mây ở đây đi hết một vòng vĩ tuyến trong ${vn(lapH, 0)} giờ${Math.abs(ll.lat) < 15 ? ' — dòng tia xích đạo thổi <b>ngược</b> chiều quay' : ''}.`,
+          `Latitude <b>${latStr(ll.lat)}</b>: wind blowing ${u >= 0 ? 'eastward' : 'westward'} at <b>${fmtInt(Math.abs(u) * 3.6)} km/h</b> (${fmtInt(Math.abs(u))} m/s, Mach ${vn(Math.abs(u) / SOUND, 2)}). Relative to the planet's interior, the clouds here take ${vn(lapH, 0)} h to go once around this latitude circle${Math.abs(ll.lat) < 15 ? ' — the equatorial jet blows <b>against</b> the rotation' : ''}.`), 7000);
         c.audio.ping(300 + Math.abs(u) * 0.8, 0.05, info.ndcX);
       },
       gdsShot(c, instant) {
@@ -770,14 +801,14 @@ const NEPTUNE = {
         if (instant) { c.camera.position.copy(target); c.controls.target.set(0, 0, 0); c.camera.lookAt(0, 0, 0); }
         else tweenTo(c, target, 3);
         c.syncUI?.();
-        c.toast?.(st.f.era ? 'Vết Tối Bắc NDS-2018 (Hubble): xoáy nghịch rộng ~11 000 km ở 25°B, có mây mê-tan sáng ở rìa. Ảnh Hubble chỉ phân giải ~1 000 km, nên các chi tiết nhỏ hơn là mô phỏng.'
-          : 'Camera bám theo Vết Tối Lớn, tua nhanh ~×50 000. Xoáy nghịch quay ngược chiều kim đồng hồ (khoảng 3 ngày một vòng theo mô hình Kida), phình–dẹt theo chu kỳ 8 ngày và trôi dần về xích đạo; mây “đồng hành” trắng lơ lửng ở rìa tây-nam. Scooter (42°N) và Vết Tối 2 (55°N) chạy nhanh hơn nên lần lượt vượt qua.', 10000);
+        c.toast?.(st.f.era ? t('Vết Tối Bắc NDS-2018 (Hubble): xoáy nghịch rộng ~11 000 km ở 25°B, có mây mê-tan sáng ở rìa. Ảnh Hubble chỉ phân giải ~1 000 km, nên các chi tiết nhỏ hơn là mô phỏng.', 'Northern dark spot NDS-2018 (Hubble): an anticyclone ~11,000 km across at 25° N, with bright methane clouds at its edge. Hubble resolves only ~1,000 km, so finer details are simulated.')
+          : t('Camera bám theo Vết Tối Lớn, tua nhanh ~×50 000. Xoáy nghịch quay ngược chiều kim đồng hồ (khoảng 3 ngày một vòng theo mô hình Kida), phình–dẹt theo chu kỳ 8 ngày và trôi dần về xích đạo; mây “đồng hành” trắng lơ lửng ở rìa tây-nam. Scooter (42°N) và Vết Tối 2 (55°N) chạy nhanh hơn nên lần lượt vượt qua.', 'The camera follows the Great Dark Spot with time sped up ~×50,000. The anticyclone spins counterclockwise (about one turn every 3 days in the Kida model), swells and flattens on an 8-day cycle and drifts slowly toward the equator; white “companion” clouds hover at its southwest edge. The Scooter (42° S) and Dark Spot 2 (55° S) move faster and overtake it in turn.'), 10000);
       },
       flyby(c) {
-        if (stopFly(c)) { c.toast?.('Đã dừng chuyến bay.'); return; }
+        if (stopFly(c)) { c.toast?.(t('Đã dừng chuyến bay.', 'Flyby stopped.')); return; }
         startFly(c, -16);
         c.syncUI?.();
-        c.toast?.('Voyager 2, 24–25/8/1989: tiếp cận từ phía có nắng với ~16 km/s, lướt qua cực Bắc ở độ cao 4 950 km trên đỉnh mây (26,8 km/s), rồi 5 giờ sau bay ngang Triton. Toàn bộ 23 giờ được tua trong ~25 giây — hành tinh kịp quay gần 1,5 vòng.', 10000);
+        c.toast?.(t('Voyager 2, 24–25/8/1989: tiếp cận từ phía có nắng với ~16 km/s, lướt qua cực Bắc ở độ cao 4 950 km trên đỉnh mây (26,8 km/s), rồi 5 giờ sau bay ngang Triton. Toàn bộ 23 giờ được tua trong ~25 giây — hành tinh kịp quay gần 1,5 vòng.', 'Voyager 2, 24–25 August 1989: approaching from the sunlit side at ~16 km/s, it skimmed over the north pole 4,950 km above the cloud tops (26.8 km/s), then passed Triton 5 hours later. The whole 23 hours are compressed into ~25 seconds — enough for the planet to turn almost 1.5 times.'), 10000);
       },
       backlit(c, instant) {
         stopFly(c);
@@ -788,7 +819,7 @@ const NEPTUNE = {
         const pos = dir.multiplyScalar(7);
         if (instant) { c.camera.position.copy(pos); c.controls.target.set(0, 0, 0); c.camera.lookAt(0, 0, 0); } else tweenTo(c, pos, 3);
         c.params.ringGain = Math.max(c.params.ringGain, 150);
-        c.toast?.('Nhìn ngược sáng (như Voyager 2 sau khi bay qua): bụi mịn tán xạ ánh sáng về phía trước nên vành Galle, Le Verrier, Lassell, Arago và Adams hiện ra; các cung Liberté, Égalité, Fraternité là những khúc vành dày hơn, bị vệ tinh Galatea giữ lại bằng cộng hưởng 42:43 và trôi cùng nhau mỗi 10,5 giờ một vòng.', 9000);
+        c.toast?.(t('Nhìn ngược sáng (như Voyager 2 sau khi bay qua): bụi mịn tán xạ ánh sáng về phía trước nên vành Galle, Le Verrier, Lassell, Arago và Adams hiện ra; các cung Liberté, Égalité, Fraternité là những khúc vành dày hơn, bị vệ tinh Galatea giữ lại bằng cộng hưởng 42:43 và trôi cùng nhau mỗi 10,5 giờ một vòng.', 'Backlit view (as Voyager 2 saw it after the flyby): fine dust scatters light forward, revealing the Galle, Le Verrier, Lassell, Arago and Adams rings; the Liberté, Égalité and Fraternité arcs are denser clumps of the ring, confined by the moon Galatea through a 42:43 resonance and circling together once every 10.5 hours.'), 9000);
       },
     };
     NEPTUNE.__inst = inst;

@@ -24,6 +24,7 @@ your final report instead of editing it.
 |---|---|
 | `id` | unique kebab-case id, also used in `#hash` deep links and `tools/snap.sh` |
 | `name` | Vietnamese display name (e.g. `'Mặt Trời'`) |
+| `en` | English versions of the text fields above/below: `{ name, subtitle, blurb, intro, facts }` (see **Language**) |
 | `category` | `'compact'` · `'stars'` · `'planets'` · `'small'` · `'galaxies'` · `'nebulae'` |
 | `order` | sort key inside the category (lower first) |
 | `subtitle` | one short line: type / classification |
@@ -46,6 +47,7 @@ your final report instead of editing it.
 { key, label, type: 'toggle', default: bool, note? }
 { key, label, type: 'seg', options: [[value, 'label'], ...], default, note? }
 ```
+Each param may carry `en: { label, note, options: ['label', ...] }` (seg option labels in the same order).
 Values live in `ctx.params[key]` (read them every frame in `update`). Optional
 `onChange(value, ctx)` on the param, or `instance.onParam(key, value, ctx)`.
 
@@ -62,6 +64,7 @@ Reserved keys (do not use for actions): `u [ ] k h s m f ? /` and Escape.
 | `onClick(info, ctx)` | optional; `info = { x, y, ndcX, ndcY, dir, origin, shift }` (`dir`/`origin` are world-space Vector3) |
 | `enter(ctx)` / `exit(ctx)` | optional hooks when the scene becomes active / inactive |
 | `ready` | optional Promise that resolves when large assets (textures, data) have loaded; the host keeps the transition (and snapshots) waiting on it, up to 15 s (60 s in snap mode). Put assets under `assets/<scene>/` |
+| `onLang(lang, ctx)` | optional; called on every created instance when the user switches language — redraw anything built once with text in it (canvas labels, sprites) |
 | `setQuality(q)` | optional; `q = { scale, steps, k }` when the user changes quality (`steps` is the black-hole march budget: 200 / 320 / 480 / 720) |
 
 ## ctx
@@ -79,6 +82,7 @@ toast(html, ms), fmt.{dist(m), time(s), sci(x), num(x)}
 setFov(deg)   change the camera field of view (e.g. a telescope or geostationary framing); reset on scene switch
 syncUI()      refresh the panel after changing ctx.params from code (the host also calls it after actions and at 10 Hz)
 bhGlobals     the host's global settings object (read-only for scenes, e.g. timeScale, exposure)
+lang()        current language 'vi' | 'en';  t(vi, en) picks the string for it (same as js/i18n.js)
 ```
 
 ## Shaders
@@ -106,7 +110,39 @@ bhGlobals     the host's global settings object (read-only for scenes, e.g. time
 * **Beautiful.** This is a showcase; aim for the image a planetarium would project.
 * **Interactive.** Each scene needs ≥ 2 meaningful params and ideally an action or click behaviour
   that teaches something ("make me surprise").
-* All user-facing text in Vietnamese with correct diacritics.
+* All user-facing text in Vietnamese with correct diacritics, plus English (see **Language**).
+
+## Language
+
+The site is bilingual: Vietnamese (default) and English, switched live from the UI (VI / EN), saved in
+localStorage and deep-linkable with `?lang=en`. The host re-renders the panel, catalog, info card and
+dock on a switch without reloading, so **never resolve the language at import time** — keep the
+Vietnamese text where it is and add English next to it:
+
+* **Static text** (scene def, params, actions): an `en` sibling object with the same field names.
+  The host shows `obj.en[field]` in English and `obj[field]` otherwise; a missing field falls back to
+  Vietnamese.
+
+  ```js
+  { id: 'moon', name: 'Mặt Trăng', subtitle: '…', blurb: '…', facts: [['Bán kính', '1 737,4 km']],
+    en: { name: 'The Moon', subtitle: '…', blurb: '…', facts: [['Radius', '1,737.4 km']] },  // facts: full list
+    params: [{ key: 'mode', label: 'Chế độ', type: 'seg', options: [[0, 'Tắt'], [1, 'Bật']], note: '…',
+               en: { label: 'Mode', note: '…', options: ['Off', 'On'] } }],
+    actions: [{ label: 'Trăng tròn', title: '…', key: 'o', run: ctx => ctx.toast(t('…', '…')),
+                en: { label: 'Full Moon', title: '…' } }] }
+  ```
+
+* **Text built at run time** (`hud()` rows, toasts, `fmt` functions, click messages, anything with
+  numbers in it): `import { t, dec, int, locale } from '../i18n.js'` (`'../../i18n.js'` from
+  `planets/` and `nebulae/`) and write `t('tiếng Việt', 'English')`. `ctx.t` / `ctx.lang()` are the
+  same functions. Call `t()` when the string is produced, not in a module-level constant.
+* **Numbers**: Vietnamese writes `1 737,4`; English writes `1,737.4`. `dec(x, d)` formats a decimal
+  with the right separator, `int(n)` a grouped integer, `locale()` gives `'vi-VN'`/`'en-US'` for
+  `toLocaleString`. In static English text write English numbers directly.
+* **Text drawn into textures** (canvas labels) must be redrawn in `instance.onLang(lang, ctx)`.
+* English should read naturally and use standard astronomical terms (e.g. *limb darkening*,
+  *tidally locked*, *accretion disk*), not a word-for-word rendering of the Vietnamese.
+* Check both languages: `tools/snap.sh <id> out.png "lang=en"`.
 
 ## Verify your work (required)
 

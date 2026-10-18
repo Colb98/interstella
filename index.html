@@ -65,8 +65,15 @@ button{font-family:inherit;color:inherit}
 #dock .sep{width:1px;background:var(--line);margin:6px 2px}
 #dock svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.5}
 
+/* language switch (VI / EN) */
+.langsw{display:flex;gap:2px;padding:3px;border-radius:12px}
+.langsw button{background:none;border:0;border-radius:9px;padding:6px 9px;font:500 10.5px var(--mono);letter-spacing:.12em;color:var(--dim);cursor:pointer;transition:background .2s,color .2s}
+.langsw button:hover{color:var(--fg)}
+.langsw button.on{background:rgba(255,181,107,.16);color:var(--amber)}
+#intro .langsw{position:absolute;top:18px;right:20px}
 /* panel */
-#panelToggle{position:absolute;top:18px;right:20px;padding:9px 14px;font-size:12px;cursor:pointer;letter-spacing:.06em}
+#topbar{position:absolute;top:18px;right:20px;display:flex;gap:8px;align-items:stretch}
+#panelToggle{padding:9px 14px;font-size:12px;cursor:pointer;letter-spacing:.06em}
 #panel{position:absolute;top:62px;right:20px;width:300px;max-height:calc(100vh - 150px);overflow-y:auto;padding:6px 14px 12px;transition:transform .45s cubic-bezier(.2,.8,.2,1),opacity .45s}
 #panel.closed{transform:translateX(340px);opacity:0;pointer-events:none}
 #panel::-webkit-scrollbar{width:6px}#panel::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:3px}
@@ -273,98 +280,98 @@ body.cine #skipTour{display:block}
   </header>
 
   <aside id="telemetry" class="glass">
-    <h4>Đo đạc tại vị trí của bạn</h4>
-    <div class="trow"><span class="k">Khoảng cách</span><span class="v hot" id="tR"></span></div>
-    <div class="trow opt"><span class="k">Bán kính Schwarzschild r<sub>s</sub></span><span class="v" id="tRs"></span></div>
-    <div class="trow"><span class="k">Giãn nở thời gian dτ/dt</span><span class="v" id="tDil"></span></div>
-    <div class="trow opt"><span class="k">Vận tốc thoát</span><span class="v" id="tEsc"></span></div>
-    <div class="trow opt"><span class="k">Quỹ đạo tròn tại đây</span><span class="v" id="tOrb"></span></div>
-    <div class="trow"><span class="k">Lực thủy triều (người 2 m)</span><span class="v" id="tTid"></span></div>
-    <div class="trow opt"><span class="k">Đường kính góc của bóng đen</span><span class="v" id="tSh"></span></div>
-    <div class="trow opt"><span class="k">Tín hiệu từ Trái Đất</span><span class="v" id="tSig"></span></div>
-    <div class="trow opt"><span class="k">1 giây trên màn hình =</span><span class="v" id="tSim"></span></div>
+    <h4 data-en="Measurements at your position">Đo đạc tại vị trí của bạn</h4>
+    <div class="trow"><span class="k" data-en="Distance">Khoảng cách</span><span class="v hot" id="tR"></span></div>
+    <div class="trow opt"><span class="k" data-en="Schwarzschild radius r<sub>s</sub>">Bán kính Schwarzschild r<sub>s</sub></span><span class="v" id="tRs"></span></div>
+    <div class="trow"><span class="k" data-en="Time dilation dτ/dt">Giãn nở thời gian dτ/dt</span><span class="v" id="tDil"></span></div>
+    <div class="trow opt"><span class="k" data-en="Escape velocity">Vận tốc thoát</span><span class="v" id="tEsc"></span></div>
+    <div class="trow opt"><span class="k" data-en="Circular orbit here">Quỹ đạo tròn tại đây</span><span class="v" id="tOrb"></span></div>
+    <div class="trow"><span class="k" data-en="Tidal stretch (2 m person)">Lực thủy triều (người 2 m)</span><span class="v" id="tTid"></span></div>
+    <div class="trow opt"><span class="k" data-en="Angular size of the shadow">Đường kính góc của bóng đen</span><span class="v" id="tSh"></span></div>
+    <div class="trow opt"><span class="k" data-en="Signal from Earth">Tín hiệu từ Trái Đất</span><span class="v" id="tSig"></span></div>
+    <div class="trow opt"><span class="k" data-en="1 second on screen =">1 giây trên màn hình =</span><span class="v" id="tSim"></span></div>
     <div class="clocks">
-      <div class="clock"><div class="lbl">Đồng hồ của bạn</div><div class="t" id="cYou">00:00:00</div></div>
-      <div class="clock earth"><div class="lbl">Trái Đất</div><div class="t" id="cEarth">00:00:00</div></div>
+      <div class="clock"><div class="lbl" data-en="Your clock">Đồng hồ của bạn</div><div class="t" id="cYou">00:00:00</div></div>
+      <div class="clock earth"><div class="lbl" data-en="Earth">Trái Đất</div><div class="t" id="cEarth">00:00:00</div></div>
     </div>
     <div class="factor" id="cFactor"></div>
   </aside>
 
   <aside id="infoCard" class="glass"><div class="cat" id="icCat"></div><h2 id="icName"></h2><div class="subt" id="icSub"></div><div class="blurb" id="icBlurb"></div><div id="icFacts"></div><div class="sep"></div><div id="icLive"></div></aside>
 
-  <aside id="probes" class="glass"><h4>Tàu thăm dò</h4><div id="probeRows"></div></aside>
+  <aside id="probes" class="glass"><h4 data-en="Probes">Tàu thăm dò</h4><div id="probeRows"></div></aside>
 
   <nav id="dock" class="glass">
-    <button id="bCatalog" title="Danh mục vũ trụ"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="18" r="2.5"/></svg><span class="lbl">Danh mục</span><kbd>U</kbd></button>
+    <button id="bCatalog" title="Danh mục vũ trụ" data-en-title="Cosmic catalogue"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="18" r="2.5"/></svg><span class="lbl" data-en="Catalogue">Danh mục</span><kbd>U</kbd></button>
     <div class="sep"></div>
-    <button class="bh-only" id="bTour" title="Hành trình có hướng dẫn"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M10 8.5l6 3.5-6 3.5z"/></svg><span class="lbl">Hành trình</span><kbd>T</kbd></button>
-    <button class="bh-only" id="bPlunge" title="Lao vào hố đen"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/></svg><span class="lbl">Lao vào</span><kbd>P</kbd></button>
-    <button class="bh-only" id="bProbe" title="Phóng tàu thăm dò"><svg viewBox="0 0 24 24"><path d="M5 19c2-6 6-11 14-14-3 8-8 12-14 14z"/><circle cx="14" cy="10" r="1.5"/></svg><span class="lbl">Phóng tàu</span><kbd>␣</kbd></button>
-    <button class="bh-only" id="bSplit" title="So sánh Newton / Einstein"><svg viewBox="0 0 24 24"><path d="M12 3v18M7 8l-4 4 4 4M17 8l4 4-4 4"/></svg><span class="lbl">Newton ⟷ Einstein</span><kbd>N</kbd></button>
+    <button class="bh-only" id="bTour" title="Hành trình có hướng dẫn" data-en-title="Guided tour"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M10 8.5l6 3.5-6 3.5z"/></svg><span class="lbl" data-en="Tour">Hành trình</span><kbd>T</kbd></button>
+    <button class="bh-only" id="bPlunge" title="Lao vào hố đen" data-en-title="Plunge into the black hole"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/></svg><span class="lbl" data-en="Plunge">Lao vào</span><kbd>P</kbd></button>
+    <button class="bh-only" id="bProbe" title="Phóng tàu thăm dò" data-en-title="Launch a probe"><svg viewBox="0 0 24 24"><path d="M5 19c2-6 6-11 14-14-3 8-8 12-14 14z"/><circle cx="14" cy="10" r="1.5"/></svg><span class="lbl" data-en="Launch probe">Phóng tàu</span><kbd>␣</kbd></button>
+    <button class="bh-only" id="bSplit" title="So sánh Newton / Einstein" data-en-title="Compare Newton / Einstein"><svg viewBox="0 0 24 24"><path d="M12 3v18M7 8l-4 4 4 4M17 8l4 4-4 4"/></svg><span class="lbl">Newton ⟷ Einstein</span><kbd>N</kbd></button>
     <span id="sceneActions"></span>
     <div class="sep"></div>
-    <button id="bShot" title="Chụp ảnh"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><circle cx="12" cy="13.5" r="3.5"/><path d="M8 7l2-3h4l2 3"/></svg><kbd>S</kbd></button>
-    <button id="bMute" title="Âm thanh"><svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path id="muteWave" d="M16.5 8.5a5 5 0 010 7M19 6a8.5 8.5 0 010 12"/></svg><kbd>M</kbd></button>
-    <button id="bHelp" title="Phím tắt"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 115 0c0 1.8-2.5 2-2.5 4M12 17h.01"/></svg><kbd>?</kbd></button>
+    <button id="bShot" title="Chụp ảnh" data-en-title="Screenshot"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><circle cx="12" cy="13.5" r="3.5"/><path d="M8 7l2-3h4l2 3"/></svg><kbd>S</kbd></button>
+    <button id="bMute" title="Âm thanh" data-en-title="Sound"><svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path id="muteWave" d="M16.5 8.5a5 5 0 010 7M19 6a8.5 8.5 0 010 12"/></svg><kbd>M</kbd></button>
+    <button id="bHelp" title="Phím tắt" data-en-title="Keyboard shortcuts"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 115 0c0 1.8-2.5 2-2.5 4M12 17h.01"/></svg><kbd>?</kbd></button>
   </nav>
 
-  <button id="panelToggle" class="glass">⚙ Điều khiển</button>
+  <div id="topbar"><div class="langsw glass" role="group" aria-label="Language"><button data-lang="vi" title="Tiếng Việt">VI</button><button data-lang="en" title="English">EN</button></div><button id="panelToggle" class="glass" data-en="⚙ Controls">⚙ Điều khiển</button></div>
   <aside id="panel" class="glass panel"></aside>
 
   <aside id="rayCard" class="glass">
-    <div class="hd"><span>Mặt phẳng quỹ đạo photon</span><button id="rayClose" title="Đóng">×</button></div>
+    <div class="hd"><span data-en="Photon orbital plane">Mặt phẳng quỹ đạo photon</span><button id="rayClose" title="Đóng" data-en-title="Close">×</button></div>
     <canvas id="rayCv" width="520" height="520"></canvas>
-    <div class="legend"><span><i style="background:#ff5a3c"></i>chân trời</span><span><i style="background:#ffb56b"></i>mặt cầu photon</span><span><i style="background:#7fd8ff"></i>ISCO</span><span><i style="background:rgba(255,255,255,.4)"></i>đường thẳng Newton</span></div>
+    <div class="legend"><span><i style="background:#ff5a3c"></i><span data-en="horizon">chân trời</span></span><span><i style="background:#ffb56b"></i><span data-en="photon sphere">mặt cầu photon</span></span><span><i style="background:#7fd8ff"></i>ISCO</span><span><i style="background:rgba(255,255,255,.4)"></i><span data-en="Newtonian straight line">đường thẳng Newton</span></span></div>
     <div id="rayInfo"></div>
-    <div class="hint3d">Xoay camera ra chỗ khác để thấy đường đi này trong không gian 3D.</div>
+    <div class="hint3d" data-en="Orbit the camera away to see this path in 3D.">Xoay camera ra chỗ khác để thấy đường đi này trong không gian 3D.</div>
   </aside>
 </div>
 
 <div id="caption"></div>
-<button id="skipTour">BỎ QUA · ESC</button>
-<div id="split"><div class="bar"></div><div class="lab l"><b>NEWTON</b>không-thời gian phẳng</div><div class="lab r"><b>EINSTEIN</b>thuyết tương đối rộng</div><div class="knob">⟷</div></div>
+<button id="skipTour" data-en="SKIP · ESC">BỎ QUA · ESC</button>
+<div id="split"><div class="bar"></div><div class="lab l"><b>NEWTON</b><span data-en="flat spacetime">không-thời gian phẳng</span></div><div class="lab r"><b>EINSTEIN</b><span data-en="general relativity">thuyết tương đối rộng</span></div><div class="knob">⟷</div></div>
 <div id="toasts"></div>
 <div id="plungeHud">
-  <div><div class="k">Bán kính</div><div class="v a" id="pR"></div></div>
-  <div><div class="k">Vận tốc (so với nghỉ)</div><div class="v" id="pV"></div></div>
-  <div><div class="k">Thời gian riêng τ</div><div class="v" id="pTau"></div></div>
-  <div><div class="k">Thủy triều</div><div class="v" id="pTid"></div></div>
-  <div><div class="k">Thời gian ngoài t</div><div class="v" id="pT"></div></div>
+  <div><div class="k" data-en="Radius">Bán kính</div><div class="v a" id="pR"></div></div>
+  <div><div class="k" data-en="Speed (vs. static)">Vận tốc (so với nghỉ)</div><div class="v" id="pV"></div></div>
+  <div><div class="k" data-en="Proper time τ">Thời gian riêng τ</div><div class="v" id="pTau"></div></div>
+  <div><div class="k" data-en="Tides">Thủy triều</div><div class="v" id="pTid"></div></div>
+  <div><div class="k" data-en="Coordinate time t">Thời gian ngoài t</div><div class="v" id="pT"></div></div>
 </div>
 
-<div id="catalog"><div class="top"><div><h3>DANH MỤC VŨ TRỤ</h3><p>Mỗi thiên thể được dựng lại từ vật lý thật — chọn một nơi để đến.</p></div><button class="close" id="catClose">ĐÓNG · ESC</button></div><div id="catGroups"></div></div>
+<div id="catalog"><div class="top"><div><h3 data-en="COSMIC CATALOGUE">DANH MỤC VŨ TRỤ</h3><p data-en="Every object is rebuilt from real physics — pick a place to go.">Mỗi thiên thể được dựng lại từ vật lý thật — chọn một nơi để đến.</p></div><button class="close" id="catClose" data-en="CLOSE · ESC">ĐÓNG · ESC</button></div><div id="catGroups"></div></div>
 <div id="warp"></div>
-<div id="loader" aria-live="polite"><div class="inner"><div class="orb"></div><div class="nm" id="ldName"></div><div class="stage" id="ldStage"></div><div class="bar"><i id="ldBar"></i></div><div class="hint" id="ldHint">Lần đầu mở, card đồ hoạ phải biên dịch shader của cảnh này — có thể mất một lúc. Những lần sau sẽ nhanh hơn nhiều.</div></div></div>
+<div id="loader" aria-live="polite"><div class="inner"><div class="orb"></div><div class="nm" id="ldName"></div><div class="stage" id="ldStage"></div><div class="bar"><i id="ldBar"></i></div><div class="hint" id="ldHint" data-en="The first time, your graphics card has to compile this scene's shaders — it can take a moment. Later visits are much faster.">Lần đầu mở, card đồ hoạ phải biên dịch shader của cảnh này — có thể mất một lúc. Những lần sau sẽ nhanh hơn nhiều.</div></div></div>
 <pre id="snap"></pre>
 
 <div id="help" class="overlay"><div class="card glass">
-  <h3>ĐIỀU KHIỂN</h3>
+  <h3 data-en="CONTROLS">ĐIỀU KHIỂN</h3>
   <div class="grid">
-    <kbd>U</kbd><span>Mở danh mục vũ trụ · <kbd>[</kbd> <kbd>]</kbd> chuyển thiên thể trước/sau</span>
-    <kbd>Kéo / cuộn</kbd><span>Xoay quanh thiên thể / tiến lại gần</span>
-    <kbd>Phím riêng</kbd><span>Mỗi thiên thể có nút hành động riêng ở thanh dưới, kèm phím tắt</span>
+    <kbd>U</kbd><span data-en="Open the cosmic catalogue · <kbd>[</kbd> <kbd>]</kbd> previous / next object">Mở danh mục vũ trụ · <kbd>[</kbd> <kbd>]</kbd> chuyển thiên thể trước/sau</span>
+    <kbd data-en="Drag / scroll">Kéo / cuộn</kbd><span data-en="Orbit the object / move closer">Xoay quanh thiên thể / tiến lại gần</span>
+    <kbd data-en="Scene keys">Phím riêng</kbd><span data-en="Each object has its own action buttons in the bottom bar, with shortcuts">Mỗi thiên thể có nút hành động riêng ở thanh dưới, kèm phím tắt</span>
   </div>
-  <h3 style="margin-top:22px">TRONG CẢNH HỐ ĐEN</h3>
+  <h3 style="margin-top:22px" data-en="IN THE BLACK HOLE SCENE">TRONG CẢNH HỐ ĐEN</h3>
   <div class="grid">
-    <kbd>Click</kbd><span>Bắn một photon ngược từ mắt bạn — xem đường đi thật của tia sáng tạo nên điểm ảnh đó</span>
-    <kbd>Shift + Click</kbd><span>Phóng tàu thăm dò từ vị trí của bạn theo hướng đó</span>
-    <kbd>Space</kbd><span>Phóng tàu vào quỹ đạo (loại quỹ đạo chọn trong bảng điều khiển)</span>
-    <kbd>T</kbd><span>Hành trình điện ảnh có thuyết minh</span>
-    <kbd>P</kbd><span>Rơi tự do vào chân trời sự kiện</span>
-    <kbd>N</kbd><span>Chia đôi màn hình Newton ⟷ Einstein</span>
-    <kbd>L</kbd><span>Bật/tắt thấu kính hấp dẫn</span>
-    <kbd>D</kbd><span>Doppler: tắt / điện ảnh / vật lý</span>
-    <kbd>G</kbd><span>Lưới mặt cầu photon (1,5 r<sub>s</sub>)</span>
-    <kbd>C</kbd><span>Xóa photon và tàu thăm dò</span>
+    <kbd>Click</kbd><span data-en="Trace a photon back from your eye — see the real path of the light that makes that pixel">Bắn một photon ngược từ mắt bạn — xem đường đi thật của tia sáng tạo nên điểm ảnh đó</span>
+    <kbd>Shift + Click</kbd><span data-en="Launch a probe from your position in that direction">Phóng tàu thăm dò từ vị trí của bạn theo hướng đó</span>
+    <kbd>Space</kbd><span data-en="Launch a probe into orbit (pick the orbit type in the control panel)">Phóng tàu vào quỹ đạo (loại quỹ đạo chọn trong bảng điều khiển)</span>
+    <kbd>T</kbd><span data-en="Narrated cinematic tour">Hành trình điện ảnh có thuyết minh</span>
+    <kbd>P</kbd><span data-en="Free-fall into the event horizon">Rơi tự do vào chân trời sự kiện</span>
+    <kbd>N</kbd><span data-en="Split screen Newton ⟷ Einstein">Chia đôi màn hình Newton ⟷ Einstein</span>
+    <kbd>L</kbd><span data-en="Gravitational lensing on/off">Bật/tắt thấu kính hấp dẫn</span>
+    <kbd>D</kbd><span data-en="Doppler: off / cinematic / physical">Doppler: tắt / điện ảnh / vật lý</span>
+    <kbd>G</kbd><span data-en="Photon-sphere grid (1.5 r<sub>s</sub>)">Lưới mặt cầu photon (1,5 r<sub>s</sub>)</span>
+    <kbd>C</kbd><span data-en="Clear photons and probes">Xóa photon và tàu thăm dò</span>
   </div>
-  <h3 style="margin-top:22px">MỌI NƠI</h3>
+  <h3 style="margin-top:22px" data-en="EVERYWHERE">MỌI NƠI</h3>
   <div class="grid">
-    <kbd>K</kbd><span>Bầu trời: Ngân Hà / lưới / bàn cờ</span>
-    <kbd>S · M</kbd><span>Chụp ảnh · tắt tiếng</span>
-    <kbd>F</kbd><span>Toàn màn hình</span>
-    <kbd>H</kbd><span>Ẩn/hiện giao diện</span>
+    <kbd>K</kbd><span data-en="Sky: Milky Way / grid / checkerboard">Bầu trời: Ngân Hà / lưới / bàn cờ</span>
+    <kbd>S · M</kbd><span data-en="Screenshot · mute">Chụp ảnh · tắt tiếng</span>
+    <kbd>F</kbd><span data-en="Full screen">Toàn màn hình</span>
+    <kbd>H</kbd><span data-en="Hide/show the interface">Ẩn/hiện giao diện</span>
   </div>
-  <div class="foot">Mỗi điểm ảnh được tính bằng cách tích phân phương trình trắc địa null của mêtric Schwarzschild: d²u/dφ² + u = (3/2) r<sub>s</sub> u². Đĩa bồi tụ dùng hồ sơ nhiệt độ Novikov–Thorne, màu vật đen tích phân qua hàm khớp màu CIE 1931, dịch tần g = δ·√(1−r<sub>s</sub>/r). Gõ thử một cái tên trong phim…</div>
+  <div class="foot" data-en="Every pixel comes from integrating the null-geodesic equation of the Schwarzschild metric: d²u/dφ² + u = (3/2) r<sub>s</sub> u². The accretion disk uses the Novikov–Thorne temperature profile, blackbody colours integrated over the CIE 1931 colour-matching functions, and the frequency shift g = δ·√(1−r<sub>s</sub>/r). Try typing a name from the film…">Mỗi điểm ảnh được tính bằng cách tích phân phương trình trắc địa null của mêtric Schwarzschild: d²u/dφ² + u = (3/2) r<sub>s</sub> u². Đĩa bồi tụ dùng hồ sơ nhiệt độ Novikov–Thorne, màu vật đen tích phân qua hàm khớp màu CIE 1931, dịch tần g = δ·√(1−r<sub>s</sub>/r). Gõ thử một cái tên trong phim…</div>
 </div></div>
 
 <div id="horizon" class="overlay">
@@ -373,16 +380,17 @@ body.cine #skipTour{display:block}
   <div class="l mono" id="h3"></div>
   <div class="l" id="h4"></div>
   <div class="l" id="h5"></div>
-  <button id="hBack">THOÁT RA — BẰNG MỘT PHÉP MÀU</button>
+  <button id="hBack" data-en="ESCAPE — BY A MIRACLE">THOÁT RA — BẰNG MỘT PHÉP MÀU</button>
 </div>
 
 <div id="intro">
+  <div class="langsw glass" role="group" aria-label="Language"><button data-lang="vi" title="Tiếng Việt">VI</button><button data-lang="en" title="English">EN</button></div>
   <div class="inner">
-    <div class="eyebrow">Danh mục vũ trụ · dựng lại từ vật lý thật · thời gian thực</div>
+    <div class="eyebrow" data-en="A cosmic catalogue · rebuilt from real physics · in real time">Danh mục vũ trụ · dựng lại từ vật lý thật · thời gian thực</div>
     <h1>INTERSTELLAR</h1>
-    <p class="poem">“Nơi ngay cả ánh sáng cũng phải cúi đầu.”</p>
+    <p class="poem" data-en="“Where even light must bow.”">“Nơi ngay cả ánh sáng cũng phải cúi đầu.”</p>
     <button id="enterBtn" disabled>Đang uốn cong không-thời gian…</button>
-    <div class="hint">🎧 Nên dùng tai nghe · nhạc nền được tạo theo thời gian thực</div>
+    <div class="hint" data-en="🎧 Headphones recommended · the music is generated in real time">🎧 Nên dùng tai nghe · nhạc nền được tạo theo thời gian thực</div>
   </div>
 </div>
 
@@ -395,6 +403,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { FULLSCREEN_VERT } from './js/glsl/common.js';
 import { BH_FRAG } from './js/glsl/blackhole.js';
+import { t, tr, lang, setLang, onLang } from './js/i18n.js';
 
 /* =====================================================================
    Units: r_s = 1 (so M = 1/2), c = 1. Time unit = r_s / c.
@@ -405,12 +414,13 @@ const AU = 1.495978707e11, LY = 9.4607e15, YEAR = 3.15576e7;
 const B_CRIT = 1.5 * Math.sqrt(3); // critical impact parameter in r_s
 
 const MASSES = [
-  { name: 'Hố đen sao · 10 M☉', short: '10 M☉', m: 10 },
-  { name: 'Sagittarius A* · 4,3 triệu M☉', short: 'Sgr A*', m: 4.297e6 },
-  { name: 'Gargantua · 100 triệu M☉', short: 'Gargantua', m: 1e8 },
-  { name: 'M87* · 6,5 tỉ M☉', short: 'M87*', m: 6.5e9 },
-  { name: 'TON 618 · 66 tỉ M☉', short: 'TON 618', m: 6.6e10 },
+  { name: 'Hố đen sao · 10 M☉', short: '10 M☉', m: 10, en: { name: 'Stellar black hole · 10 M☉' } },
+  { name: 'Sagittarius A* · 4,3 triệu M☉', short: 'Sgr A*', m: 4.297e6, en: { name: 'Sagittarius A* · 4.3 million M☉' } },
+  { name: 'Gargantua · 100 triệu M☉', short: 'Gargantua', m: 1e8, en: { name: 'Gargantua · 100 million M☉' } },
+  { name: 'M87* · 6,5 tỉ M☉', short: 'M87*', m: 6.5e9, en: { name: 'M87* · 6.5 billion M☉' } },
+  { name: 'TON 618 · 66 tỉ M☉', short: 'TON 618', m: 6.6e10, en: { name: 'TON 618 · 66 billion M☉' } },
 ];
+const massName = () => tr(MASSES[P.massIndex], 'name');
 const QUALITY = {
   low:   { scale: 0.5,  steps: 200, k: 0.09 },
   med:   { scale: 0.75, steps: 320, k: 0.06 },
@@ -781,11 +791,15 @@ function showRayDiagram(res, d, gr) {
   Object.assign(rayDiag, { res, d: d.clone(), gr, e1, e2, R, rc, t0: performance.now(), dur: 1400 + Math.min(1600, res.pts.length * 2) });
   const cap = res.fate === 'captured', bTxt = res.b.toFixed(3);
   let msg;
-  if (!gr) msg = `<b>Không-thời gian phẳng</b> — photon đi thẳng, ${cap ? 'chạm chân trời' : 'không bị lệch'}.`;
-  else if (cap) msg = `<b>Bị nuốt</b> · b = ${bTxt} r<sub>s</sub> &lt; b<sub>c</sub> = 2,598 · quấn ${res.orbits.toFixed(2)} vòng rồi rơi qua chân trời.`;
-  else msg = `<b>Thoát ra</b> · b = ${bTxt} r<sub>s</sub> · gần nhất ${res.rMin.toFixed(3)} r<sub>s</sub> · lệch ${res.defl.toFixed(1)}° · quấn ${res.orbits.toFixed(2)} vòng.`;
-  if (gr && res.crossings > 0) msg += ` Xuyên mặt phẳng đĩa ${res.crossings} lần${res.crossings > 1 ? ' (ảnh bậc cao của đĩa)' : ''}.`;
-  if (gr && Math.abs(res.b - B_CRIT) < 0.02) msg += ' <b>Sát ngưỡng tới hạn — gần như bị giam trên mặt cầu photon!</b>';
+  if (!gr) msg = t(`<b>Không-thời gian phẳng</b> — photon đi thẳng, ${cap ? 'chạm chân trời' : 'không bị lệch'}.`,
+    `<b>Flat spacetime</b> — the photon travels in a straight line, ${cap ? 'hitting the horizon' : 'undeflected'}.`);
+  else if (cap) msg = t(`<b>Bị nuốt</b> · b = ${bTxt} r<sub>s</sub> &lt; b<sub>c</sub> = 2,598 · quấn ${res.orbits.toFixed(2)} vòng rồi rơi qua chân trời.`,
+    `<b>Captured</b> · b = ${bTxt} r<sub>s</sub> &lt; b<sub>c</sub> = 2.598 · winds ${res.orbits.toFixed(2)} times, then falls through the horizon.`);
+  else msg = t(`<b>Thoát ra</b> · b = ${bTxt} r<sub>s</sub> · gần nhất ${res.rMin.toFixed(3)} r<sub>s</sub> · lệch ${res.defl.toFixed(1)}° · quấn ${res.orbits.toFixed(2)} vòng.`,
+    `<b>Escaped</b> · b = ${bTxt} r<sub>s</sub> · closest ${res.rMin.toFixed(3)} r<sub>s</sub> · deflected ${res.defl.toFixed(1)}° · winds ${res.orbits.toFixed(2)} times.`);
+  if (gr && res.crossings > 0) msg += t(` Xuyên mặt phẳng đĩa ${res.crossings} lần${res.crossings > 1 ? ' (ảnh bậc cao của đĩa)' : ''}.`,
+    ` Crosses the disk plane ${res.crossings} time${res.crossings > 1 ? 's (higher-order images of the disk)' : ''}.`);
+  if (gr && Math.abs(res.b - B_CRIT) < 0.02) msg += t(' <b>Sát ngưỡng tới hạn — gần như bị giam trên mặt cầu photon!</b>', ' <b>Right at the critical value — almost trapped on the photon sphere!</b>');
   $('rayInfo').innerHTML = msg;
   $('ui').classList.add('raycard');
   if (!rayDiag.anim) { rayDiag.anim = true; requestAnimationFrame(drawRayDiagram); }
@@ -834,8 +848,8 @@ function drawRayDiagram() {
   // observer, or an arrow pointing to them when off-scale
   const [ex, ey] = P2(x0);
   c.font = '500 18px "JetBrains Mono", monospace'; c.fillStyle = 'rgba(236,230,218,.85)';
-  if (ex < W - 12) { c.beginPath(); c.arc(ex, ey, 5, 0, Math.PI * 2); c.fill(); c.fillText('bạn', ex - 18, ey - 12); }
-  else { c.beginPath(); c.moveTo(W - 6, cy); c.lineTo(W - 22, cy - 9); c.lineTo(W - 22, cy + 9); c.fill(); c.textAlign = 'right'; c.fillText(`bạn · ${D.rc.toFixed(1)} rₛ`, W - 28, cy - 14); c.textAlign = 'left'; }
+  if (ex < W - 12) { c.beginPath(); c.arc(ex, ey, 5, 0, Math.PI * 2); c.fill(); c.fillText(t('bạn', 'you'), ex - 18, ey - 12); }
+  else { c.beginPath(); c.moveTo(W - 6, cy); c.lineTo(W - 22, cy - 9); c.lineTo(W - 22, cy + 9); c.fill(); c.textAlign = 'right'; c.fillText(`${t('bạn', 'you')} · ${D.rc.toFixed(1)} rₛ`, W - 28, cy - 14); c.textAlign = 'left'; }
   c.restore();
   if (prog < 1) requestAnimationFrame(drawRayDiagram); else D.anim = false;
 }
@@ -950,7 +964,7 @@ function zoomWhirlParams() {
   for (let i = 0; i < 80; i++) { const m = (lo + hi) / 2; if (Veff(m, L2) < E2) lo = m; else hi = m; }
   return { Ra: lo, L };
 }
-const ORBIT_LABEL = { precess: 'quỹ đạo elip tiến động', circular: 'quỹ đạo tròn', whirl: 'quỹ đạo zoom-whirl', plunge: 'rơi xoắn ốc' };
+const orbitLabel = type => ({ precess: t('quỹ đạo elip tiến động', 'precessing elliptical orbit'), circular: t('quỹ đạo tròn', 'circular orbit'), whirl: t('quỹ đạo zoom-whirl', 'zoom-whirl orbit'), plunge: t('rơi xoắn ốc', 'spiral plunge') })[type];
 function launchProbe(type = P.orbitType) {
   const { e1, e2 } = randomPlane();
   let x, v;
@@ -971,8 +985,9 @@ function launchProbe(type = P.orbitType) {
   } else {
     const R = 10 + Math.random() * 5; x = e1.clone().multiplyScalar(R); v = e2.clone().multiplyScalar(0.06 + Math.random() * 0.06);
   }
-  const p = addProbe(x, v, ORBIT_LABEL[type]);
-  toast(`Đã phóng <b>${p.name}</b> — ${p.label}. ${type === 'whirl' ? 'Năng lượng được tinh chỉnh sát đỉnh thế năng: nó sẽ "xoáy" nhiều vòng quanh 2,2 r<sub>s</sub> rồi văng ra.' : type === 'precess' ? 'Theo Newton nó sẽ vẽ một elip khép kín; theo Einstein elip quay dần thành hình hoa hồng.' : type === 'plunge' ? 'Mô-men động lượng quá nhỏ — không có quỹ đạo nào cứu được nó.' : 'Tốc độ đúng bằng quỹ đạo tròn Schwarzschild.'}`, 6000);
+  const p = addProbe(x, v, orbitLabel(type));
+  toast(t(`Đã phóng <b>${p.name}</b> — ${p.label}. ${type === 'whirl' ? 'Năng lượng được tinh chỉnh sát đỉnh thế năng: nó sẽ "xoáy" nhiều vòng quanh 2,2 r<sub>s</sub> rồi văng ra.' : type === 'precess' ? 'Theo Newton nó sẽ vẽ một elip khép kín; theo Einstein elip quay dần thành hình hoa hồng.' : type === 'plunge' ? 'Mô-men động lượng quá nhỏ — không có quỹ đạo nào cứu được nó.' : 'Tốc độ đúng bằng quỹ đạo tròn Schwarzschild.'}`,
+    `Launched <b>${p.name}</b> — ${p.label}. ${type === 'whirl' ? 'Its energy is tuned just below the top of the potential barrier: it will "whirl" several times around 2.2 r<sub>s</sub>, then fly back out.' : type === 'precess' ? 'Newton says it would trace a closed ellipse; Einstein makes the ellipse slowly turn into a rosette.' : type === 'plunge' ? 'Its angular momentum is too small — no orbit can save it.' : 'Exactly the Schwarzschild circular-orbit speed.'}`), 6000);
 }
 function launchFromCamera(cx, cy) {
   const { d } = pixelRay(cx, cy);
@@ -980,8 +995,8 @@ function launchFromCamera(cx, cy) {
   const beta = 0.3, gam = 1 / Math.sqrt(1 - beta * beta);
   const rh = x.clone().divideScalar(r), dr = d.dot(rh);
   const v = d.clone().addScaledVector(rh, dr * (Math.sqrt(1 - 1 / r) - 1)).multiplyScalar(gam * beta);
-  const p = addProbe(x.addScaledVector(d, 0.6), v, 'phóng từ vị trí của bạn, 0,3c');
-  toast(`<b>${p.name}</b> rời tàu mẹ với vận tốc 0,3c.`, 3500);
+  const p = addProbe(x.addScaledVector(d, 0.6), v, t('phóng từ vị trí của bạn, 0,3c', 'launched from your position at 0.3c'));
+  toast(t(`<b>${p.name}</b> rời tàu mẹ với vận tốc 0,3c.`, `<b>${p.name}</b> leaves the mothership at 0.3c.`), 3500);
 }
 function clearAll() {
   while (probes.length) probes.pop().dispose();
@@ -1227,16 +1242,16 @@ const fmt = {
     if (a < 1e-3) return (s * 1e6).toPrecision(3) + ' μs';
     if (a < 1) return (s * 1e3).toPrecision(3) + ' ms';
     if (a < 60) return s.toPrecision(3) + ' s';
-    if (a < 3600) return (s / 60).toPrecision(3) + ' phút';
-    if (a < 86400) return (s / 3600).toPrecision(3) + ' giờ';
-    if (a < YEAR) return (s / 86400).toPrecision(3) + ' ngày';
-    const y = s / YEAR; return y < 1e5 ? y.toPrecision(3) + ' năm' : fmt.sci(y) + ' năm';
+    if (a < 3600) return (s / 60).toPrecision(3) + t(' phút', ' min');
+    if (a < 86400) return (s / 3600).toPrecision(3) + t(' giờ', ' h');
+    if (a < YEAR) return (s / 86400).toPrecision(3) + t(' ngày', ' days');
+    const y = s / YEAR; return (y < 1e5 ? y.toPrecision(3) : fmt.sci(y)) + t(' năm', ' yr');
   },
   dist(m) {
     if (m < 1e3) return m.toFixed(0) + ' m';
     if (m < 1e10) return Math.round(m / 1e3).toLocaleString('en-US') + ' km';
     if (m < 0.05 * LY) return (m / AU).toPrecision(3) + ' AU';
-    return (m / LY).toPrecision(3) + ' năm ánh sáng';
+    return (m / LY).toPrecision(3) + t(' năm ánh sáng', ' light-years');
   },
   clock(s) {
     if (s >= 86400 * 2) return fmt.time(s);
@@ -1293,52 +1308,62 @@ function buildPanel() {
   const section = (title, open, scope) => uiSection(panel, title, open, scope);
   const range = uiRange, toggle = uiToggle, seg = uiSeg, buttons = uiButtons;
 
-  let s = section('Vật lý', true, 'bh');
-  toggle(s, 'Thấu kính hấp dẫn', 'lensing', () => toast(P.lensing ? 'Thấu kính hấp dẫn <b>BẬT</b> — ánh sáng đi theo trắc địa cong.' : 'Thấu kính <b>TẮT</b> — ánh sáng đi thẳng như trong không-thời gian phẳng.'));
-  seg(s, 'Dịch tần Doppler + hấp dẫn', 'doppler', [[0, 'Tắt'], [1, 'Điện ảnh'], [2, 'Vật lý']], null,
-    '“Vật lý”: g = δ·√(1−r<sub>s</sub>/r), cường độ ∝ g⁴. Interstellar đã dùng “tắt” để khán giả không bối rối.');
-  toggle(s, 'Chia đôi Newton ⟷ Einstein', 'splitOn', updateSplit);
-  s = section('Hố đen', false, 'bh');
-  seg(s, 'Khối lượng', 'massIndex', MASSES.map((m, i) => [i, m.short]), () => { $('massName').textContent = MASSES[P.massIndex].name; toast(massFact()); },
-    'Hình ảnh bất biến theo tỉ lệ — khối lượng chỉ đổi kích thước thật, thời gian và lực thủy triều trong bảng đo đạc.');
-  s = section('Đĩa bồi tụ', true, 'bh');
-  toggle(s, 'Hiện đĩa', 'disk');
-  range(s, 'Nhiệt độ cực đại', 'diskTmax', 1500, 30000, 100, v => Math.round(v).toLocaleString('en-US') + ' K', 'Đĩa thật của hố đen sao nóng ~10⁷ K (tia X). Ở đây dải nhiệt được đặt trong vùng mắt nhìn thấy.');
-  range(s, 'Bán kính ngoài', 'diskOuter', 6, 30, 0.5, v => v.toFixed(1) + ' rₛ');
-  range(s, 'Mật độ quang học', 'diskDensity', 0.2, 3, 0.05, v => v.toFixed(2));
-  range(s, 'Nhiễu loạn', 'diskTurb', 0, 1, 0.01, v => v.toFixed(2));
-  range(s, 'Độ sáng', 'diskBright', 0.1, 4, 0.05, v => v.toFixed(2));
-  range(s, 'Quầng khí', 'glow', 0, 2, 0.05, v => v.toFixed(2));
-  s = section('Bầu trời');
-  seg(s, 'Nền', 'sky', [[0, 'Ngân Hà'], [1, 'Lưới'], [2, 'Bàn cờ']]);
-  range(s, 'Sao', 'starBright', 0, 3, 0.05, v => v.toFixed(2));
-  range(s, 'Dải Ngân Hà', 'skyBright', 0, 3, 0.05, v => v.toFixed(2));
-  s = section('Trực quan hóa', false, 'bh');
-  toggle(s, 'Mặt cầu photon (1,5 rₛ)', 'showPS');
-  toggle(s, 'ISCO — quỹ đạo bền trong cùng (3 rₛ)', 'showISCO');
-  toggle(s, 'Vệt quỹ đạo tàu thăm dò', 'showTrails');
-  toggle(s, 'Phễu Flamm (độ cong không gian)', 'showFlamm', null, 'Mặt nhúng z = 2√(rₛ(r−rₛ)) — hình học thật của lát cắt không gian. Vòng đỏ: chân trời; cam: mặt cầu photon; xanh: ISCO.');
-  s = section('Tàu thăm dò', false, 'bh');
-  seg(s, 'Loại quỹ đạo', 'orbitType', [['precess', 'Elip tiến động'], ['circular', 'Tròn'], ['whirl', 'Zoom-whirl'], ['plunge', 'Rơi']]);
-  buttons(s, [['Phóng ␣', () => launchProbe()], ['Xóa tất cả', clearAll]]);
-  s = section('Máy quay, thời gian & hình ảnh');
-  range(s, 'Tốc độ thời gian', 'timeScale', 0, 30, 0.5, v => v.toFixed(1) + '×', 'Nhân tốc độ của đồng hồ mô phỏng. Trong cảnh hố đen, 1× = một r<sub>s</sub>/c mỗi giây.');
-  range(s, 'Góc nhìn', 'fov', 25, 110, 1, v => v.toFixed(0) + '°');
-  toggle(s, 'Tự xoay khi rảnh', 'autoRotate');
-  range(s, 'Phơi sáng', 'exposure', 0.2, 3, 0.05, v => v.toFixed(2));
+  let s = section(t('Vật lý', 'Physics'), true, 'bh');
+  toggle(s, t('Thấu kính hấp dẫn', 'Gravitational lensing'), 'lensing', () => toast(P.lensing
+    ? t('Thấu kính hấp dẫn <b>BẬT</b> — ánh sáng đi theo trắc địa cong.', 'Gravitational lensing <b>ON</b> — light follows curved geodesics.')
+    : t('Thấu kính <b>TẮT</b> — ánh sáng đi thẳng như trong không-thời gian phẳng.', 'Lensing <b>OFF</b> — light travels in straight lines, as in flat spacetime.')));
+  seg(s, t('Dịch tần Doppler + hấp dẫn', 'Doppler + gravitational shift'), 'doppler', [[0, t('Tắt', 'Off')], [1, t('Điện ảnh', 'Cinematic')], [2, t('Vật lý', 'Physical')]], null,
+    t('“Vật lý”: g = δ·√(1−r<sub>s</sub>/r), cường độ ∝ g⁴. Interstellar đã dùng “tắt” để khán giả không bối rối.',
+      '“Physical”: g = δ·√(1−r<sub>s</sub>/r), intensity ∝ g⁴. The film Interstellar used “off” so as not to confuse the audience.'));
+  toggle(s, t('Chia đôi Newton ⟷ Einstein', 'Split Newton ⟷ Einstein'), 'splitOn', updateSplit);
+  s = section(t('Hố đen', 'Black hole'), false, 'bh');
+  seg(s, t('Khối lượng', 'Mass'), 'massIndex', MASSES.map((m, i) => [i, m.short]), () => { $('massName').textContent = massName(); toast(massFact()); },
+    t('Hình ảnh bất biến theo tỉ lệ — khối lượng chỉ đổi kích thước thật, thời gian và lực thủy triều trong bảng đo đạc.',
+      'The image is scale-invariant — mass only changes the real size, the timescales and the tidal forces in the measurements card.'));
+  s = section(t('Đĩa bồi tụ', 'Accretion disk'), true, 'bh');
+  toggle(s, t('Hiện đĩa', 'Show disk'), 'disk');
+  range(s, t('Nhiệt độ cực đại', 'Peak temperature'), 'diskTmax', 1500, 30000, 100, v => Math.round(v).toLocaleString('en-US') + ' K',
+    t('Đĩa thật của hố đen sao nóng ~10⁷ K (tia X). Ở đây dải nhiệt được đặt trong vùng mắt nhìn thấy.', 'A real stellar black hole disk is ~10⁷ K (X-rays). Here the temperature range is set inside what the eye can see.'));
+  range(s, t('Bán kính ngoài', 'Outer radius'), 'diskOuter', 6, 30, 0.5, v => v.toFixed(1) + ' rₛ');
+  range(s, t('Mật độ quang học', 'Optical depth'), 'diskDensity', 0.2, 3, 0.05, v => v.toFixed(2));
+  range(s, t('Nhiễu loạn', 'Turbulence'), 'diskTurb', 0, 1, 0.01, v => v.toFixed(2));
+  range(s, t('Độ sáng', 'Brightness'), 'diskBright', 0.1, 4, 0.05, v => v.toFixed(2));
+  range(s, t('Quầng khí', 'Gas glow'), 'glow', 0, 2, 0.05, v => v.toFixed(2));
+  s = section(t('Bầu trời', 'Sky'));
+  seg(s, t('Nền', 'Background'), 'sky', [[0, t('Ngân Hà', 'Milky Way')], [1, t('Lưới', 'Grid')], [2, t('Bàn cờ', 'Checkerboard')]]);
+  range(s, t('Sao', 'Stars'), 'starBright', 0, 3, 0.05, v => v.toFixed(2));
+  range(s, t('Dải Ngân Hà', 'Milky Way band'), 'skyBright', 0, 3, 0.05, v => v.toFixed(2));
+  s = section(t('Trực quan hóa', 'Visualisation'), false, 'bh');
+  toggle(s, t('Mặt cầu photon (1,5 rₛ)', 'Photon sphere (1.5 rₛ)'), 'showPS');
+  toggle(s, t('ISCO — quỹ đạo bền trong cùng (3 rₛ)', 'ISCO — innermost stable circular orbit (3 rₛ)'), 'showISCO');
+  toggle(s, t('Vệt quỹ đạo tàu thăm dò', 'Probe orbit trails'), 'showTrails');
+  toggle(s, t('Phễu Flamm (độ cong không gian)', "Flamm's paraboloid (curvature of space)"), 'showFlamm', null,
+    t('Mặt nhúng z = 2√(rₛ(r−rₛ)) — hình học thật của lát cắt không gian. Vòng đỏ: chân trời; cam: mặt cầu photon; xanh: ISCO.',
+      'The embedding surface z = 2√(rₛ(r−rₛ)) — the true geometry of a slice of space. Red ring: horizon; orange: photon sphere; blue: ISCO.'));
+  s = section(t('Tàu thăm dò', 'Probes'), false, 'bh');
+  seg(s, t('Loại quỹ đạo', 'Orbit type'), 'orbitType', [['precess', t('Elip tiến động', 'Precessing ellipse')], ['circular', t('Tròn', 'Circular')], ['whirl', 'Zoom-whirl'], ['plunge', t('Rơi', 'Plunge')]]);
+  buttons(s, [[t('Phóng ␣', 'Launch ␣'), () => launchProbe()], [t('Xóa tất cả', 'Clear all'), clearAll]]);
+  s = section(t('Máy quay, thời gian & hình ảnh', 'Camera, time & image'));
+  range(s, t('Tốc độ thời gian', 'Time speed'), 'timeScale', 0, 30, 0.5, v => v.toFixed(1) + '×',
+    t('Nhân tốc độ của đồng hồ mô phỏng. Trong cảnh hố đen, 1× = một r<sub>s</sub>/c mỗi giây.', 'Multiplies the simulation clock. In the black hole scene, 1× = one r<sub>s</sub>/c per second.'));
+  range(s, t('Góc nhìn', 'Field of view'), 'fov', 25, 110, 1, v => v.toFixed(0) + '°');
+  toggle(s, t('Tự xoay khi rảnh', 'Auto-rotate when idle'), 'autoRotate');
+  range(s, t('Phơi sáng', 'Exposure'), 'exposure', 0.2, 3, 0.05, v => v.toFixed(2));
   range(s, 'Bloom', 'bloom', 0, 2.5, 0.05, v => v.toFixed(2));
-  s = section('Âm thanh');
-  range(s, 'Âm lượng', 'volume', 0, 1, 0.01, v => Math.round(v * 100) + '%', null, () => audio.setVolume());
-  toggle(s, 'Nhạc = tín hiệu từ Trái Đất', 'relAudio', null, 'Nhạc được coi như sóng phát từ nơi rất xa: lơ lửng gần hố đen bạn nghe nó cao và nhanh hơn (dịch xanh hấp dẫn); khi rơi tự do, nó trầm xuống còn một nửa ở chân trời.');
-  s = section('Chất lượng');
-  seg(s, 'Mức', 'quality', [['low', 'Thấp'], ['med', 'Vừa'], ['high', 'Cao'], ['ultra', 'Cực cao']], () => setQuality(P.quality));
-  toggle(s, 'Tự điều chỉnh độ phân giải', 'autoQuality');
+  s = section(t('Âm thanh', 'Sound'));
+  range(s, t('Âm lượng', 'Volume'), 'volume', 0, 1, 0.01, v => Math.round(v * 100) + '%', null, () => audio.setVolume());
+  toggle(s, t('Nhạc = tín hiệu từ Trái Đất', 'Music = signal from Earth'), 'relAudio', null,
+    t('Nhạc được coi như sóng phát từ nơi rất xa: lơ lửng gần hố đen bạn nghe nó cao và nhanh hơn (dịch xanh hấp dẫn); khi rơi tự do, nó trầm xuống còn một nửa ở chân trời.',
+      'The music is treated as a signal sent from far away: hovering near the black hole you hear it higher and faster (gravitational blueshift); in free fall it drops to half its pitch at the horizon.'));
+  s = section(t('Chất lượng', 'Quality'));
+  seg(s, t('Mức', 'Level'), 'quality', [['low', t('Thấp', 'Low')], ['med', t('Vừa', 'Medium')], ['high', t('Cao', 'High')], ['ultra', t('Cực cao', 'Ultra')]], () => setQuality(P.quality));
+  toggle(s, t('Tự điều chỉnh độ phân giải', 'Adaptive resolution'), 'autoQuality');
 }
 function massFact() {
   const { M, rs, tu } = massPhys();
   const TH = HBAR * C ** 3 / (8 * Math.PI * G * M * KB);
   const evap = 5120 * Math.PI * G * G * M ** 3 / (HBAR * C ** 4) / YEAR;
-  return `<b>${MASSES[P.massIndex].name}</b><div class="mono">r<sub>s</sub> = ${fmt.dist(rs)} · r<sub>s</sub>/c = ${fmt.time(tu)} · nhiệt độ Hawking ${fmt.sci(TH)} K · bốc hơi sau ${fmt.sci(evap)} năm</div>`;
+  return `<b>${massName()}</b><div class="mono">r<sub>s</sub> = ${fmt.dist(rs)} · r<sub>s</sub>/c = ${fmt.time(tu)} · ${t('nhiệt độ Hawking', 'Hawking temperature')} ${fmt.sci(TH)} K · ${t(`bốc hơi sau ${fmt.sci(evap)} năm`, `evaporates in ${fmt.sci(evap)} yr`)}</div>`;
 }
 
 /* ---------- toasts / captions ---------- */
@@ -1408,42 +1433,42 @@ async function runTour() {
   set({ doppler: 2, sky: 0, showPS: false, showISCO: false, splitOn: false, lensing: true, disk: true, showFlamm: false });
 
   const steps = [
-    async () => { caption('Một hố đen Schwarzschild: không quay, không điện tích — chỉ có khối lượng. Mọi thứ bạn thấy là ánh sáng đi theo đường trắc địa của không-thời gian cong.', 'I · Chân trời'); await tweenCamera({ r: 38, pol: 84, az: 20 }, 8, token); return hold(3000); },
-    async () => { caption('Phần đĩa nằm <i>phía sau</i> hố đen không bị che khuất: ánh sáng của nó bị bẻ cong vòng qua đỉnh và đáy bóng tối — tạo nên vầng hào quang kinh điển.', 'II · Thấu kính'); await tweenCamera({ r: 21, pol: 86.5, az: 70 }, 6, token); return hold(4000); },
+    async () => { caption(t('Một hố đen Schwarzschild: không quay, không điện tích — chỉ có khối lượng. Mọi thứ bạn thấy là ánh sáng đi theo đường trắc địa của không-thời gian cong.', 'A Schwarzschild black hole: no spin, no charge — only mass. Everything you see is light following the geodesics of curved spacetime.'), t('I · Chân trời', 'I · The horizon')); await tweenCamera({ r: 38, pol: 84, az: 20 }, 8, token); return hold(3000); },
+    async () => { caption(t('Phần đĩa nằm <i>phía sau</i> hố đen không bị che khuất: ánh sáng của nó bị bẻ cong vòng qua đỉnh và đáy bóng tối — tạo nên vầng hào quang kinh điển.', 'The part of the disk <i>behind</i> the black hole is not hidden: its light bends over the top and under the bottom of the shadow — making the classic halo.'), t('II · Thấu kính', 'II · Lensing')); await tweenCamera({ r: 21, pol: 86.5, az: 70 }, 6, token); return hold(4000); },
     async () => {
-      caption('Bên trái: không-thời gian phẳng của Newton. Bên phải: Einstein. Cùng một đĩa khí, cùng một vị trí quan sát.', 'III · Newton ⟷ Einstein');
+      caption(t('Bên trái: không-thời gian phẳng của Newton. Bên phải: Einstein. Cùng một đĩa khí, cùng một vị trí quan sát.', 'Left: Newton\'s flat spacetime. Right: Einstein. The same gas disk, seen from the same place.'), 'III · Newton ⟷ Einstein');
       set({ splitOn: true, split: 0.02 });
       const t0 = performance.now();
       while (performance.now() - t0 < 9000) { if (!alive()) return false; const k = (performance.now() - t0) / 9000; P.split = 0.02 + 0.6 * Math.sin(Math.min(1, k * 1.4) * Math.PI / 2) - 0.1 * Math.max(0, k - 0.7) / 0.3; updateSplit(); await sleep(16); }
       set({ splitOn: false }); return alive();
     },
     async () => {
-      caption('Khí ở mép trong quay gần 50% tốc độ ánh sáng. Nhìn lúc chưa có Doppler…', 'IV · Doppler tương đối tính');
+      caption(t('Khí ở mép trong quay gần 50% tốc độ ánh sáng. Nhìn lúc chưa có Doppler…', 'Gas at the inner edge orbits at nearly 50% of the speed of light. Here it is without Doppler…'), t('IV · Doppler tương đối tính', 'IV · Relativistic Doppler'));
       set({ doppler: 0 }); await tweenCamera({ r: 27, pol: 87.5, az: 95 }, 5, token);
       if (!(await hold(1500))) return false;
-      caption('…và lúc có: phía lao về phía bạn sáng rực và ngả xanh, phía lùi xa mờ đỏ. (Interstellar đã cố ý bỏ hiệu ứng này.)', 'IV · Doppler tương đối tính');
+      caption(t('…và lúc có: phía lao về phía bạn sáng rực và ngả xanh, phía lùi xa mờ đỏ. (Interstellar đã cố ý bỏ hiệu ứng này.)', '…and with it: the side rushing towards you blazes and turns blue, the receding side dims to red. (Interstellar left this effect out on purpose.)'), t('IV · Doppler tương đối tính', 'IV · Relativistic Doppler'));
       set({ doppler: 2 }); return hold(7000);
     },
     async () => {
-      caption('Ở r = 1,5 r<sub>s</sub>, ánh sáng có thể bay vòng tròn quanh hố đen: mặt cầu photon. Các vòng sáng mảnh sát mép bóng tối là ảnh của cả vũ trụ, lặp lại sau mỗi vòng.', 'V · Mặt cầu photon');
+      caption(t('Ở r = 1,5 r<sub>s</sub>, ánh sáng có thể bay vòng tròn quanh hố đen: mặt cầu photon. Các vòng sáng mảnh sát mép bóng tối là ảnh của cả vũ trụ, lặp lại sau mỗi vòng.', 'At r = 1.5 r<sub>s</sub> light can circle the black hole: the photon sphere. The thin bright rings hugging the shadow are images of the whole universe, repeated with every lap.'), t('V · Mặt cầu photon', 'V · The photon sphere'));
       set({ showPS: true }); await tweenCamera({ r: 6.5, pol: 72, az: 150 }, 7, token); if (!(await hold(4000))) return false; set({ showPS: false }); return true;
     },
-    async () => { caption('Nhìn từ trên xuống. Bóng đen rộng gấp ~2,6 lần chân trời sự kiện: b<sub>c</sub> = (3√3/2)·r<sub>s</sub> — đúng thứ mà kính Event Horizon Telescope đã chụp được.', 'VI · Cái bóng'); await tweenCamera({ r: 30, pol: 6, az: 150 }, 7, token); return hold(4500); },
+    async () => { caption(t('Nhìn từ trên xuống. Bóng đen rộng gấp ~2,6 lần chân trời sự kiện: b<sub>c</sub> = (3√3/2)·r<sub>s</sub> — đúng thứ mà kính Event Horizon Telescope đã chụp được.', 'Seen from above. The shadow is ~2.6 times wider than the event horizon: b<sub>c</sub> = (3√3/2)·r<sub>s</sub> — exactly what the Event Horizon Telescope photographed.'), t('VI · Cái bóng', 'VI · The shadow')); await tweenCamera({ r: 30, pol: 6, az: 150 }, 7, token); return hold(4500); },
     async () => {
-      caption('Thay bầu trời bằng bàn cờ để thấy rõ sự méo mó: vành Einstein, và mỗi điểm trên trời xuất hiện nhiều lần.', 'VII · Bầu trời bị bẻ cong');
+      caption(t('Thay bầu trời bằng bàn cờ để thấy rõ sự méo mó: vành Einstein, và mỗi điểm trên trời xuất hiện nhiều lần.', 'Swap the sky for a checkerboard to see the distortion clearly: an Einstein ring, and every point of the sky appearing several times.'), t('VII · Bầu trời bị bẻ cong', 'VII · The bent sky'));
       set({ sky: 2, disk: false }); await tweenCamera({ r: 14, pol: 80, az: 205 }, 6, token); if (!(await hold(5000))) return false; set({ sky: 0, disk: true }); return true;
     },
     async () => {
-      caption('Một tàu thăm dò rơi tự do. Nhìn từ xa, nó chậm dần, đỏ dần và mờ đi sát chân trời — không bao giờ thực sự vượt qua. Hãy lắng nghe tín hiệu của nó.', 'VIII · Đóng băng thời gian');
+      caption(t('Một tàu thăm dò rơi tự do. Nhìn từ xa, nó chậm dần, đỏ dần và mờ đi sát chân trời — không bao giờ thực sự vượt qua. Hãy lắng nghe tín hiệu của nó.', 'A probe in free fall. Seen from afar it slows, reddens and fades at the horizon — never quite crossing it. Listen to its signal.'), t('VIII · Đóng băng thời gian', 'VIII · Frozen time'));
       await tweenCamera({ r: 22, pol: 82, az: 240 }, 4, token);
       const dir = camera.position.clone().normalize();
       const side = new V3().crossVectors(dir, new V3(0, 1, 0)).normalize();
       const x = side.multiplyScalar(8).addScaledVector(dir, 2).add(new V3(0, 1.2, 0));
-      addProbe(x, new V3().crossVectors(new V3(0, 1, 0), x).normalize().multiplyScalar(0.04), 'rơi tự do');
+      addProbe(x, new V3().crossVectors(new V3(0, 1, 0), x).normalize().multiplyScalar(0.04), t('rơi tự do', 'free fall'));
       return hold(14000);
     },
-    async () => { caption('Vạch xanh: ISCO — quỹ đạo tròn bền trong cùng, ở 3 r<sub>s</sub>. Bên trong nó không có quỹ đạo ổn định; đĩa khí kết thúc đột ngột tại đây.', 'IX · ISCO'); set({ showISCO: true }); await tweenCamera({ r: 16, pol: 60, az: 280 }, 6, token); if (!(await hold(4000))) return false; set({ showISCO: false }); return true; },
-    async () => { caption('Giờ đến lượt bạn. Kéo để xoay · cuộn để lại gần · click để bắn photon · Shift+click để phóng tàu · <b>P</b> để lao vào.', 'X · Vũ trụ của bạn'); await tweenCamera({ r: 26, pol: 83, az: 330 }, 6, token); return hold(5000); },
+    async () => { caption(t('Vạch xanh: ISCO — quỹ đạo tròn bền trong cùng, ở 3 r<sub>s</sub>. Bên trong nó không có quỹ đạo ổn định; đĩa khí kết thúc đột ngột tại đây.', 'Blue line: the ISCO — the innermost stable circular orbit, at 3 r<sub>s</sub>. Inside it no orbit is stable; the gas disk ends abruptly here.'), 'IX · ISCO'); set({ showISCO: true }); await tweenCamera({ r: 16, pol: 60, az: 280 }, 6, token); if (!(await hold(4000))) return false; set({ showISCO: false }); return true; },
+    async () => { caption(t('Giờ đến lượt bạn. Kéo để xoay · cuộn để lại gần · click để bắn photon · Shift+click để phóng tàu · <b>P</b> để lao vào.', 'Your turn now. Drag to orbit · scroll to move in · click to fire a photon · Shift+click to launch a probe · <b>P</b> to plunge.'), t('X · Vũ trụ của bạn', 'X · Your universe')); await tweenCamera({ r: 26, pol: 83, az: 330 }, 6, token); return hold(5000); },
   ];
   for (const s of steps) { if (!(await s())) break; }
   if (alive()) endTour(true);
@@ -1456,7 +1481,7 @@ function endTour(finished) {
   caption('');
   document.body.classList.remove('cine'); $('bTour').classList.remove('active');
   controls.enabled = true; state.lastInteract = performance.now();
-  if (finished) toast('Hết hành trình. Vũ trụ là của bạn.');
+  if (finished) toast(t('Hết hành trình. Vũ trụ là của bạn.', 'End of the tour. The universe is yours.'));
 }
 
 /* ------------------------------------------------------------------ */
@@ -1477,7 +1502,7 @@ function startPlunge() {
   controls.enabled = false;
   $('plungeHud').classList.add('on'); $('bPlunge').classList.add('active');
   document.body.classList.add('cine');
-  toast(`Rơi tự do (như thả từ vô cực) từ r = ${r0.toFixed(1)} r<sub>s</sub> — vận tốc tại mỗi điểm bằng vận tốc thoát. Kéo chuột để nhìn quanh, thử nhìn ngược ra phía sau.`, 5000);
+  toast(t(`Rơi tự do (như thả từ vô cực) từ r = ${r0.toFixed(1)} r<sub>s</sub> — vận tốc tại mỗi điểm bằng vận tốc thoát. Kéo chuột để nhìn quanh, thử nhìn ngược ra phía sau.`, `Free fall (as if dropped from infinity) from r = ${r0.toFixed(1)} r<sub>s</sub> — at every point your speed equals the escape velocity. Drag to look around; try looking back behind you.`), 5000);
 }
 function updatePlunge(dt) {
   const pl = state.plunge;
@@ -1521,13 +1546,13 @@ function crossHorizon() {
   const fadeIn = () => { const k = Math.min(1, (performance.now() - fadeStart) / 1600); state.fade = k; if (k < 1) requestAnimationFrame(fadeIn); };
   fadeIn();
   const lines = [
-    ['h1', 'Bạn đã vượt qua chân trời sự kiện.'],
-    ['h2', 'Từ đây, mọi hướng về tương lai đều dẫn tới điểm kỳ dị — “tâm” r = 0 giờ là một <i>thời điểm</i>, không phải một nơi chốn.'],
-    ['h3', `${MASSES[P.massIndex].name}: thời gian riêng tối đa còn lại ≈ ${fmt.time(tauMax)}  ·  bạn đã rơi ${fmt.time(pl.tau * tu)} (đồng hồ của bạn)`],
+    ['h1', t('Bạn đã vượt qua chân trời sự kiện.', 'You have crossed the event horizon.')],
+    ['h2', t('Từ đây, mọi hướng về tương lai đều dẫn tới điểm kỳ dị — “tâm” r = 0 giờ là một <i>thời điểm</i>, không phải một nơi chốn.', 'From here every future direction leads to the singularity — the “centre” r = 0 is now a <i>moment in time</i>, not a place.')],
+    ['h3', t(`${massName()}: thời gian riêng tối đa còn lại ≈ ${fmt.time(tauMax)}  ·  bạn đã rơi ${fmt.time(pl.tau * tu)} (đồng hồ của bạn)`, `${massName()}: maximum proper time left ≈ ${fmt.time(tauMax)}  ·  you fell for ${fmt.time(pl.tau * tu)} (your clock)`)],
     ['h4', rSpag > rs
-      ? `Thực ra, với hố đen nhỏ như vậy, lực thủy triều đã kéo bạn thành sợi mì ở r ≈ ${fmt.dist(rSpag)} — trước khi tới đây rất lâu.`
-      : `Lực thủy triều tại chân trời chỉ ≈ ${fmt.num(tidH, 3)} g — bạn vượt qua mà không cảm thấy gì đặc biệt.`],
-    ['h5', 'Người quan sát ở xa sẽ không bao giờ thấy bạn vượt qua: hình ảnh cuối cùng của bạn đông cứng lại, đỏ dần và tắt lịm — mãi mãi.'],
+      ? t(`Thực ra, với hố đen nhỏ như vậy, lực thủy triều đã kéo bạn thành sợi mì ở r ≈ ${fmt.dist(rSpag)} — trước khi tới đây rất lâu.`, `In fact, with a black hole this small, tides would have spaghettified you at r ≈ ${fmt.dist(rSpag)} — long before getting here.`)
+      : t(`Lực thủy triều tại chân trời chỉ ≈ ${fmt.num(tidH, 3)} g — bạn vượt qua mà không cảm thấy gì đặc biệt.`, `The tidal stretch at the horizon is only ≈ ${fmt.num(tidH, 3)} g — you cross without feeling anything special.`)],
+    ['h5', t('Người quan sát ở xa sẽ không bao giờ thấy bạn vượt qua: hình ảnh cuối cùng của bạn đông cứng lại, đỏ dần và tắt lịm — mãi mãi.', 'A distant observer will never see you cross: your last image freezes, reddens and fades away — forever.')],
   ];
   setTimeout(() => {
     $('horizon').classList.add('on');
@@ -1609,8 +1634,8 @@ addEventListener('keydown', e => {
     ' ': () => launchProbe(),
     t: runTour, p: startPlunge,
     n: () => { P.splitOn = !P.splitOn; updateSplit(); syncUI(); },
-    l: () => { P.lensing = !P.lensing; syncUI(); toast(P.lensing ? 'Thấu kính hấp dẫn <b>BẬT</b>' : 'Thấu kính hấp dẫn <b>TẮT</b> — không-thời gian phẳng'); },
-    d: () => { P.doppler = (P.doppler + 1) % 3; syncUI(); toast('Doppler: <b>' + ['Tắt', 'Điện ảnh', 'Vật lý'][P.doppler] + '</b>'); },
+    l: () => { P.lensing = !P.lensing; syncUI(); toast(P.lensing ? t('Thấu kính hấp dẫn <b>BẬT</b>', 'Gravitational lensing <b>ON</b>') : t('Thấu kính hấp dẫn <b>TẮT</b> — không-thời gian phẳng', 'Gravitational lensing <b>OFF</b> — flat spacetime')); },
+    d: () => { P.doppler = (P.doppler + 1) % 3; syncUI(); toast('Doppler: <b>' + [t('Tắt', 'Off'), t('Điện ảnh', 'Cinematic'), t('Vật lý', 'Physical')][P.doppler] + '</b>'); },
     k: () => { P.sky = (P.sky + 1) % 3; syncUI(); },
     g: () => { P.showPS = !P.showPS; syncUI(); },
     h: () => { state.hidden = !state.hidden; $('ui').classList.toggle('hidden', state.hidden); },
@@ -1620,11 +1645,11 @@ addEventListener('keydown', e => {
   }[k];
   if (act) { e.preventDefault(); act(); }
 });
-function toggleMute() { const m = audio.toggleMute(); $('muteWave').style.display = m ? 'none' : ''; toast(m ? 'Đã tắt tiếng' : 'Đã bật tiếng', 1500); }
+function toggleMute() { const m = audio.toggleMute(); $('muteWave').style.display = m ? 'none' : ''; toast(m ? t('Đã tắt tiếng', 'Muted') : t('Đã bật tiếng', 'Sound on'), 1500); }
 function gargantua() {
   typed = '';
   Object.assign(P, { doppler: 1, diskTmax: 4300, diskOuter: 22, diskDensity: 1.6, glow: 1.2, massIndex: 2, sky: 0, bloom: 1.2 });
-  syncUI(); $('massName').textContent = MASSES[P.massIndex].name;
+  syncUI(); $('massName').textContent = massName();
   audio.organ();
   toast('<b>GARGANTUA</b><div class="mono">“Do not go gentle into that good night.” — Dylan Thomas</div>', 8000);
   if (!state.plunge && !state.tour) { controls.enabled = false; tweenCamera({ r: 23, pol: 87.3, az: THREE.MathUtils.radToDeg(sphOf(camera.position).az) + 25 }, 6).then(() => controls.enabled = true); }
@@ -1648,27 +1673,27 @@ function updateHUD() {
   $('tRs').textContent = fmt.dist(rs);
   $('tDil').textContent = state.dil.toFixed(5);
   $('tEsc').textContent = r > 1 ? `${(1 / Math.sqrt(r)).toFixed(4)} c` : '> c';
-  if (r < 1.5) $('tOrb').textContent = 'không tồn tại (< 1,5 rₛ)';
+  if (r < 1.5) $('tOrb').textContent = t('không tồn tại (< 1,5 rₛ)', 'none (< 1.5 rₛ)');
   else {
     const T = 2 * Math.PI * Math.sqrt(Math.pow(r * rs, 3) / (G * M));
-    $('tOrb').textContent = `${fmt.time(T)} · ${Math.sqrt(0.5 / (r - 1)).toFixed(3)}c${r < 3 ? ' · không bền' : ''}`;
+    $('tOrb').textContent = `${fmt.time(T)} · ${Math.sqrt(0.5 / (r - 1)).toFixed(3)}c${r < 3 ? t(' · không bền', ' · unstable') : ''}`;
   }
   const tid = 2 * G * M * 2 / Math.pow(r * rs, 3) / 9.81;
   const tEl = $('tTid'); tEl.textContent = `${fmt.num(tid, 2)} g${tid > 100 ? ' ☠' : tid > 3 ? ' ⚠' : ''}`; tEl.classList.toggle('hot', tid > 3);
   const sinA = B_CRIT * Math.sqrt(Math.max(1 - 1 / r, 0)) / r;
   let alpha = Math.asin(Math.min(1, sinA)); if (r < 1.5) alpha = Math.PI - alpha;
   $('tSh').textContent = `${THREE.MathUtils.radToDeg(2 * alpha).toFixed(2)}°`;
-  $('tSig').textContent = `×${state.signal.toFixed(3)} tần số`;
+  $('tSig').textContent = `×${state.signal.toFixed(3)} ${t('tần số', 'frequency')}`;
   $('tSim').textContent = fmt.time(P.timeScale * tu);
   $('cYou').textContent = fmt.clock(state.youClock);
   $('cEarth').textContent = fmt.clock(state.earthClock);
   const f = 1 / state.dil;
-  $('cFactor').innerHTML = f > 1.0005 ? `mỗi giây của bạn = <b>${f < 1000 ? f.toFixed(4) : fmt.sci(f)}</b> giây trên Trái Đất` : 'gần như không giãn nở thời gian';
+  $('cFactor').innerHTML = f > 1.0005 ? t(`mỗi giây của bạn = <b>${f < 1000 ? f.toFixed(4) : fmt.sci(f)}</b> giây trên Trái Đất`, `each of your seconds = <b>${f < 1000 ? f.toFixed(4) : fmt.sci(f)}</b> seconds on Earth`) : t('gần như không giãn nở thời gian', 'almost no time dilation');
   // probes
   const rows = probes.map(p => {
     const c = `rgb(${p.col.map(v => Math.round(v * 255)).join(',')})`;
     const z = 1 / Math.max(p.g, 1e-9) - 1;
-    return `<div class="prow"><i style="color:${c};background:${c}"></i><span class="n">${p.name}</span><span class="d" title="thời gian riêng τ = ${fmt.time(p.tau * tu)}">r ${p.r.toFixed(2)} · z ${z > 999 ? fmt.sci(z, 1) : (z >= 0 ? '+' : '') + z.toFixed(3)}</span></div>`;
+    return `<div class="prow"><i style="color:${c};background:${c}"></i><span class="n">${p.name}</span><span class="d" title="${t('thời gian riêng', 'proper time')} τ = ${fmt.time(p.tau * tu)}">r ${p.r.toFixed(2)} · z ${z > 999 ? fmt.sci(z, 1) : (z >= 0 ? '+' : '') + z.toFixed(3)}</span></div>`;
   }).join('');
   $('probeRows').innerHTML = rows;
   $('probes').classList.toggle('show', probes.length > 0);
@@ -1688,12 +1713,14 @@ function updateHUD() {
 /* hole above is the one built-in scene.                                */
 /* ------------------------------------------------------------------ */
 const CATEGORIES = [
-  ['compact', 'Vật thể đặc & dị thường'], ['stars', 'Sao'], ['planets', 'Hành tinh'],
-  ['small', 'Thiên thể nhỏ'], ['galaxies', 'Thiên hà'], ['nebulae', 'Tinh vân'],
+  ['compact', 'Vật thể đặc & dị thường', 'Compact & exotic objects'], ['stars', 'Sao', 'Stars'], ['planets', 'Hành tinh', 'Planets'],
+  ['small', 'Thiên thể nhỏ', 'Small bodies'], ['galaxies', 'Thiên hà', 'Galaxies'], ['nebulae', 'Tinh vân', 'Nebulae'],
 ];
+const catName = id => { const c = CATEGORIES.find(c => c[0] === id); return c ? t(c[1], c[2]) : ''; };
 const BLACKHOLE_SCENE = {
   id: 'blackhole', builtin: true, name: 'Hố đen', category: 'compact', order: 0,
   subtitle: 'Schwarzschild · ray-tracing trắc địa null', swatch: ['#ffcf8a', '#000000'],
+  en: { name: 'Black hole', subtitle: 'Schwarzschild · null-geodesic ray tracing' },
   orbCss: 'radial-gradient(circle, #000 0 30%, #fff1d6 33%, #ffae5c 40%, #6a2a08 56%, transparent 70%)',
 };
 const scenes = [BLACKHOLE_SCENE];
@@ -1709,7 +1736,7 @@ function sceneCtx(def) {
   sceneState.ctxFor = def;
   return sceneState.ctx = {
     THREE, shared, camera, controls, renderer, overlayScene, bbTexture: bbTex, bbColor: bbJS, bhUniforms, bhGlobals: P,
-    quality, params: sceneState.params[def.id], audio: sceneAudio, toast, fmt, time: timeInfo, scene: def, syncUI,
+    quality, params: sceneState.params[def.id], audio: sceneAudio, toast, fmt, time: timeInfo, scene: def, syncUI, t, lang,
     // field of view in degrees; the host restores the scene default on the next scene switch
     setFov: deg => { P.fov = Math.max(5, Math.min(110, deg)); syncUI(); },
   };
@@ -1744,18 +1771,19 @@ async function loadScenes() {
 /* ---------- catalog overlay ---------- */
 function buildCatalog() {
   const box = $('catGroups'); box.innerHTML = '';
-  for (const [cid, cname] of CATEGORIES) {
+  for (const [cid] of CATEGORIES) {
     const list = scenes.filter(s => s.category === cid);
     if (!list.length) continue;
     const g = document.createElement('div'); g.className = 'group';
-    g.innerHTML = `<h4>${cname}</h4><div class="cards"></div>`;
+    g.innerHTML = `<h4>${catName(cid)}</h4><div class="cards"></div>`;
     for (const s of list) {
       const c = document.createElement('button'); c.className = 'ccard'; c.dataset.id = s.id;
       const [c0, c1] = s.swatch || ['#ffffff', '#333333'];
       const orb = s.orbCss || `radial-gradient(circle at 35% 35%, ${c0}, ${c1} 75%)`;
       const bg = `url(assets/thumbs/${s.id}.webp) center/cover no-repeat, ${orb}`;
       c.style.setProperty('--glow', c0 + '66');
-      c.innerHTML = `<div class="shot"><i style="background:${bg}"></i></div><div class="txt"><div class="nm">${s.name}</div><div class="st">${s.subtitle || ''}</div></div>`;
+      c.innerHTML = `<div class="shot"><i style="background:${bg}"></i></div><div class="txt"><div class="nm">${tr(s, 'name')}</div><div class="st">${tr(s, 'subtitle') || ''}</div></div>`;
+      c.classList.toggle('cur', s.id === sceneState.cur.id);
       c.onclick = () => { closeCatalog(); switchScene(s.id); };
       g.querySelector('.cards').appendChild(c);
     }
@@ -1782,12 +1810,13 @@ function rebuildScenePanel() {
   document.querySelectorAll('#panel details[data-scope="bh"]').forEach(d => d.style.display = (def.builtin || def.usesBH) ? '' : 'none');
   if (def.builtin || !(def.params || []).length) return;
   const o = sceneState.params[def.id];
-  const sec = uiSection(box, def.name, true);
+  const sec = uiSection(box, tr(def, 'name'), true);
   const call = (p) => (v) => { p.onChange?.(v, sceneCtx(def)); sceneState.inst?.onParam?.(p.key, v, sceneCtx(def)); };
   for (const p of def.params) {
-    if (p.type === 'toggle') uiToggle(sec, p.label, p.key, call(p), p.note, o);
-    else if (p.type === 'seg') uiSeg(sec, p.label, p.key, p.options, call(p), p.note, o);
-    else uiRange(sec, p.label, p.key, p.min, p.max, p.step ?? (p.max - p.min) / 100, p.fmt || (v => +(+v).toFixed(3) + ''), p.note, call(p), o);
+    const label = tr(p, 'label'), note = tr(p, 'note');
+    if (p.type === 'toggle') uiToggle(sec, label, p.key, call(p), note, o);
+    else if (p.type === 'seg') uiSeg(sec, label, p.key, p.options.map(([v, txt], i) => [v, t(txt, p.en?.options?.[i])]), call(p), note, o);
+    else uiRange(sec, label, p.key, p.min, p.max, p.step ?? (p.max - p.min) / 100, p.fmt || (v => +(+v).toFixed(3) + ''), note, call(p), o);
   }
 }
 // syncers of the global panel controls, registered once at boot and kept across scene rebuilds
@@ -1795,29 +1824,29 @@ let globalSyncers = [];
 function updateSceneChrome() {
   const def = sceneState.cur, other = !def.builtin;
   $('ui').classList.toggle('scene-other', other);
-  $('massName').textContent = other ? `${def.name}` : MASSES[P.massIndex].name;
-  $('brandSub').textContent = other ? 'Danh mục vũ trụ · dựng lại từ vật lý thật · U để chọn nơi khác' : 'Hố đen Schwarzschild · ray-tracing trắc địa null trên GPU';
+  $('massName').textContent = other ? `${tr(def, 'name')}` : massName();
+  $('brandSub').textContent = other ? t('Danh mục vũ trụ · dựng lại từ vật lý thật · U để chọn nơi khác', 'Cosmic catalogue · rebuilt from real physics · U to go elsewhere')
+    : t('Hố đen Schwarzschild · ray-tracing trắc địa null trên GPU', 'Schwarzschild black hole · null-geodesic ray tracing on the GPU');
   const acts = $('sceneActions'); acts.innerHTML = '';
   for (const a of (other && def.actions) || []) {
     const b = document.createElement('button');
-    b.innerHTML = `<span class="lbl">${a.label}</span>${a.key ? `<kbd>${a.key.toUpperCase()}</kbd>` : ''}`;
+    b.innerHTML = `<span class="lbl">${tr(a, 'label')}</span>${a.key ? `<kbd>${a.key.toUpperCase()}</kbd>` : ''}`;
     if (!a.key) b.querySelector('.lbl').style.display = 'inline';
-    b.title = a.title || a.label;
+    b.title = t(a.title || a.label, a.en && (a.en.title || a.en.label));
     b.onclick = () => { a.run(sceneCtx(def)); syncUI(); };
     acts.appendChild(b);
   }
   if (!other) return;
-  const catName = (CATEGORIES.find(c => c[0] === def.category) || [, ''])[1];
-  $('icCat').textContent = catName;
-  $('icName').textContent = def.name;
-  $('icSub').innerHTML = def.subtitle || '';
-  $('icBlurb').innerHTML = def.blurb || '';
-  $('icFacts').innerHTML = (def.facts || []).map(([k, v]) => `<div class="trow"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
+  $('icCat').textContent = catName(def.category);
+  $('icName').textContent = tr(def, 'name');
+  $('icSub').innerHTML = tr(def, 'subtitle') || '';
+  $('icBlurb').innerHTML = tr(def, 'blurb') || '';
+  $('icFacts').innerHTML = (tr(def, 'facts') || []).map(([k, v]) => `<div class="trow"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('');
 }
 function updateInfoLive() {
   const def = sceneState.cur, inst = sceneState.inst;
   const tgt = controls.target, d = camera.position.distanceTo(tgt);
-  const rows = def.unitKm ? [['Khoảng cách tới tâm', `${d.toFixed(2)} · ${fmt.dist(d * def.unitKm * 1000)}`]] : [];
+  const rows = def.unitKm ? [[t('Khoảng cách tới tâm', 'Distance to centre'), `${d.toFixed(2)} · ${fmt.dist(d * def.unitKm * 1000)}`]] : [];
   try { if (inst && inst.hud) rows.push(...inst.hud(sceneCtx(def))); } catch (e) { console.error(e); }
   $('icLive').innerHTML = rows.map(([k, v]) => `<div class="trow"><span class="k">${k}</span><span class="v hot">${v}</span></div>`).join('');
 }
@@ -1844,7 +1873,7 @@ function flyCamera(toPos, toTgt, dur) {
 async function switchScene(id, opts = {}) {
   const def = scenes.find(s => s.id === id);
   if (!def || (def === sceneState.cur && !opts.force) || sceneState.switching) return;
-  if (state.plunge || state.tour) return toast('Hãy kết thúc hành trình / cú rơi hiện tại trước.');
+  if (state.plunge || state.tour) return toast(t('Hãy kết thúc hành trình / cú rơi hiện tại trước.', 'Finish the current tour / plunge first.'));
   sceneState.switching = true; sceneState.switchingError = false;
   const instant = !!opts.instant;
   if (!instant) { audio.whoosh(); $('warp').classList.add('on'); await fadeTo(1, 650); }
@@ -1877,24 +1906,24 @@ async function switchScene(id, opts = {}) {
       sceneState.loadErrors.push(`${id}: ${e.message}`);
     }
   }
-  if (!ok) { sceneState.hold = false; loader?.done(); sceneState.switching = false; sceneState.cur = old; toast(`Không mở được “${def.name}”.`); await fadeTo(0, 400); $('warp').classList.remove('on'); return switchScene(old.builtin ? 'blackhole' : old.id, { instant: true, force: true }); }
+  if (!ok) { sceneState.hold = false; loader?.done(); sceneState.switching = false; sceneState.cur = old; toast(t(`Không mở được “${tr(def, 'name')}”.`, `Couldn't open “${tr(def, 'name')}”.`)); await fadeTo(0, 400); $('warp').classList.remove('on'); return switchScene(old.builtin ? 'blackhole' : old.id, { instant: true, force: true }); }
   camera.up.set(0, 1, 0);
   const fin = placeCamera(def), start = instant ? fin : placeCamera(def, 2.4);
   camera.position.copy(start.pos); controls.target.copy(start.tgt); camera.lookAt(controls.target);
   camera.fov = P.fov; camera.updateProjectionMatrix();
   rebuildScenePanel(); updateSceneChrome(); syncUI();
-  loader?.stage('Biên dịch shader', 0.45);
+  loader?.stage(t('Biên dịch shader', 'Compiling shaders'), 0.45);
   try { await Promise.all([renderer.compileAsync(bhScene, ortho), renderer.compileAsync(overlayScene, camera)]); } catch (e) { /* compiled on first render instead */ }
   // scenes that stream large assets (textures) expose `ready`; hold the transition until they arrive
   if (sceneState.inst && sceneState.inst.ready) {
-    loader?.stage('Tải dữ liệu', 0.75);
+    loader?.stage(t('Tải dữ liệu', 'Loading data'), 0.75);
     try { await Promise.race([sceneState.inst.ready, new Promise(r => setTimeout(r, SNAP ? 60000 : 15000))]); }
     catch (e) { console.error(`[scene ${id}] assets`, e); sceneState.loadErrors.push(`${id} assets: ${e && e.message || e}`); }
   }
   // first frames upload textures and finish any remaining GPU work: let them happen behind the loader
   sceneState.hold = false;
   if (loader) {
-    loader.stage('Dựng khung hình đầu tiên', 0.92);
+    loader.stage(t('Dựng khung hình đầu tiên', 'Rendering the first frame'), 0.92);
     for (let i = 0; i < 3; i++) await new Promise(r => requestAnimationFrame(r));
     loader.done();
   }
@@ -1908,7 +1937,7 @@ async function switchScene(id, opts = {}) {
   }
   controls.enabled = state.started;
   sceneState.switching = false;
-  if (!instant && def.intro) toast(def.intro, 7000);
+  if (!instant && tr(def, 'intro')) toast(tr(def, 'intro'), 7000);
 }
 // Loader shown over the black transition; only appears if loading takes more than a moment, so cached
 // scenes switch without a flash. Returns { stage(text, progress0to1), done() }.
@@ -1916,8 +1945,8 @@ function showLoader(def) {
   const el = $('loader'), bar = $('ldBar'), hint = $('ldHint'), t0 = performance.now();
   const sw = def.swatch || ['#fff3d6', '#ff9a3c'];
   el.style.setProperty('--c1', sw[0]); el.style.setProperty('--c2', sw[1]);
-  $('ldName').textContent = def.name;
-  $('ldStage').textContent = 'Khởi tạo cảnh…'; bar.style.width = '15%';
+  $('ldName').textContent = tr(def, 'name');
+  $('ldStage').textContent = t('Khởi tạo cảnh…', 'Setting up the scene…'); bar.style.width = '15%';
   hint.classList.remove('on');
   const showT = setTimeout(() => el.classList.add('on'), 220);
   const hintT = setTimeout(() => hint.classList.add('on'), 3500);
@@ -1999,7 +2028,8 @@ function frame(now) {
     }
     if (p.g < 0.012 || r < 1.0003) {
       const { tu } = massPhys();
-      toast(`<b>${p.name}</b> đã “đông cứng” ở chân trời — ánh sáng dịch đỏ tới z > ${Math.round(1 / Math.max(p.g, 1e-4))}. Theo đồng hồ riêng, nó vượt qua sau τ ≈ ${fmt.time(p.tau * p.r ** 0 * tu)}; với chúng ta: không bao giờ.<div class="mono">tần số dao động riêng l=2 của hố đen: f = ${fmt.num(0.3737 / (Math.PI * tu), 3)} Hz, Q ≈ 2,1 (âm thanh đã kéo giãn để nghe được)</div>`, 8000);
+      toast(t(`<b>${p.name}</b> đã “đông cứng” ở chân trời — ánh sáng dịch đỏ tới z > ${Math.round(1 / Math.max(p.g, 1e-4))}. Theo đồng hồ riêng, nó vượt qua sau τ ≈ ${fmt.time(p.tau * p.r ** 0 * tu)}; với chúng ta: không bao giờ.<div class="mono">tần số dao động riêng l=2 của hố đen: f = ${fmt.num(0.3737 / (Math.PI * tu), 3)} Hz, Q ≈ 2,1 (âm thanh đã kéo giãn để nghe được)</div>`,
+        `<b>${p.name}</b> has “frozen” at the horizon — its light is redshifted beyond z > ${Math.round(1 / Math.max(p.g, 1e-4))}. By its own clock it crossed after τ ≈ ${fmt.time(p.tau * p.r ** 0 * tu)}; for us: never.<div class="mono">l=2 quasinormal mode of the black hole: f = ${fmt.num(0.3737 / (Math.PI * tu), 3)} Hz, Q ≈ 2.1 (sound stretched to be audible)</div>`), 8000);
       audio.ringdown();
       p.dispose(); probes.splice(i, 1);
     } else if (r > 400) { p.dispose(); probes.splice(i, 1); }
@@ -2056,7 +2086,7 @@ function frame(now) {
   if (state.shot) {
     state.shot = false;
     const a = document.createElement('a'); a.download = `interstellar-${Date.now()}.png`; a.href = canvas.toDataURL('image/png'); a.click();
-    toast('Đã lưu ảnh chụp.', 1800);
+    toast(t('Đã lưu ảnh chụp.', 'Screenshot saved.'), 1800);
   }
 
   // adaptive resolution
@@ -2094,17 +2124,52 @@ renderer.debug.onShaderError = (gl, program, vs, fs) => {
 const query = new URLSearchParams(location.search);
 const SNAP = query.has('snap');
 
+/* ---------- language (VI / EN) ---------- */
+function applyStaticLang() {
+  const en = lang() === 'en';
+  document.documentElement.lang = lang();
+  document.title = t('Interstellar — Danh mục vũ trụ', 'Interstellar — Cosmic Catalogue');
+  document.querySelector('meta[name="description"]').content = t('Mô phỏng hố đen Schwarzschild ray-traced theo thuyết tương đối rộng, thời gian thực trên GPU.',
+    'A ray-traced Schwarzschild black hole following general relativity, and a catalogue of real objects, rendered in real time on the GPU.');
+  document.querySelectorAll('[data-en]').forEach(el => { el.dataset.vi ??= el.innerHTML; el.innerHTML = en ? el.dataset.en : el.dataset.vi; });
+  document.querySelectorAll('[data-en-title]').forEach(el => { el.dataset.viTitle ??= el.title; el.title = en ? el.dataset.enTitle : el.dataset.viTitle; });
+  document.querySelectorAll('.langsw button').forEach(b => { b.classList.toggle('on', b.dataset.lang === lang()); b.setAttribute('aria-pressed', b.dataset.lang === lang()); });
+  const eb = $('enterBtn'); eb.textContent = eb.disabled ? t('Đang uốn cong không-thời gian…', 'Bending spacetime…') : t('Bước vào chân trời', 'Step through the horizon');
+}
+function rebuildLangUI() {
+  applyStaticLang();
+  // the global panel is built from translated strings: rebuild it, keeping which sections were open
+  const open = [...document.querySelectorAll('#panel > details')].map(d => d.open);
+  $('panel').innerHTML = ''; syncers.length = 0;
+  buildPanel(); globalSyncers = syncers.slice();
+  document.querySelectorAll('#panel > details').forEach((d, i) => { if (i < open.length) d.open = open[i]; });
+  rebuildScenePanel(); updateSceneChrome(); buildCatalog(); syncUI();
+  updateHUD(); if (!sceneState.cur.builtin) updateInfoLive();
+  for (const [id, inst] of Object.entries(sceneState.instances)) {
+    try { inst.onLang?.(lang(), sceneCtx(scenes.find(s => s.id === id))); } catch (e) { console.error(`[scene ${id}] onLang`, e); }
+  }
+}
+onLang(() => {
+  rebuildLangUI();
+  // keep a shareable deep link in step with the choice
+  const u = new URL(location.href);
+  if (u.searchParams.get('lang') !== lang()) { u.searchParams.set('lang', lang()); history.replaceState(null, '', u); }
+});
+document.querySelectorAll('.langsw button').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); setLang(b.dataset.lang, { persist: !SNAP }); }));
+applyStaticLang();
+
 buildPanel();
 globalSyncers = syncers.slice();
-$('massName').textContent = MASSES[P.massIndex].name;
+updateSceneChrome();
 resize();
 camera.lookAt(0, 0, 0);
 requestAnimationFrame(frame);
 const scenesReady = loadScenes();
 requestAnimationFrame(() => requestAnimationFrame(() => {
-  const b = $('enterBtn'); b.disabled = false; b.textContent = 'Bước vào chân trời';
+  const b = $('enterBtn'); b.disabled = false; b.textContent = t('Bước vào chân trời', 'Step through the horizon');
 }));
 $('enterBtn').addEventListener('click', async () => {
+  if ($('enterBtn').disabled) return;
   audio.start();
   $('intro').classList.add('gone');
   state.started = true; state.lastInteract = performance.now();
@@ -2117,12 +2182,14 @@ $('enterBtn').addEventListener('click', async () => {
   await tweenCamera({ r: 26, pol: 83.5, az: 25 }, 10);
   controls.enabled = true;
   $('ui').classList.add('on');
-  toast('Kéo để xoay · cuộn để lại gần · <b>click</b> vào bất kỳ đâu để xem đường đi của photon tạo nên điểm ảnh đó. Nhấn <b>T</b> để bắt đầu hành trình.', 8000);
-  setTimeout(() => toast(`Còn cả một vũ trụ ngoài kia — nhấn <b>U</b> để mở <b>Danh mục vũ trụ</b>.`, 7000), 9000);
+  toast(t('Kéo để xoay · cuộn để lại gần · <b>click</b> vào bất kỳ đâu để xem đường đi của photon tạo nên điểm ảnh đó. Nhấn <b>T</b> để bắt đầu hành trình.',
+    'Drag to orbit · scroll to move in · <b>click</b> anywhere to see the path of the photon that makes that pixel. Press <b>T</b> to start the tour.'), 8000);
+  setTimeout(() => toast(t(`Còn cả một vũ trụ ngoài kia — nhấn <b>U</b> để mở <b>Danh mục vũ trụ</b>.`, `There is a whole universe out there — press <b>U</b> to open the <b>Cosmic catalogue</b>.`), 7000), 9000);
 });
 
 /* ---------- snapshot mode for the headless checker (tools/snap.sh) ----------
-   ?snap=1&scene=<id>[&cam=dist,polar,azimuth][&t=simTime][&params=k:v,k:v][&ui=0][&q=low|med|high] */
+   ?snap=1&scene=<id>[&cam=dist,polar,azimuth][&t=simTime][&params=k:v,k:v][&ui=0][&q=low|med|high]
+   [&lang=en] (English; reports visible text that still has Vietnamese letters) [&relang=en] (switch live after loading) */
 if (SNAP) (async () => {
   window.addEventListener('error', e => sceneState.loadErrors.push('js: ' + e.message));
   window.addEventListener('unhandledrejection', e => sceneState.loadErrors.push('promise: ' + (e.reason && e.reason.message || e.reason)));
@@ -2162,6 +2229,7 @@ if (SNAP) (async () => {
       await switchScene(s.id, { instant: true, force: true });
       for (let i = 0; i < 3; i++) { timeInfo.dt = 0.016; try { sceneState.inst?.update?.(0.016, sceneCtx(s)); } catch (e) { sceneState.loadErrors.push(`${s.id} update: ${e.message}`); } renderer.setRenderTarget(rtBH); renderer.render(bhScene, ortho); renderer.setRenderTarget(null); composer.render(); }
       visited.push(s.id);
+      if (lang() === 'en') { updateHUD(); if (!s.builtin) updateInfoLive(); for (const u of untranslated()) sceneState.loadErrors.push(`untranslated (${s.id}): ${u}`); }
     }
   }
   // ?bench=N: render N frames back to back, synchronising with the GPU, and report ms per frame
@@ -2185,12 +2253,35 @@ if (SNAP) (async () => {
       benchMs = +((performance.now() - t0) / n).toFixed(2);
     }
   }
+  // ?relang=en: switch language after loading, to exercise the live (no reload) rebuild
+  if (query.get('relang')) { setLang(query.get('relang'), { persist: false }); await new Promise(r => setTimeout(r, 300)); }
+  if (lang() === 'en') {
+    updateHUD(); if (!sceneState.cur.builtin) updateInfoLive();
+    for (const u of untranslated()) sceneState.loadErrors.push('untranslated: ' + u);
+  }
   const errs = [...sceneState.loadErrors, ...shaderErrors];
   const out = $('snap');
   out.textContent = JSON.stringify({ ok: errs.length === 0, scene: sceneState.cur.id, errors: errs, visited, benchMs, res: [rtBH.width, rtBH.height], hud: (sceneState.inst && sceneState.inst.hud) ? sceneState.inst.hud(sceneCtx(sceneState.cur)) : null });
   out.classList.toggle('err', errs.length > 0);
   window.__snapDone = true;
 })();
+// English-mode check for the snapshot tool: text in the current scene's chrome that still has Vietnamese letters
+function untranslated() {
+  const VI = /[\u1EA0-\u1EF9ăâđêôơưĂÂĐÊÔƠƯàáèéìíòóùúýÀÁÈÉÌÍÒÓÙÚÝ]/;
+  const roots = ['ui', 'help', 'intro', 'loader', 'split', 'plungeHud', 'skipTour', 'horizon'].map($);
+  roots.push(...document.querySelectorAll(`#catalog .top, #catalog .group h4, .ccard[data-id="${sceneState.cur.id}"]`));
+  // proper names that are spelled with accents in English too
+  const NAMES = /Fraternité|Égalité|Liberté/g, viText = x => VI.test(x.replace(NAMES, ''));
+  const out = new Set();
+  for (const r of roots) {
+    const w = document.createTreeWalker(r, NodeFilter.SHOW_TEXT);
+    for (let n; (n = w.nextNode());) if (viText(n.nodeValue)) out.add(n.nodeValue.trim().slice(0, 120));
+    for (const el of [r, ...r.querySelectorAll('[title]')]) if (el.title && viText(el.title)) out.add('title: ' + el.title);
+  }
+  out.delete('Tiếng Việt'); out.delete('title: Tiếng Việt');
+  if (VI.test(document.title)) out.add('document.title');
+  return [...out];
+}
 window.__bh = { P, state, camera, probes, launchProbe, shootRay, startPlunge, runTour, switchScene, scenes, sceneState };
 </script>
 </body>

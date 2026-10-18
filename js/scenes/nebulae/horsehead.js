@@ -26,6 +26,7 @@
 // Lacroce) with σ Ori, Alnitak, NGC 2023 and the Flame Nebula.
 import * as THREE from 'three';
 import { COMMON_GLSL, FULLSCREEN_VERT } from '../../glsl/common.js';
+import { t, dec } from '../../i18n.js';
 
 const ASSET = f => new URL(`../../../assets/horsehead/${f}`, import.meta.url).href;
 
@@ -368,8 +369,8 @@ void main(){
 // helpers
 // ------------------------------------------------------------------------------------------
 const stepsFor = q => (q.steps <= 200 ? 40 : q.steps <= 320 ? 52 : q.steps <= 480 ? 64 : 80);
-const vi = (x, d = 1) => x.toFixed(d).replace('.', ',');
-const ly = (x, d = 1) => vi(x, d) + ' năm ánh sáng';
+const vi = (x, d = 1) => dec(x, d);
+const ly = (x, d = 1) => vi(x, d) + t(' năm ánh sáng', ' light-years');
 const MODES = { vis: 0, ir: 1, jwst: 2 };
 const hash = i => { const s = Math.sin(i * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
 
@@ -381,11 +382,11 @@ function loadTex(url) {
     tex.generateMipmaps = true; tex.anisotropy = 4;
     tex.needsUpdate = true;
     resolve(tex);
-  }, undefined, () => reject(new Error('không tải được ' + url))));
+  }, undefined, () => reject(new Error(t('không tải được ', 'could not load ') + url))));
 }
 async function loadStars(name) {
   const r = await fetch(ASSET(`stars_${name}.bin`));
-  if (!r.ok) throw new Error('không tải được stars_' + name);
+  if (!r.ok) throw new Error(t('không tải được stars_', 'could not load stars_') + name);
   return new Float32Array(await r.arrayBuffer());
 }
 // keep a CPU copy of a dust texture (τ_V in R) for click measurements
@@ -467,9 +468,9 @@ function makeFlyer() {
 // scene
 // ------------------------------------------------------------------------------------------
 const VIEW_LABEL = {
-  vis: 'khả kiến B·V·R (0,44–0,66 µm) · ESO VLT/FORS2',
-  ir: 'hồng ngoại gần 1,1–1,6 µm · Hubble WFC3/IR + Euclid',
-  jwst: 'hồng ngoại 1,9–4,4 µm · JWST NIRCam',
+  vis: () => t('khả kiến B·V·R (0,44–0,66 µm) · ESO VLT/FORS2', 'visible B·V·R (0.44–0.66 µm) · ESO VLT/FORS2'),
+  ir: () => t('hồng ngoại gần 1,1–1,6 µm · Hubble WFC3/IR + Euclid', 'near-infrared 1.1–1.6 µm · Hubble WFC3/IR + Euclid'),
+  jwst: () => t('hồng ngoại 1,9–4,4 µm · JWST NIRCam', 'infrared 1.9–4.4 µm · JWST NIRCam'),
 };
 const VIEWS = {
   vis: { target: [0, 0, 0], dist: D0, polar: 90, azim: 0, fov: FOV0 },
@@ -496,25 +497,50 @@ const horsehead = {
     ['Tuổi thọ còn lại', '≈ 5 triệu năm (bị UV bào mòn)'],
     ['Ảnh gốc', 'ESO · ESA/Hubble · ESA/Webb · ESA/Euclid · G. Lacroce (Hα)'],
   ],
+  en: {
+    name: 'Horsehead Nebula',
+    subtitle: 'Dark nebula Barnard 33 against IC 434 (Orion)',
+    blurb: 'A pillar of cold (~10–20 K) dust and molecular gas jutting out of the Orion B cloud. It gives off almost no light of its own: what we see is its <b>silhouette</b> against the sheet of hydrogen in IC 434, glowing in Hα because σ Orionis ionizes it. The 3D shape here is built directly from real images: the dust’s optical depth is measured from how dark the silhouette is, so the reference view matches the photographs, while orbiting around reveals real parallax.',
+    intro: 'Press <b>I</b> to see it in infrared (Hubble): the dust turns transparent. <b>J</b>: JWST close-up. <b>W</b>: wide view with σ Orionis, Alnitak and the Flame Nebula. Click on the dust to measure A<sub>V</sub>.',
+    facts: [
+      ['Distance', '≈ 1,375 light-years'],
+      ['Constellation', 'Orion, next to Alnitak'],
+      ['Height (head + neck)', '≈ 3.5 light-years (≈ 8′)'],
+      ['Ionizing star', 'σ Orionis (O9.5 V, ≈ 32,000 K), ≈ 14 ly away'],
+      ['Core temperature', '≈ 10–20 K · n<sub>H</sub> ~ 10⁵ cm⁻³'],
+      ['Remaining lifetime', '≈ 5 million years (eroded by UV)'],
+      ['Source images', 'ESO · ESA/Hubble · ESA/Webb · ESA/Euclid · G. Lacroce (Hα)'],
+    ],
+  },
   camera: { distance: D0, polar: 90, azimuth: 0, min: 0.6, max: 120, fov: FOV0, target: [0, 0, 0] },
   exposure: 1.0,
   bloom: 0.22,
   params: [
     { key: 'view', label: 'Ảnh / bước sóng', type: 'seg', options: [['vis', 'Khả kiến (ESO VLT)'], ['ir', 'Hồng ngoại (Hubble 2013)'], ['jwst', 'JWST (2024)']], default: 'vis',
-      note: 'Hồng ngoại: A<sub>H</sub>/A<sub>V</sub> ≈ 0,18 — bụi gần trong suốt và tự phát sáng (ánh sao tán xạ + PAH).' },
-    { key: 'dust', label: 'Mật độ bụi', type: 'range', min: 0, max: 2, step: 0.01, default: 1, fmt: v => '×' + v.toFixed(2) },
+      note: 'Hồng ngoại: A<sub>H</sub>/A<sub>V</sub> ≈ 0,18 — bụi gần trong suốt và tự phát sáng (ánh sao tán xạ + PAH).',
+      en: { label: 'Image / wavelength', note: 'Infrared: A<sub>H</sub>/A<sub>V</sub> ≈ 0.18 — the dust is nearly transparent and glows on its own (scattered starlight + PAHs).', options: ['Visible (ESO VLT)', 'Infrared (Hubble 2013)', 'JWST (2024)'] } },
+    { key: 'dust', label: 'Mật độ bụi', type: 'range', min: 0, max: 2, step: 0.01, default: 1, fmt: v => '×' + v.toFixed(2),
+      en: { label: 'Dust density' } },
     { key: 'ion', label: 'Độ sáng IC 434 (σ Ori)', type: 'range', min: 0, max: 2.5, step: 0.01, default: 1, fmt: v => '×' + v.toFixed(2),
-      note: 'Bức xạ UV của σ Orionis ion hóa mặt đám mây: tấm IC 434 và viền sáng trên bờm.' },
+      note: 'Bức xạ UV của σ Orionis ion hóa mặt đám mây: tấm IC 434 và viền sáng trên bờm.',
+      en: { label: 'IC 434 brightness (σ Ori)', note: 'UV light from σ Orionis ionizes the face of the cloud: the IC 434 sheet and the bright rim along the mane.' } },
     { key: 'depth', label: 'Độ dày theo hướng nhìn', type: 'range', min: 0.2, max: 2, step: 0.01, default: 0.6, fmt: v => '×' + v.toFixed(2),
-      note: 'Ảnh chỉ cho biết tổng lượng bụi dọc tia nhìn, không cho độ sâu. ×1 = sâu bằng bề rộng; mặc định ×0,6 (mô hình vùng PDR của Habart và cs. 2005 cho mép sáng dày ~0,1 pc theo hướng nhìn). Góc nhìn chuẩn không đổi — hãy xoay để thấy khác biệt.' },
-    { key: 'pal', label: 'Màu (khả kiến)', type: 'seg', options: [['auto', 'Tự động'], ['eso', 'ESO B·V·R'], ['ha', 'Hα thật']], default: 'auto' },
+      note: 'Ảnh chỉ cho biết tổng lượng bụi dọc tia nhìn, không cho độ sâu. ×1 = sâu bằng bề rộng; mặc định ×0,6 (mô hình vùng PDR của Habart và cs. 2005 cho mép sáng dày ~0,1 pc theo hướng nhìn). Góc nhìn chuẩn không đổi — hãy xoay để thấy khác biệt.',
+      en: { label: 'Depth along the line of sight', note: 'The images only give the total dust column along each sightline, not its depth. ×1 = as deep as it is wide; the default ×0.6 follows the PDR model of Habart et al. 2005, where the bright edge is ~0.1 pc thick along the line of sight. The reference view doesn’t change — orbit around to see the difference.' } },
+    { key: 'pal', label: 'Màu (khả kiến)', type: 'seg', options: [['auto', 'Tự động'], ['eso', 'ESO B·V·R'], ['ha', 'Hα thật']], default: 'auto',
+      en: { label: 'Colour (visible)', options: ['Auto', 'ESO B·V·R', 'True Hα'] } },
   ],
   actions: [
-    { label: 'Khả kiến', key: 'v', title: 'Ảnh ESO VLT (B, V, R)', run: ctx => ctx.scene._go?.(ctx, 'vis') },
-    { label: 'Hồng ngoại', key: 'i', title: 'Hubble WFC3/IR 2013 + Euclid 2023', run: ctx => ctx.scene._go?.(ctx, 'ir') },
-    { label: 'JWST', key: 'j', title: 'Cận cảnh bờm ngựa — JWST NIRCam 2024', run: ctx => ctx.scene._go?.(ctx, 'jwst') },
-    { label: 'Toàn cảnh', key: 'w', title: 'σ Orionis, Alnitak, NGC 2023, tinh vân Ngọn Lửa', run: ctx => ctx.scene._go?.(ctx, 'wide') },
-    { label: 'Nhìn nghiêng', key: 'o', title: 'Bay tới mép góc nhìn cho phép (±32°, JWST ±12°) để thấy chiều sâu; nhấn lần nữa để quay về', run: ctx => ctx.scene._go?.(ctx, 'oblique') },
+    { label: 'Khả kiến', key: 'v', title: 'Ảnh ESO VLT (B, V, R)', run: ctx => ctx.scene._go?.(ctx, 'vis'),
+      en: { label: 'Visible', title: 'ESO VLT image (B, V, R)' } },
+    { label: 'Hồng ngoại', key: 'i', title: 'Hubble WFC3/IR 2013 + Euclid 2023', run: ctx => ctx.scene._go?.(ctx, 'ir'),
+      en: { label: 'Infrared', title: 'Hubble WFC3/IR 2013 + Euclid 2023' } },
+    { label: 'JWST', key: 'j', title: 'Cận cảnh bờm ngựa — JWST NIRCam 2024', run: ctx => ctx.scene._go?.(ctx, 'jwst'),
+      en: { label: 'JWST', title: 'Close-up of the mane — JWST NIRCam 2024' } },
+    { label: 'Toàn cảnh', key: 'w', title: 'σ Orionis, Alnitak, NGC 2023, tinh vân Ngọn Lửa', run: ctx => ctx.scene._go?.(ctx, 'wide'),
+      en: { label: 'Wide view', title: 'σ Orionis, Alnitak, NGC 2023, Flame Nebula' } },
+    { label: 'Nhìn nghiêng', key: 'o', title: 'Bay tới mép góc nhìn cho phép (±32°, JWST ±12°) để thấy chiều sâu; nhấn lần nữa để quay về', run: ctx => ctx.scene._go?.(ctx, 'oblique'),
+      en: { label: 'Oblique view', title: 'Fly to the edge of the allowed viewing angle (±32°, JWST ±12°) to see the depth; press again to go back' } },
   ],
   create(ctx) {
     const P = ctx.params;
@@ -673,10 +699,11 @@ const horsehead = {
           const e = img.data[i] / 255; return e * e * 10;
         };
         let tau = samp(cpuC, XF.C); if (tau === null) tau = samp(cpuW, XF.W);
-        if (tau === null) { c.toast('Ngoài vùng có dữ liệu bụi.', 2500); return; }
+        if (tau === null) { c.toast(t('Ngoài vùng có dữ liệu bụi.', 'Outside the area with dust data.'), 2500); return; }
         tau *= c.params.dust;
         const pct = k => Math.round(100 * Math.exp(-tau * k));
-        c.toast(`Tại (${vi(x, 2)}; ${vi(y, 2)}) ly: τ<sub>V</sub> ≈ ${vi(tau, 1)} → A<sub>V</sub> ≈ ${vi(1.086 * tau, 1)} mag.<br>Ánh sáng nền lọt qua: Hα ${pct(0.8)} % · 1,6 µm ${pct(0.18)} % · 4 µm ${pct(0.05)} %`, 6000);
+        c.toast(t(`Tại (${vi(x, 2)}; ${vi(y, 2)}) ly: τ<sub>V</sub> ≈ ${vi(tau, 1)} → A<sub>V</sub> ≈ ${vi(1.086 * tau, 1)} mag.<br>Ánh sáng nền lọt qua: Hα ${pct(0.8)} % · 1,6 µm ${pct(0.18)} % · 4 µm ${pct(0.05)} %`,
+          `At (${vi(x, 2)}, ${vi(y, 2)}) ly: τ<sub>V</sub> ≈ ${vi(tau, 1)} → A<sub>V</sub> ≈ ${vi(1.086 * tau, 1)} mag.<br>Background light getting through: Hα ${pct(0.8)} % · 1.6 µm ${pct(0.18)} % · 4 µm ${pct(0.05)} %`), 6000);
         c.audio?.click?.(0.3, info.ndcX, Math.min(1, tau / 6));
       },
       hud(c) {
@@ -686,11 +713,11 @@ const horsehead = {
         const k = KEXT[c.params.view][0];
         const tau = TAU_HEAD * c.params.dust;
         return [
-          ['Ánh sáng', VIEW_LABEL[c.params.view]],
-          ['Camera cách đầu ngựa', ly(c.camera.position.length())],
-          ['Bề rộng khung nhìn', ly(wv)],
-          ['A<sub>V</sub> qua đầu ngựa', '≳ ' + vi(1.086 * tau) + ' mag (ảnh bão hòa)'],
-          ['Ánh nền xuyên qua đầu', '≈ ' + vi(100 * Math.exp(-tau * k), 1) + ' %'],
+          [t('Ánh sáng', 'Light'), VIEW_LABEL[c.params.view]()],
+          [t('Camera cách đầu ngựa', 'Camera to the Horsehead'), ly(c.camera.position.length())],
+          [t('Bề rộng khung nhìn', 'Field of view width'), ly(wv)],
+          [t('A<sub>V</sub> qua đầu ngựa', 'A<sub>V</sub> through the head'), '≳ ' + vi(1.086 * tau) + t(' mag (ảnh bão hòa)', ' mag (image saturated)')],
+          [t('Ánh nền xuyên qua đầu', 'Background light through the head'), '≈ ' + vi(100 * Math.exp(-tau * k), 1) + ' %'],
         ];
       },
     };
