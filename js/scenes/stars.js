@@ -653,6 +653,187 @@ float chromoI(vec3 q, float mu, float fp){
 }
 float viewK(){ return uView < 1.5 ? 0.6 : (uView < 2.5 ? 0.8 : 0.85); }
 
+// ==== He II 304 Å the way SDO/AIA shows it ===========================================================
+// In the 304 view everything (disc, limb, spicules, prominences, CME) is accumulated as ONE scalar: the
+// pixel value s ∈ [0, 1] of an AIA browse image (a byte-scaled, roughly logarithmic intensity), and only at the
+// end turned into colour through the real sdoaia304 colour table. The statistics are matched to real frames
+// (2026-10-18 and 2024-05-08 browse images, R☉ ≈ 400 px): quiet disc 5/25/50/75/95 % = 0.30/0.38/0.44/0.49/0.60,
+// active regions saturating to white, limb at ≈ 0.44 falling to 0.30 / 0.23 / 0.15 / 0.07 / 0.03 at
+// 1.01 / 1.02 / 1.04 / 1.07 / 1.10 R☉. Goddard's processed frames (MGN): 0.24/0.29/0.36/0.48/0.62, i.e.
+// darker cells, brighter network — much more local contrast at every scale.
+uniform float uMgn;   // multi-scale Gaussian normalisation 0 (raw browse image) … 1 (NASA Goddard style)
+// sdoaia304 = IDL colour table 3 "Red Temperature" (SunPy: idl_3.csv), exactly — piecewise linear in display units
+vec3 idl3(float s){ s = clamp(s, 0.0, 1.0) * 255.0; return clamp(vec3(s * (255.0 / 176.0), (s - 120.0) * (255.0 / 135.0), (s - 190.0) * (255.0 / 65.0)), 0.0, 255.0) / 255.0; }
+// sdoaia171 = (r0, c0, b0) of the same table (used for the real 171 Å images)
+vec3 aia171(float s){ vec3 c = idl3(s); return vec3(c.r, clamp(s, 0.0, 1.0), c.b); }
+// display value → linear radiance through the host's tone curve (ACES fit, then 1/2.2 gamma), so what reaches
+// the screen (at exposure 1) is the colour table itself. Values ≳ 0.9 come out ≳ 2 and bloom: white-hot flares.
+vec3 acesInv(vec3 A){ A = clamp(A, 0.0, 0.96); vec3 a = 2.51 - 2.43 * A, b = 0.03 - 0.59 * A; return (-b + sqrt(b * b + 0.56 * a * A)) / (2.0 * a); }
+vec3 dispLin(vec3 D){ return acesInv(pow(max(D, 0.0), vec3(2.2))); }
+// MGN applies arctan(k·(I − ⟨I⟩_w)/σ_w) per scale w (Morgan & Druckmüller 2014). The bands below are built
+// already normalised (unit-amplitude noise), so the per-band normalisation reduces to this soft clip.
+float mgnK(float n){ return mix(n, 1.3 * n / (1.0 + 0.55 * abs(n)), uMgn); }
+
+// Filament channels: the dark lanes (~2–4× the filament's width) in which quiescent filaments lie. The
+// filaments themselves are the volumetric prominences seen against the disc (promMarch).
+float filChannel(vec3 q){
+  float ch = 0.0;
+  for (int k = 0; k < NP; k++){
+    vec4 G = uPrC[k], A = uPrA[k];
+    if (G.w <= 0.0 || A.w > 1.5) continue;
+    vec3 v = q - A.xyz;
+    float rr = G.x * 1.5 + 0.06;
+    if (dot(v, v) > rr * rr) continue;
+    vec3 X = uPrB[k].xyz, Z = cross(X, A.xyz);
+    float x = dot(v, X), xn = x / G.x * 2.0, sd = uPrB[k].w;
+    float z = dot(v, Z) - G.x * 0.15 * (0.5 * sin(xn + sd) + 0.3 * sin(2.3 * xn + 1.7 * sd) + 0.2 * sin(5.1 * xn + 2.9 * sd));   // follows the sheet (wave() in promDensity)
+    float w = 0.012 + 2.2 * G.z;
+    ch = max(ch, min(G.w, 1.0) * exp(-z * z / (w * w)) * smoothstep(G.x * 1.4, G.x * 0.7, abs(x)));
+  }
+  return ch;
+}
+// Active regions in 304: bright plage around each bipole, and fine loops / fibrils along its field lines.
+// For two opposite flux concentrations (seen locally as a plane) the field lines are the circles through both
+// feet: they are the contours of the flux function ψ = θa − θb (angles seen from each foot), and the potential
+// ϕ = ln(ra / rb) runs along them. Noise sampled on (cos ψ, sin ψ)·K and slowly in ϕ is therefore stretched
+// along the field — thin loops — with no seam, and |∇ψ| = 2h/(ra·rb) gives its band limit.
+// Returns the plage strength; fib (−1…1) the loop / fibril texture, core the white-hot core.
+float activeRegion304(vec3 q, float fp, out float fib, out float core){
+  float pl = 0.0, wf = 0.0; fib = 0.0; core = 0.0;
+  for (int i = 0; i < NS; i += 2){
+    vec4 xa = uSpotX[i];
+    if (xa.w <= 0.0 || xa.z <= 0.0) continue;
+    vec3 A = uSpot[i].xyz, B = uSpot[i + 1].xyz;
+    vec3 m = normalize(A + B);
+    float h = 0.5 * length(B - A);
+    // in 304 the plage around a bipole is far bigger than the spots, and stretched along the bipole axis
+    // (≈ east–west, Joy's law): ~100–250 Mm × 50–120 Mm
+    float rr = xa.w * 1.35 + 1.1 * h;
+    vec3 dv = q - m;
+    float d2 = dot(dv, dv);
+    if (d2 > rr * rr * 4.2) continue;
+    float seed = xa.y;
+    vec3 e1 = normalize((B - A) - m * dot(B - A, m) + 1e-6), e2 = cross(m, e1);
+    vec2 p = vec2(dot(dv, e1), dot(dv, e2));
+    vec2 pe = p / (rr * vec2(1.45, 0.75));
+    float de = dot(pe, pe);
+    // patchy, irregular outline (plage is made of many small flux elements)
+    float shape = 0.75 + 0.5 * snoise(vec3(p * (2.2 / rr), seed + TPS / 400000.0));
+    float env = xa.z * exp(-de) * max(shape, 0.0) * smoothstep(2.6, 1.6, de);
+    pl += env;
+    float cr = exp(-dot(p / (rr * vec2(0.85, 0.35)), p / (rr * vec2(0.85, 0.35))));
+    if (env < 0.03 && cr < 0.03) continue;
+    // "flames": the curly, swirling loops and arcade footpoints that make an AR look alive in 304 — warped
+    // ridged noise in the region's frame, slowly evolving
+    vec2 pw = p / rr;
+    float w1 = snoise(vec3(pw * 2.3, seed + TPS / 200000.0));
+    float fl = 1.0 - abs(snoise(vec3(pw * 6.5 + vec2(w1, -w1) * 0.9, seed * 1.3 + TPS / 120000.0)));
+    float lodFl = 1.0 - smoothstep(0.03, 0.09, fp / rr);
+    float acc = 0.6 * (fl * fl * fl * 2.0 - 0.5) * lodFl;
+    vec2 pa = p + vec2(h, 0.0), pb = p - vec2(h, 0.0);
+    float ra = max(length(pa), 1e-4), rb = max(length(pb), 1e-4);
+    float psi = atan(pa.y, pa.x) - atan(pb.y, pb.x);
+    float phi = log(ra / rb);
+    // loops: ridged noise across the field (K ≈ 40 strands per radian of ψ), slowly varying along it
+    const float K = 6.0;
+    float per = ra * rb / (2.0 * h * K * 2.0);            // ≈ spatial period across the field
+    float lodL = smoothstep(1.5, 4.0, per / max(fp, 1e-6));
+    if (lodL > 0.01 && env > 0.03){
+      float n = snoise(vec3(cos(psi), sin(psi), 0.0) * K + vec3(0.0, 0.0, phi * 0.35 + seed + TPS / 90000.0));
+      float lod2 = smoothstep(1.5, 4.0, per / (3.1 * max(fp, 1e-6)));
+      float n2 = lod2 > 0.01 ? snoise4(vec4(vec3(cos(psi), sin(psi), 0.0) * (K * 3.1) + vec3(0.0, 0.0, phi * 0.6 + seed * 1.7), TPF / 6000.0)) : 0.0;
+      acc += lodL * ((1.0 - 2.0 * abs(n)) * 0.6 + (1.0 - 2.0 * abs(n2)) * 0.4 * lod2);
+    }
+    fib += env * acc;
+    wf += env;
+    // the core between the feet: flare-like, white, elongated along the neutral line
+    if (cr > 0.03) core += xa.z * cr * max(0.55 + 0.6 * fl + 0.4 * snoise(vec3(p * (9.0 / rr), seed + 3.0 + TPF / 30000.0)), 0.0);
+  }
+  fib /= max(wf, 1e-4);
+  return pl;
+}
+// Disc value s of the 304 image at q.
+float he304(vec3 q, float mu, float fp){
+  vec3 nr = toRef(q);
+  fp *= sqrt(mu);                                     // isotropic footprint: keep the foreshortened network near the limb
+  float sgF = uGranF / 28.0;                          // supergranules ≈ 30 Mm
+  vec3 xs = nr * sgF;
+  float lodN = 1.0 - smoothstep(0.12 / sgF, 0.5 / sgF, fp);
+  float lodM = 1.0 - smoothstep(0.05 / sgF, 0.2 / sgF, fp);
+  float lodF = 1.0 - smoothstep(0.03 / sgF, 0.11 / sgF, fp);
+  float lodX = 1.0 - smoothstep(0.005 / sgF, 0.02 / sgF, fp);
+  // band 0 (~0.3 R☉): enhanced-network / quiet zones, evolving over days
+  float big = snoise4(vec4(nr * 3.0 + 2.0, TPS / 300000.0)) + 0.5 * snoise(nr * 8.0 + 5.0);
+  // network brightness varies strongly on ~100–200 Mm scales: enhanced network vs quiet patches
+  float netMod = 0.3 + 1.0 * smoothstep(-0.55, 0.65, snoise(nr * 4.5 + 7.0) + 0.35 * big);
+  // coronal holes: open-field regions, large, dark, with a much weaker network (polar ones near minimum)
+  float hole = smoothstep(0.15, 0.55, snoise(nr * 1.1 + 31.0) - 0.15 * big) * (0.5 + 0.5 * uActivity);
+  hole = max(hole, (1.0 - 0.7 * uActivity) * smoothstep(0.7, 0.88, abs(nr.y)));
+  // band 2 (~10 Mm): mottles, warped so they are sinuous rather than round
+  float cl = snoise(xs * 1.1 + 4.0);                  // network clumping (the cells themselves live and die: superGran)
+  float n2 = 0.0;
+  if (lodM > 0.001) n2 = lodM * snoise4(vec4(xs * 2.0 + 0.8 * cl, TPS / 15000.0));   // (warped by the clump field)
+  // band 1 (30 Mm): the chromospheric network. Flux swept to the supergranule borders shows up in He II as
+  // bright borders built of short, curved fibrils ("flames", rosettes), around dark cell interiors; the cell
+  // pattern itself is warped, so borders are irregular.
+  float blobs = 0.0;
+  if (lodN > 0.001){
+    vec3 e1, e2; tBasis(nr, e1, e2);
+    vec3 xw = xs + (e1 * snoise(xs * 0.9 + 1.3) + e2 * snoise(xs * 0.9 + 8.1)) * 0.3;
+    vec3 dir; vec3 sg = superGran(xw, nr, sgF, dOmega(nr.y * nr.y), dir);
+    float edge = smoothstep(0.75, 0.0, sg.x);
+    // curly fibrils along the borders: ridged, warped noise (~7 Mm), evolving through the warp
+    float cu = 1.0 - abs(snoise(xs * 3.6 + vec3(cl, n2, 0.5 * big) * 0.9));
+    float lodC = 1.0 - smoothstep(0.04 / sgF, 0.14 / sgF, fp);
+    blobs = edge * mix(0.6, 0.15 + 1.2 * cu * cu * cu, lodC) * (0.25 + 1.0 * smoothstep(-0.55, 0.6, cl + 0.3 * n2));
+  }
+  blobs = mix(0.3, blobs, lodN);                      // below the resolution: its mean
+  float mot = 0.5 + 0.5 * n2;
+  // band 3 (~3 Mm) and 4 (~1 Mm): fibrils and fine threads, living minutes
+  float n3 = 0.0;
+  if (lodF > 0.001){
+    float a = snoise4(vec4(xs * 5.5 + 0.5 * n2, TPF / 1500.0));
+    n3 = lodF * (0.6 * a + 0.4 * (1.0 - 2.0 * abs(a)));       // part ridged: fibrous
+    if (lodX > 0.001) n3 += 0.6 * lodX * snoise4(vec4(nr * 640.0, TPF / 300.0));
+  }
+  // long, dark, sinuous filament channels (100–400 Mm) — empty ones too, not only those holding the
+  // volumetric filaments — and small dark lanes between network patches
+  float lr = 1.0 - abs(snoise(nr * 1.7 + 0.3 * vec3(cl) + 51.0));
+  float lanes = (smoothstep(0.9, 0.975, lr) * 0.6 + smoothstep(0.975, 0.995, lr) * 0.6) * smoothstep(-0.1, 0.45, snoise(nr * 1.3 + 77.0));
+  float worm = 0.0;
+  if (lodN > 0.001) worm = lodN * smoothstep(0.0008, 0.0025, fp) * smoothstep(0.82, 0.97, 1.0 - abs(snoise(xs * 0.9 + 0.7 * n2 + 11.0)));
+  float ch = max(filChannel(q), lanes);
+  float fib, core;
+  float pl = activeRegion304(q, fp, fib, core);
+  // decaying active regions: bright, elongated (E–W) plage remnants spread along the activity belts (±5–35°)
+  float belt = exp(-pow((abs(nr.y) - 0.3) / 0.17, 2.0));
+  float rem = smoothstep(0.0, 0.65, snoise(nr * vec3(2.2, 6.5, 2.2) + 17.0) + 0.2 * cl);
+  float remP = 1.6 * uActivity * belt * rem;
+  pl = min(pl + remP, 1.2);
+  core += 0.35 * remP * pow(rem, 4.0) * max(0.35 + 0.6 * cl, 0.0);   // small white kernels in the bigger remnants
+  float hn = 1.0 - 0.6 * hole;                        // network weaker in holes
+  // raw (browse image) and MGN-processed versions; the slider interpolates between them
+  float sRaw = 0.36 + 0.05 * big + (0.22 * blobs * netMod * (0.75 + 0.5 * mot) + 0.03 * n2 + 0.02 * n3 - 0.07 * worm) * hn - 0.12 * hole - 0.15 * ch
+             + pl * (0.22 + 0.06 * n2 + 0.14 * fib) + 0.3 * min(core, 1.1);
+  float sMgn = 0.25 + 0.06 * big + (0.36 * blobs * netMod * (0.7 + 0.6 * mot) + 0.05 * mgnK(n2) + 0.05 * mgnK(n3) - 0.1 * worm) * hn - 0.14 * hole - 0.2 * ch
+             + pl * (0.22 + 0.08 * n2 + 0.24 * fib) + 0.32 * min(core, 1.1);
+  float s = mix(sRaw, sMgn, uMgn);
+  // limb: a slight brightening on the disc (He II is optically thick, the line of sight grazes hotter layers)
+  s += (0.035 + 0.025 * uMgn) * smoothstep(0.75, 0.1, mu) + 0.035 * exp(-mu / 0.035);
+  return s;
+}
+// Real SDO / SUVI images projected onto the visible hemisphere ("Mặt Trời hôm nay").
+uniform sampler2D uSdoTex;   // R: image value s (colour table inverted), G: the same after MGN (computed on the CPU)
+uniform float uSdoOn, uSdoAlign;
+uniform vec3 uSdoE, uSdoN, uSdoW;   // toward Earth at the image's date (latitude B0), image north (solar north), image west
+uniform vec4 uSdoGeo;        // disc centre (uv), radius (uv per R☉), texels per uv
+float sdoImg(vec3 P, float fpR){
+  vec2 uv = uSdoGeo.xy + vec2(dot(P, uSdoW), -dot(P, uSdoN)) * uSdoGeo.z;
+  float lod = log2(max(fpR * uSdoGeo.z * uSdoGeo.w, 1.0));
+  vec2 t = textureLod(uSdoTex, uv, lod).rg;
+  return mix(t.r, t.g, uMgn);
+}
+
 // The chromosphere seen edge-on through a narrow-band filter: a dense ~2 Mm layer and above it the
 // forest of spicules — jets ~0.5 Mm wide, 5–10 Mm tall, tilted, each living 5–10 min ("burning prairie").
 // Sampled in the plane of the sky (sp: unit vector toward the limb point, vh: toward the camera).
@@ -860,7 +1041,7 @@ vec3 promMarch(vec3 ro, vec3 rd, float tEnd, float pixAng, inout float trans){
       float x = min(rho, 1.6);
       vec3 S = uView < 0.5 ? HALPHA * (0.1 + 0.08 * x)
              : uView < 1.5 ? lutHa((0.12 + 0.3 * x) * gHa)
-             : uView < 2.5 ? lut304((0.1 + 0.3 * x) * gHa)
+             : uView < 2.5 ? vec3((0.07 + 0.17 * x) * gHa)        // 304: an image value (see he304); dark filaments on the disc
              : lut171(0.05 + 0.03 * x);
       acc += trans * al * S;
       trans *= 1.0 - al;
@@ -965,8 +1146,23 @@ void main(){
     float mu = clamp(hh / R, 0.0, 1.0);
     float fp = tHit * pixAng / max(mu, 0.04);
 #if KIND == 0
-    if (uView < 0.5) surf = photosphere(q, mu, fp);
-    else surf = lutView(chromoI(q, mu, fp) * viewK());
+    // real image on the hemisphere that faced Earth when it was taken (no Hα image: procedural there)
+    float wImg = uSdoOn > 0.0 && (uView < 0.5 || uView > 1.5) ? uSdoOn * mix(smoothstep(0.08, 0.5, dot(q, uSdoE)), step(0.0, dot(q, uSdoE)), uSdoAlign) : 0.0;   // wide, soft seam seen from the side; out to the limb seen from Earth
+    if (wImg < 0.999){
+      if (uView < 0.5) surf = photosphere(q, mu, fp);
+      else if (uView < 2.5 && uView > 1.5) surf = vec3(he304(q, mu, fp));
+      else surf = lutView(chromoI(q, mu, fp) * viewK());
+    }
+    if (wImg > 0.0){
+      // seen from (nearly) the image's own direction, project the pixel's plane-of-sky point instead of the
+      // surface point, so the picture matches the perspective view exactly out to the limb
+      vec3 P = mix(q, ro + rd * tc, uSdoAlign);
+      float si = sdoImg(P, tHit * pixAng);
+      vec3 ld = limbDark(mu);
+      vec3 img = uView < 0.5 ? uBright * bb(uTeff) * si * 1.25 * ld / max(ld.r, 0.05)
+               : uView < 2.5 ? vec3(si) : dispLin(aia171(si));
+      surf = mix(surf, img, wImg);
+    }
 #elif KIND == 1
     surf = photosphere(q, mu, fp);
 #elif KIND == 2
@@ -1004,7 +1200,14 @@ void main(){
 #if KIND == 0
   if (uView > 0.5) skyK *= 0.25;      // a narrow-band filter passes almost nothing of the night sky
 #endif
-  vec3 col = mix(sky(rd, 1.0) * skyK, surf, cov);
+  vec3 skyC = sky(rd, 1.0) * skyK;
+  vec3 col = mix(skyC, surf, cov);
+#if KIND == 0
+  // 304: col carries the scalar image value s until the colour table is applied at the end (see he304)
+  bool v304 = uView > 1.5 && uView < 2.5;
+  vec3 skyCol = vec3(0.0);
+  if (v304){ skyCol = skyC * 0.3 * (1.0 - cov); col = surf * cov; }
+#endif
   float h = max(b - R, 0.0);
 
 #if KIND <= 1
@@ -1022,17 +1225,34 @@ void main(){
   vec3 pcu = ro + rd * tcu; float bu = max(length(pcu), 1e-5), hu = max(bu - R, 0.0);
   vec3 spu = pcu / bu;
   #define FRONT(Hs) (0.5 + 0.5 * erfA(tcu / sqrt(2.0 * (Hs) * bu)))
+  if (v304 && cov < 1.0){
+    // the 304 limb: spicule forest, then the He II "corona" (the transition region seen edge-on, and
+    // scattered light) falling off as measured on AIA frames; MGN lifts the faint outer part. Added under the
+    // anti-aliased disc edge too, so the limb has no dark seam.
+    if (hu < 0.6){
+      vec3 sr = toRef(spu);   // radial rays: depend on direction only, turning with the Sun
+      float sh = 1.0 + 0.45 * snoise(sr * 7.0 + 3.0) + 0.25 * snoise(sr * 23.0) + 0.6 * uActivity * exp(-sr.y * sr.y / 0.12);
+      float I = 0.22 * spiculeForest(spu, vh, hu, pxW) * FRONT(0.003) + 0.3 * exp(-hu / 0.028) * FRONT(0.02)
+              + (0.02 + 0.04 * uMgn) * exp(-hu / (0.05 + 0.06 * uMgn)) * clamp(sh, 0.3, 2.0) * FRONT(0.1);
+      col += vec3(I * (1.0 - cov));
+    }
+  }
   if (tEnd > 1e8){
     if (uView < 0.5) col += chromosphere(spu, hu) * FRONT(0.002) * (1.0 + 4.0 * uEclipse) + corona(spu, bu) * FRONT(0.25) * (1.0 + 7.0 * uEclipse);
     else if (uView < 1.5) col += lutHa(0.95 * spiculeForest(spu, vh, hu, pxW) * FRONT(0.003) * viewK());
     else if (uView < 2.5){
-      float I = 0.75 * spiculeForest(spu, vh, hu, pxW) * FRONT(0.003) + 0.3 * exp(-hu / 0.006) * FRONT(0.006) + 0.05 * exp(-hu / 0.08) * FRONT(0.08);
-      col += lut304(I * viewK()) + corona(spu, bu) * 0.15 * FRONT(0.25);
+      // 304: see above
     } else {
       // 171 Å: optically thin ~1 MK plasma, emission ∝ n², so it falls off much faster than the white-light K corona
       vec3 k = corona(spu, bu) / max(uCorona, 1e-3);
       float I = dot(k, vec3(0.3, 0.6, 0.1)) * 9.0 * exp(-(bu - 1.0) / 0.3) * FRONT(0.15) + 0.35 * exp(-hu / 0.02) * FRONT(0.02);
       col += lut171(I * viewK()) * (0.4 + 0.6 * uCorona);
+    }
+    // the real image's own off-limb part (spicules, prominences, corona), when looking from its direction
+    float wOff = uSdoOn * uSdoAlign * smoothstep(1.45, 1.3, bu) * step(1.5, uView);
+    if (wOff > 0.0){
+      float si = sdoImg(pcu, max(tcu, 0.05) * pixAng);
+      col = mix(col, v304 ? vec3(si) : dispLin(aia171(si)) + skyC, wOff);
     }
   }
   if (uView > 2.5 && uLoopK > 0.0) col += loopsGlow(ro, rd, tEnd) * uLoopK;
@@ -1045,8 +1265,9 @@ void main(){
   }
   if (uCme.w > 0.0 && uCmeB > 0.0 && uView != 1.0){
     float c = cmeShell(ro, rd, tEnd) * uCmeB;
-    col += c * (uView < 0.5 ? bb(5772.0) * 0.035 * (1.0 + 3.0 * uEclipse) : uView < 2.5 ? lut304(0.1) : lut171(0.22));
+    col += c * (uView < 0.5 ? bb(5772.0) * 0.035 * (1.0 + 3.0 * uEclipse) : uView < 2.5 ? vec3(0.12) : lut171(0.22));
   }
+  if (v304) col = dispLin(idl3(col.x)) + skyCol;
   #else
   if (tEnd > 1e8) col += chromosphere(sp, h) * (1.0 + 4.0 * uEclipse);
   if (uProm > 0.0) col += loopsGlow(ro, rd, tEnd) * uProm * (1.0 + uEclipse);
@@ -1288,6 +1509,8 @@ function makeStar(ctx, kind, cfg) {
     uPrA: { value: v4arr(NP) }, uPrB: { value: v4arr(NP) }, uPrC: { value: v4arr(NP) }, uPrD: { value: v4arr(NP) }, uPrE: { value: v4arr(NP) },
     uCme: { value: new THREE.Vector4() }, uCmeB: { value: 0 }, uView: { value: 0 }, uLoopK: { value: 0 },
     uClk: { value: new THREE.Vector4() }, uTp: { value: new THREE.Vector2() }, uRef: { value: new THREE.Vector2(1, 0) }, uDOm: { value: new THREE.Vector2() },
+    uMgn: { value: 0 }, uSdoTex: { value: null }, uSdoOn: { value: 0 }, uSdoAlign: { value: 0 },
+    uSdoE: { value: new THREE.Vector3(0, 0, 1) }, uSdoN: { value: new THREE.Vector3(0, 1, 0) }, uSdoW: { value: new THREE.Vector3(1, 0, 0) }, uSdoGeo: { value: new THREE.Vector4(0.5, 0.5, 0.4, 1024) },
   };
   const material = new THREE.ShaderMaterial({
     uniforms: U, defines: { KIND: kind, NS, NL, NF, NP },
@@ -1329,6 +1552,165 @@ function activeRegions(t, tRot, activity, omegaFn, cfg, out) {
   }
   for (; si < NS; si++) { out.spot[si].set(0, 1, 0, 0); out.spotX[si].set(0, 0, 0, 0); }
   return regs;
+}
+
+/* ============================================================================================== */
+/* "Mặt Trời hôm nay": real full-disc images                                                        */
+/* ============================================================================================== */
+// Bundled: SDO browse JPEGs (assets/sun/CREDITS.txt). Live: SDO/AIA itself is not served with CORS headers
+// (sdo.gsfc.nasa.gov, JSOC, iSWA, LMSAL; Helioviewer only allows helioviewer.org), so a WebGL page cannot use
+// it; NOAA SWPC serves the same two EUV lines from GOES-19/SUVI, and SDO/HMI intensitygrams, with
+// "Access-Control-Allow-Origin: *". All of these are rotated to solar north up (P angle removed).
+const SWPC = 'https://services.swpc.noaa.gov';
+const SDO_SRC = {
+  euv304: { file: 'assets/sun/sdo_aia304_20261018_053854.jpg', date: '2026-10-18T05:38:54Z', inst: 'SDO/AIA 304 Å', table: 'idl3',
+            live: { list: SWPC + '/products/animations/suvi-primary-304.json', inst: 'GOES-19/SUVI 304 Å', table: 'idl3', pct: [0.33, 0.56] } },
+  euv171: { file: 'assets/sun/sdo_aia171_20261018_053634.jpg', date: '2026-10-18T05:36:34Z', inst: 'SDO/AIA 171 Å', table: 'aia171',
+            live: { list: SWPC + '/products/animations/suvi-primary-171.json', inst: 'GOES-19/SUVI 171 Å', table: 'aia171', pct: [0.229, 0.437] } },
+  wl: { file: 'assets/sun/sdo_hmi_cont_20261018_053000.jpg', date: '2026-10-18T05:30:00Z', inst: 'SDO/HMI continuum 617 nm', table: 'hmi',
+        live: { list: SWPC + '/products/animations/sdo-hmii.json', inst: 'SDO/HMI (ảnh cường độ)', table: 'hmi' } },
+};
+// sdoaia304 = IDL colour table 3 "Red Temperature" (SunPy idl_3.csv); sdoaia171 = (r0, c0, b0) of it
+const idl3JS = s => [Math.min(255, s * 255 / 176), Math.min(255, Math.max(0, (s - 120) * 255 / 135)), Math.min(255, Math.max(0, (s - 190) * 255 / 65))];
+// Inverse colour table: R+G+B rises monotonically along both tables, so the pixel's sum gives its value.
+function invTable(kind) {
+  const sums = [];
+  for (let s = 0; s < 256; s++) { const c = idl3JS(s); sums.push(kind === 'aia171' ? Math.round(c[0]) + s + Math.round(c[2]) : Math.round(c[0]) + Math.round(c[1]) + Math.round(c[2])); }
+  const inv = new Float32Array(766);
+  let j = 0;
+  for (let S = 0; S <= 765; S++) {
+    while (j < 254 && sums[j + 1] <= S) j++;
+    const a = sums[j], b = sums[Math.min(j + 1, 255)];
+    inv[S] = Math.min(1, (j + (b > a ? Math.min(1, Math.max(0, (S - a) / (b - a))) : 0)) / 255);
+  }
+  return inv;
+}
+// solar P angle and B0 (heliographic latitude of the disc centre) for a date — Meeus, Astronomical Algorithms ch. 29
+function solarBP(date) {
+  const jd = date.getTime() / 864e5 + 2440587.5, T = (jd - 2451545) / 36525;
+  const L0 = 280.46646 + 36000.76983 * T + 0.0003032 * T * T, M = (357.52911 + 35999.05029 * T - 0.0001537 * T * T) * D2R;
+  const C = (1.914602 - 0.004817 * T) * Math.sin(M) + (0.019993 - 0.000101 * T) * Math.sin(2 * M) + 0.000289 * Math.sin(3 * M);
+  const Om = (125.04 - 1934.136 * T) * D2R;
+  const lam = (L0 + C - 0.00569 - 0.00478 * Math.sin(Om)) * D2R;            // apparent longitude of the Sun
+  const eps = (23.439291 - 0.0130042 * T + 0.00256 * Math.cos(Om)) * D2R;
+  const I = 7.25 * D2R, K = (73.6667 + 1.3958333 * (jd - 2396758) / 36525) * D2R;   // solar equator: inclination, node
+  const P = Math.atan(-Math.cos(lam) * Math.tan(eps)) + Math.atan(-Math.cos(lam - K) * Math.tan(I));
+  return { P: P / D2R, B0: Math.asin(Math.sin(lam - K) * Math.sin(I)) / D2R };
+}
+// separable box blur (running sums), clamped edges; three passes ≈ a Gaussian of σ ≈ r + ½
+function boxBlur(src, dst, tmp, n, r) {
+  const w = 2 * r + 1;
+  for (let y = 0; y < n; y++) {
+    const o = y * n; let acc = 0;
+    for (let k = -r; k <= r; k++) acc += src[o + Math.min(n - 1, Math.max(0, k))];
+    for (let x = 0; x < n; x++) {
+      tmp[o + x] = acc / w;
+      acc += src[o + Math.min(n - 1, x + r + 1)] - src[o + Math.max(0, x - r)];
+    }
+  }
+  for (let x = 0; x < n; x++) {
+    let acc = 0;
+    for (let k = -r; k <= r; k++) acc += tmp[Math.min(n - 1, Math.max(0, k)) * n + x];
+    for (let y = 0; y < n; y++) {
+      dst[y * n + x] = acc / w;
+      acc += tmp[Math.min(n - 1, y + r + 1) * n + x] - tmp[Math.max(0, y - r) * n + x];
+    }
+  }
+}
+function gauss3(src, out, t1, t2, n, sigma) {
+  const r = Math.max(1, Math.round(sigma - 0.5));
+  boxBlur(src, out, t1, n, r); boxBlur(out, t2, t1, n, r); boxBlur(t2, out, t1, n, r);
+}
+// Disc centre and radius: coarse from the bright-pixel mask, then the steepest drop along 240 rays and a
+// least-squares circle (Kåsa fit) with outliers (prominences, flares on the limb) rejected.
+function fitDisc(v, n) {
+  let sx = 0, sy = 0, c = 0, med = [];
+  for (let y = n * 0.4 | 0; y < n * 0.6; y += 2) for (let x = n * 0.4 | 0; x < n * 0.6; x += 2) med.push(v[y * n + x]);
+  med.sort((a, b) => a - b);
+  const thr = 0.5 * med[med.length >> 1];
+  for (let y = 0; y < n; y += 2) for (let x = 0; x < n; x += 2) if (v[y * n + x] > thr) { sx += x; sy += y; c++; }
+  let cx = sx / c, cy = sy / c, R = Math.sqrt(4 * c / Math.PI);
+  const at = (x, y) => { const i = Math.min(n - 1, Math.max(0, Math.round(y))) * n + Math.min(n - 1, Math.max(0, Math.round(x))); return v[i]; };
+  for (let pass = 0; pass < 2; pass++) {
+    const pts = [];
+    for (let k = 0; k < 240; k++) {
+      const a = k / 240 * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a);
+      let best = 0, br = 0;
+      const sm = r => { let s = 0; for (let j = -2; j <= 2; j++) s += at(cx + ca * (r + j), cy + sa * (r + j)); return s / 5; };
+      for (let r = R * 0.82; r < R * 1.15; r += 0.5) { const d = sm(r - 1.5) - sm(r + 1.5); if (d > best) { best = d; br = r; } }
+      if (best > 0) pts.push([cx + ca * br, cy + sa * br]);
+    }
+    const fit = P => {   // Kåsa: x² + y² + D x + E y + F = 0
+      let Sxx = 0, Sxy = 0, Syy = 0, Sx = 0, Sy = 0, Sz = 0, Sxz = 0, Syz = 0; const N = P.length;
+      for (const [x0, y0] of P) { const x = x0 - cx, y = y0 - cy, z = x * x + y * y; Sxx += x * x; Sxy += x * y; Syy += y * y; Sx += x; Sy += y; Sz += z; Sxz += x * z; Syz += y * z; }
+      const A = [[Sxx, Sxy, Sx], [Sxy, Syy, Sy], [Sx, Sy, N]], b = [-Sxz, -Syz, -Sz];
+      const det = m => m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+      const d0 = det(A), sol = [0, 1, 2].map(i => det(A.map((row, r) => row.map((e, j) => (j === i ? b[r] : e)))) / d0);
+      const ox = -sol[0] / 2, oy = -sol[1] / 2;
+      return [cx + ox, cy + oy, Math.sqrt(ox * ox + oy * oy - sol[2])];
+    };
+    let [fx, fy, fr] = fit(pts);
+    const res = pts.map(([x, y]) => Math.abs(Math.hypot(x - fx, y - fy) - fr)), sr = [...res].sort((a, b) => a - b)[res.length >> 1];
+    [fx, fy, fr] = fit(pts.filter((_, i) => res[i] < Math.max(3 * sr, 1)));
+    cx = fx; cy = fy; R = fr;
+  }
+  return { cx, cy, R };
+}
+// Image → RG8 texture: R = image value (colour table inverted, or HMI intensity relative to the disc centre),
+// G = the same after multi-scale Gaussian normalisation (Morgan & Druckmüller 2014): for scales w = 1.5…24 px
+// (at R☉ = 800 px) C_w = arctan(k (B − ⟨B⟩_w)/σ_w), averaged, added to a gamma-stretched B. Coefficients fitted
+// so the result has the value distribution of NASA Goddard's processed 304 frames.
+async function decodeDisc(img, src) {
+  const t0 = performance.now();
+  const n = Math.min(2048, img.width);
+  const cv = document.createElement('canvas'); cv.width = cv.height = n;
+  const g = cv.getContext('2d', { willReadFrequently: true });
+  g.drawImage(img, 0, 0, n, n);
+  const px = g.getImageData(0, 0, n, n).data, N = n * n;
+  const B = new Float32Array(N);
+  if (src.table === 'hmi') for (let i = 0; i < N; i++) B[i] = px[4 * i + 1] / 255;    // HMI: green ∝ intensity (red saturates)
+  else { const inv = invTable(src.table); for (let i = 0; i < N; i++) B[i] = inv[px[4 * i] + px[4 * i + 1] + px[4 * i + 2]]; }
+  const { cx, cy, R } = fitDisc(B, n);
+  // normalise. HMI: to its disc centre (= 0.8, room for faculae). SUVI (another colour table, longer
+  // exposures): an affine map putting the 10th / 90th percentiles of the disc where SDO's browse frames have
+  // them, which also brings its much brighter corona down to SDO's level
+  const pick = rmax => { const a = []; for (let y = -R * rmax | 0; y < R * rmax; y += 3) for (let x = -R * rmax | 0; x < R * rmax; x += 3) if (x * x + y * y < rmax * rmax * R * R) a.push(B[Math.round(cy + y) * n + Math.round(cx + x)]); return a.sort((p, q) => p - q); };
+  let ka = 1, kb = 0;
+  if (src.table === 'hmi') { const c = pick(0.3); ka = 0.8 / (c[c.length >> 1] || 1); }
+  else if (src.pct) { const d = pick(0.9), p10 = d[d.length * 0.1 | 0], p90 = d[d.length * 0.9 | 0]; ka = (src.pct[1] - src.pct[0]) / Math.max(p90 - p10, 0.02); kb = src.pct[0] - ka * p10; }
+  // outside 1.5 R☉ the frames carry labels and the SUVI composite's rotated borders: fade them out
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const r = Math.hypot(x - cx, y - cy) / R; const i = y * n + x; B[i] = Math.min(1, Math.max(0, B[i] * ka + kb)) * (r < 1.45 ? 1 : Math.max(0, (1.55 - r) / 0.1)); }
+  const out = new Uint8Array(N * 2);
+  if (src.table === 'hmi') { for (let i = 0; i < N; i++) out[2 * i] = out[2 * i + 1] = Math.round(B[i] * 255); }
+  else {
+    const C = new Float32Array(N), m = new Float32Array(N), v = new Float32Array(N), sq = new Float32Array(N), t1 = new Float32Array(N), t2 = new Float32Array(N);
+    for (let i = 0; i < N; i++) sq[i] = B[i] * B[i];
+    for (const w of [1.5, 3, 6, 12, 24]) {
+      await new Promise(r => setTimeout(r, 0));    // keep the page responsive
+      const s = w * R / 800;
+      gauss3(B, m, t1, t2, n, s); gauss3(sq, v, t1, t2, n, s);
+      for (let i = 0; i < N; i++) C[i] += Math.atan(0.7 * (B[i] - m[i]) / Math.max(Math.sqrt(Math.max(v[i] - m[i] * m[i], 0)), 0.02));
+    }
+    for (let i = 0; i < N; i++) {
+      const G = 1.1 * Math.pow(B[i], 1.25) + 0.12 * C[i] / (5 * Math.PI / 2) - 0.005;
+      out[2 * i] = Math.round(B[i] * 255); out[2 * i + 1] = Math.round(Math.min(1, Math.max(0, G)) * 255);
+    }
+  }
+  const tex = new THREE.DataTexture(out, n, n, THREE.RGFormat, THREE.UnsignedByteType);
+  tex.generateMipmaps = true; tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter;
+  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping; tex.unpackAlignment = 1; tex.needsUpdate = true;
+  return { tex, geo: new THREE.Vector4(cx / n, cy / n, R / n, n), ms: performance.now() - t0 };
+}
+function loadImg(url) {
+  return new Promise((res, rej) => { const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => res(im); im.onerror = () => rej(new Error('tải ảnh lỗi')); im.src = url; });
+}
+// newest frame listed by SWPC (…_s20261018T054800Z_… or 20261018_051038_512_HMII.jpg) → { url, date }
+async function latestSWPC(list, signal) {
+  const r = await fetch(list, { signal, cache: 'no-store' });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const arr = await r.json(), last = arr[arr.length - 1].url;
+  const m = /(\d{4})(\d\d)(\d\d)[T_](\d\d)(\d\d)(\d\d)/.exec(last.split('/').pop());
+  return { url: SWPC + last, date: m ? `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}Z` : null };
 }
 
 /* ============================================================================================== */
@@ -1380,7 +1762,8 @@ const PROM_HEROES = {
   // two long quiescent filaments crossing the disc as seen from the default view (disc centre ≈ lon 70°)
   1: { lat: -30, lon: 50, az: 25, L: 0.22, H: 0.045, a: 0.007 },
   2: { lat: 47, lon: 100, az: -12, L: 0.18, H: 0.04, a: 0.006 },
-  30: { lat: -24, lon: 166, az: 70, L: 0.05, H: 0.07, a: 0.009, twist: 1.6, lean: 0.25 },
+  // a large arch that crosses the left limb of the default view at t ≈ 40 (seen above the limb for t ≈ 0–80)
+  30: { lat: -24, lon: 188, az: 70, L: 0.1, H: 0.18, a: 0.03, twist: 1.6, lean: 0.25 },
   35: { lat: 12, lon: -15, az: 5, L: 0.022, H: 0.028 },
 };
 function promCatalog() {
@@ -1451,7 +1834,7 @@ const sun = {
   subtitle: 'Sao lùn vàng G2V · ngôi sao của chúng ta',
   swatch: ['#fff6e0', '#ff9a2a'],
   blurb: 'Bề mặt sôi sục: mỗi <b>hạt sáng</b> (~1 000 km) là một cột plasma nóng trồi lên rồi nguội đi, chìm xuống ở rãnh tối. Phía trên, trong vành nhật hoa triệu độ, những <b>tai lửa</b> — rèm plasma nguội ~10 000 K, đặc gấp trăm lần xung quanh — được từ trường nâng đỡ: ở rìa đĩa chúng sáng hồng trong vạch <b>Hα</b>, trên đĩa chúng thành những <b>sợi tối</b>.',
-  intro: 'Nhấn <b>V</b> để đổi bước sóng (thử <b>Hα 656 nm</b>), <b>L</b> để bay tới cận cảnh <b>tai lửa</b> ở rìa đĩa, <b>R</b> để xem một tai lửa <b>phun trào</b>, <b>E</b> cho nhật thực toàn phần.',
+  intro: 'Đây là Mặt Trời ở <b>EUV 304 Å</b> như kính SDO/AIA thấy. Nhấn <b>O</b> để xem <b>ảnh thật hôm nay</b> chiếu lên quả cầu, <b>V</b> để đổi bước sóng, <b>L</b> để bay tới <b>tai lửa</b> ở rìa đĩa, <b>R</b> để xem một tai lửa <b>phun trào</b>, <b>E</b> cho nhật thực.',
   facts: [
     ['Phân loại', 'G2V — sao lùn vàng dãy chính'],
     ['Bán kính', '695 700 km (109 × Trái Đất)'],
@@ -1469,8 +1852,10 @@ const sun = {
   exposure: 1.0,
   bloom: 0.25,
   params: [
-    { key: 'view', label: 'Bước sóng quan sát', type: 'seg', options: [['wl', 'Ánh sáng trắng'], ['ha', 'Hα 656 nm'], ['euv304', 'EUV 304 Å'], ['euv171', 'EUV 171 Å']], default: 'wl', note: 'Ánh sáng trắng: quang cầu. Hα: sắc cầu — tai lửa sáng ở rìa, sợi tối trên đĩa. 304 Å (He II): sắc cầu–vùng chuyển tiếp. 171 Å (Fe IX): vành nhật hoa ~1 triệu K với các vòng từ. Ảnh hẹp băng là đơn sắc; màu là bảng màu quy ước (như SDO).' },
-    { key: 'activity', label: 'Mức hoạt động (vết đen)', type: 'range', min: 0, max: 1, step: 0.01, default: 0.6, note: 'Chu kỳ 11 năm: 0 = cực tiểu (đĩa trơn, vành nhật hoa dẹt theo xích đạo), 1 = cực đại (nhiều nhóm vết đen, các tia vành nhật hoa tỏa mọi hướng).' },
+    { key: 'view', label: 'Bước sóng quan sát', type: 'seg', options: [['wl', 'Ánh sáng trắng'], ['ha', 'Hα 656 nm'], ['euv304', 'EUV 304 Å'], ['euv171', 'EUV 171 Å']], default: 'euv304', note: 'Ánh sáng trắng: quang cầu. Hα: sắc cầu — tai lửa sáng ở rìa, sợi tối trên đĩa. 304 Å (He II): sắc cầu–vùng chuyển tiếp. 171 Å (Fe IX): vành nhật hoa ~1 triệu K với các vòng từ. Ảnh hẹp băng là đơn sắc; màu là bảng màu quy ước (như SDO).' },
+    { key: 'mgn', label: 'Tăng cường tương phản (MGN)', type: 'range', min: 0, max: 1, step: 0.01, default: 0.9, note: 'Ảnh EUV của SDO được xử lý bằng “chuẩn hóa Gauss đa thang” (MGN, Morgan & Druckmüller 2014): ở mỗi thang kích thước, độ sáng được so với trung bình và độ lệch chuẩn quanh nó, làm nổi chi tiết ở cả vùng tối lẫn vùng sáng. 0 = ảnh thô như ảnh “browse” của SDO, 1 = kiểu phim 4K của NASA Goddard. Áp dụng cho 304 Å và ảnh thật.' },
+    { key: 'sdo', label: 'Mặt Trời hôm nay (SDO)', type: 'toggle', default: false, note: 'Chiếu ảnh toàn đĩa thật lên nửa cầu nhìn từ Trái Đất lúc chụp (nghiêng B₀, bắc ở trên); nửa kia vẫn là mô phỏng. 304 Å / 171 Å / ánh sáng trắng (HMI); Hα không có ảnh. Ảnh SDO đi kèm luôn có sẵn; khi có mạng sẽ tải ảnh mới nhất (máy chủ SDO không cho phép tải chéo nguồn nên 304/171 trực tuyến lấy từ GOES-19/SUVI của NOAA, cùng vạch phổ).' },
+    { key: 'activity', label: 'Mức hoạt động (vết đen)', type: 'range', min: 0, max: 1, step: 0.01, default: 0.85, note: 'Chu kỳ 11 năm: 0 = cực tiểu (đĩa trơn, vành nhật hoa dẹt theo xích đạo), 1 = cực đại (nhiều nhóm vết đen, các tia vành nhật hoa tỏa mọi hướng).' },
     { key: 'granulation', label: 'Độ tương phản hạt', type: 'range', min: 0, max: 2, step: 0.01, default: 1, note: 'Hạt nóng hơn rãnh tối ~200–300 K; thấy rõ khi lại gần (khoảng cách < 1.2). Thời gian được tua nhanh theo khoảng cách, như phim của kính thiên văn mặt trời: cận cảnh 1 s ≈ 2 phút (từng hạt sinh ra, phình, tách đôi rồi tan trong vài giây), toàn đĩa 1 s ≈ 7 giờ (thấy Mặt Trời quay). Thanh “Tốc độ thời gian” nhân thêm hệ số này.' },
     { key: 'corona', label: 'Vành nhật hoa', type: 'range', min: 0, max: 2, step: 0.01, default: 0.6 },
     { key: 'prominences', label: 'Sắc cầu & tai lửa', type: 'range', min: 0, max: 2, step: 0.01, default: 1, note: 'Mật độ plasma trong tai lửa. Ở ánh sáng trắng tai lửa gần như vô hình (chỉ lộ ra khi nhật thực); hãy xem ở Hα.' },
@@ -1488,6 +1873,7 @@ const sun = {
     } },
     { label: 'Cận cảnh rìa', key: 'l', title: 'Bay tới tai lửa ở rìa đĩa (nhấn tiếp để đổi loại, rồi quay về)', run: ctx => sun.__inst?.limbTour(ctx) },
     { label: 'Phun trào', key: 'r', title: 'Cho một tai lửa phun trào (CME)', run: ctx => sun.__inst?.erupt(ctx) },
+    { label: 'Ảnh SDO', key: 'o', title: 'Mặt Trời hôm nay: ảnh thật của SDO chiếu lên quả cầu', run: ctx => sun.__inst?.toggleSdo(ctx) },
     { label: 'Nhật thực', key: 'e', title: 'Bật/tắt nhật thực toàn phần', run: ctx => { ctx.params.eclipse = !ctx.params.eclipse; if (ctx.params.eclipse) ctx.params.view = 'wl'; ctx.toast(ctx.params.eclipse ? 'Nhật thực toàn phần: quang cầu bị che, lộ ra <b>vành nhật hoa</b> (1–2 triệu K) và các <b>tai lửa</b> hồng (vạch Balmer của hydro).' : 'Quang cầu sáng trở lại — vành nhật hoa mờ hơn ~một triệu lần nên chìm trong ánh chói.'); } },
   ],
   create(ctx) {
@@ -1520,6 +1906,63 @@ const sun = {
     // camera: 0 free, 1 flying to the featured prominence, 2 following it, 3 flying back to the full disc
     const cam = { mode: 0, i: -1, k: -1, t0: 0, dur: 2.2, fromPos: new V3(), fromTgt: new V3(), fromUp: new V3(0, 1, 0), step: -1 };
     const defMin = sun.camera.min;
+
+    // ---- "Mặt Trời hôm nay": real full-disc images projected on the hemisphere that faced Earth ----------
+    // img[view] = { tex, geo, date, inst, live }. The picture is fixed in space (not in the rotating Sun):
+    // it shows the Sun as seen from Earth at that moment. E = direction to Earth at heliographic latitude B0,
+    // with its azimuth taken from the camera when the mode is switched on; the image's north is the Sun's
+    // rotation axis (+y) projected on the sky, since the products are already rotated by −P.
+    const qs = new URLSearchParams(location.search);
+    const sdo = { img: {}, bundled: {}, liveTried: {}, status: {}, active: false, E: new V3(0, 0, 1), az: sun.camera.azimuth * D2R, BP: solarBP(new Date()), err: '' };
+    const sdoView = v => (v === 'euv304' || v === 'euv171' || v === 'wl') ? v : null;
+    const wantLive = !SNAP_MODE || qs.get('sdolive') === '1';
+    const fmtUTC = d => d ? d.replace('T', ' ').slice(0, 16) : '?';
+    // orientation of the projection for the image currently shown
+    const setSdoFrame = () => {
+      const it = sdo.img[sdoView(sun.__params?.view)] || sdo.img.euv304;
+      sdo.BP = solarBP(it ? new Date(it.date) : new Date());
+      const b0 = sdo.BP.B0 * D2R;
+      // same convention as the host's setFromSphericalCoords: azimuth θ measured from +z toward +x
+      sdo.E.set(Math.cos(b0) * Math.sin(sdo.az), Math.sin(b0), Math.cos(b0) * Math.cos(sdo.az));
+      U.uSdoE.value.copy(sdo.E);
+      U.uSdoN.value.copy(Y).addScaledVector(sdo.E, -sdo.E.y).normalize();
+      U.uSdoW.value.crossVectors(sdo.E.clone().negate(), U.uSdoN.value).normalize();   // image right = solar west
+    };
+    const loadBundled = view => {
+      if (!sdo.bundled[view]) {
+        const src = SDO_SRC[view];
+        if (!sdo.status[view]) sdo.status[view] = 'loading';
+        sdo.bundled[view] = loadImg(src.file).then(im => decodeDisc(im, src)).then(r => {
+          const it = { ...r, date: src.date, inst: src.inst, live: false };
+          if (!sdo.img[view]) sdo.img[view] = it;
+          if (sdo.status[view] === 'loading') sdo.status[view] = 'bundled';
+          return it;
+        }).catch(e => { if (sdo.status[view] === 'loading') sdo.status[view] = 'failed'; console.warn('SDO bundled image', view, e); });
+      }
+      return sdo.bundled[view];
+    };
+    const loadLive = (view, ctx) => {
+      if (sdo.liveTried[view] || !wantLive) return;
+      sdo.liveTried[view] = true;
+      const src = SDO_SRC[view].live, ac = new AbortController(), timer = setTimeout(() => ac.abort(), 30000);
+      sdo.status[view] = 'live-loading';
+      return latestSWPC(src.list, ac.signal)
+        .then(({ url, date }) => Promise.race([loadImg(url), new Promise((_, rej) => setTimeout(() => rej(new Error('hết thời gian chờ')), 30000))])
+          .then(im => decodeDisc(im, src)).then(r => ({ ...r, date, inst: src.inst, live: true })))
+        .then(it => {
+          clearTimeout(timer);
+          sdo.img[view] = it; sdo.status[view] = 'live';
+          if (ctx.params.sdo && sdoView(ctx.params.view) === view) ctx.toast(`Đã tải ảnh mới nhất: <b>${it.inst}</b> lúc ${fmtUTC(it.date)} UTC.`, 5000);
+        })
+        .catch(e => {
+          clearTimeout(timer);
+          sdo.status[view] = 'live-failed'; sdo.err = e && e.name === 'AbortError' ? 'hết thời gian chờ' : (e && e.message) || 'lỗi mạng';
+          if (ctx.params.sdo) ctx.toast(`Không tải được ảnh trực tuyến (${sdo.err}) — dùng ảnh SDO đi kèm.`, 5000);
+        });
+    };
+    // snapshots use the bundled images (no network dependence); ?sdolive=1 also waits for the live download
+    const ready = SNAP_MODE ? Promise.all(['euv304', 'euv171', 'wl'].map(loadBundled))
+      .then(() => wantLive ? Promise.all(['euv304', 'euv171', 'wl'].map(v => loadLive(v, ctx))) : null) : Promise.resolve();
 
     const collect = (t, activity) => {
       const out = [];
@@ -1578,11 +2021,13 @@ const sun = {
       cam.mode = 1; cam.t0 = ctx.time.wall; cam.dur = 2.4;
       cam.fromPos.copy(ctx.camera.position); cam.fromTgt.copy(ctx.controls.target); cam.fromUp.copy(ctx.camera.up);
     };
-    let prevView = null;
+    let prevView = null, prevSdo = false;
+    const leaveSdo = (ctx) => { if (ctx.params.sdo) { ctx.params.sdo = false; prevSdo = true; sdo.active = false; } };
     const toHalpha = (ctx) => { if (ctx.params.view === 'wl' && !ctx.params.eclipse) { prevView = 'wl'; ctx.params.view = 'ha'; } };
     const exitLimb = (ctx) => {
       if (prevView) { ctx.params.view = prevView; prevView = null; }
-      cam.mode = 3; cam.i = -1; cam.t0 = ctx.time.wall; cam.dur = 2.2; cam.step = -1;
+      if (prevSdo) { ctx.params.sdo = true; prevSdo = false; }
+      cam.mode = 3; cam.i = -1; cam.t0 = ctx.time.wall; cam.dur = 2.2; cam.step = -1; cam.dest = null;
       cam.fromPos.copy(ctx.camera.position); cam.fromTgt.copy(ctx.controls.target); cam.fromUp.copy(ctx.camera.up);
     };
     const typeToast = (it, ctx) => {
@@ -1609,13 +2054,32 @@ const sun = {
 
     const inst = {
       material,
+      ready,
+      toggleSdo(ctx) {
+        ctx.params.sdo = !ctx.params.sdo;
+        if (ctx.params.sdo) {
+          if (!sdoView(ctx.params.view)) ctx.params.view = 'euv304';
+          ctx.toast('<b>Mặt Trời hôm nay</b>: ảnh toàn đĩa thật chiếu lên nửa cầu hướng về Trái Đất lúc chụp (trục quay nghiêng B₀ về phía ta, bắc ở trên). Xoay quanh để thấy nửa kia — phần mô phỏng. Thanh <b>MGN</b> chỉnh độ tương phản như ảnh 4K của NASA Goddard.', 8000);
+        } else ctx.toast('Trở lại Mặt Trời mô phỏng.');
+      },
+      sdoOn(ctx) {
+        sdo.active = true;
+        if (cam.mode === 1 || cam.mode === 2) { cam.mode = 0; cam.i = -1; cam.step = -1; ctx.controls.target.set(0, 0, 0); ctx.camera.up.set(0, 1, 0); ctx.controls.minDistance = defMin; }
+        const pos = ctx.camera.position, snapCam = SNAP_MODE && qs.get('cam');
+        sdo.az = snapCam ? sun.camera.azimuth * D2R : Math.atan2(pos.x, pos.z);
+        setSdoFrame();
+        // look from Earth's direction (the picture's own perspective)
+        const d = Math.min(Math.max(pos.length(), 2.2), 8), dest = sdo.E.clone().multiplyScalar(d);
+        if (SNAP_MODE) { if (!snapCam) { pos.copy(dest); ctx.controls.target.set(0, 0, 0); ctx.camera.up.copy(Y); ctx.camera.lookAt(0, 0, 0); } }
+        else { cam.mode = 3; cam.dest = dest; cam.t0 = ctx.time.wall; cam.dur = 1.8; cam.fromPos.copy(pos); cam.fromTgt.copy(ctx.controls.target); cam.fromUp.copy(ctx.camera.up); }
+      },
       limbTour(ctx) {
         if (erupt && erupt.cur && cam.i !== erupt.i) { const it = findItem(erupt.i, erupt.k); if (it) { setFeatured(it, ctx); return; } }
         // cycle hedgerow → arch → arcade → back to the full disc
         for (let s = cam.step + 1; s <= 3; s++) {
           if (s === 3) { exitLimb(ctx); ctx.toast('Quay về toàn đĩa.'); return; }
           const it = biggest(s);
-          if (it) { cam.step = s; toHalpha(ctx); setFeatured(it, ctx); typeToast(it, ctx); return; }
+          if (it) { cam.step = s; leaveSdo(ctx); toHalpha(ctx); setFeatured(it, ctx); typeToast(it, ctx); return; }
         }
       },
       erupt(ctx, age = 0, quiet = false) {
@@ -1625,6 +2089,7 @@ const sun = {
         erupt = { i: it.pr.i, k: it.k, age };
         if (cam.mode !== 1 && cam.mode !== 2) cam.step = 0;
         if (!quiet) {
+          leaveSdo(ctx);
           toHalpha(ctx);
           setFeatured(it, ctx);
           ctx.audio?.tone?.(55, 4, 0.2, 0, 'sawtooth');
@@ -1687,6 +2152,7 @@ const sun = {
           const sc = it.C.dot(camDir);
           const pri = it.erupting || it === feat ? -10 : Math.abs(sc);
           if (pri > -1 && sc < -0.45) continue;
+          if (pri > -1 && U.uSdoOn.value > 0.5 && it.C.dot(sdo.E) > -0.35) continue;   // the real image shows this side
           ranked.push([pri, it, it.erupting || it === feat ? 1 : smooth(-0.45, -0.3, sc)]);
         }
         ranked.sort((a, b) => a[0] - b[0]);
@@ -1732,6 +2198,20 @@ const sun = {
         for (; li < NL; li++) U.uLoopC.value[li].set(0, 0, 0, 0);
         U.uLoopK.value = view === 3 ? 0.6 * (0.4 + 0.6 * p.corona) : 0;
 
+        // ---- real images ----
+        U.uMgn.value = p.mgn ?? 0.9;
+        sun.__params = p;
+        if (p.sdo && !sdo.active) this.sdoOn(ctx);
+        if (!p.sdo && sdo.active) sdo.active = false;
+        const sv = sdoView(p.view);
+        if (p.sdo && sv) { if (!sdo.img[sv]) loadBundled(sv); loadLive(sv, ctx); }
+        const shown = p.sdo && sv ? sdo.img[sv] : null;
+        if (shown && U.uSdoTex.value !== shown.tex) { U.uSdoTex.value = shown.tex; U.uSdoGeo.value.copy(shown.geo); setSdoFrame(); }
+        U.uSdoAlign.value = smooth(0.95, 0.995, ctx.camera.position.clone().normalize().dot(sdo.E));
+        const sdoT = shown ? 1 : 0;
+        if (shown) U.uLoopK.value *= 1 - smooth(0.3, 0.8, U.uSdoAlign.value);   // seen from Earth, the image has the real loops
+        U.uSdoOn.value = SNAP_MODE ? sdoT : ease(U.uSdoOn.value, sdoT, dt * 2.5, this);
+
         // ---- camera: fly to / follow the featured prominence (OrbitControls still works around it) ----
         const camera = ctx.camera, target = ctx.controls.target;
         if (cam.mode === 1 || cam.mode === 2) {
@@ -1762,11 +2242,11 @@ const sun = {
           }
         } else if (cam.mode === 3) {
           const k = Math.min(1, (ctx.time.wall - cam.t0) / cam.dur), e = 1 - Math.pow(1 - k, 3);
-          const P = camDir.clone().multiplyScalar(sun.camera.distance);
+          const P = cam.dest ? cam.dest.clone() : camDir.clone().multiplyScalar(sun.camera.distance);
           camera.position.lerpVectors(cam.fromPos, P, e); target.lerpVectors(cam.fromTgt, new V3(), e);
           camera.up.lerpVectors(cam.fromUp, Y, e).normalize();
           camera.lookAt(target);
-          if (k >= 1) { cam.mode = 0; ctx.controls.minDistance = defMin; camera.up.copy(Y); }
+          if (k >= 1) { cam.mode = 0; cam.dest = null; ctx.controls.minDistance = defMin; camera.up.copy(Y); }
         } else if (!SNAP_MODE && dts > 0) {
           // close to the surface the "telescope" tracks the rotation, like a real solar telescope, so what you
           // see moving is the plasma itself and not the whole field sliding past
@@ -1797,6 +2277,17 @@ const sun = {
           rows.push(['Phun trào: độ cao', `${Math.round(erupt.cur.H * 696).toLocaleString('vi-VN')} Mm (${(erupt.cur.H).toFixed(2)} R☉)`]);
           rows.push(['Phun trào: vận tốc', `~${Math.round(erupt.cur.v * R_SUN_KM / REAL_PER_WALL)} km/s`]);
         }
+        if (ctx.params.sdo) {
+          const sv = sdoView(ctx.params.view), it = sv && sdo.img[sv], st = sv && sdo.status[sv];
+          if (!sv) rows.push(['Ảnh thật', 'không có ảnh Hα — đang hiện mô phỏng']);
+          else if (it) {
+            const isSdo = it.inst.startsWith('SDO');
+            rows.push([isSdo ? 'Ảnh SDO' : 'Ảnh thật', `Ảnh ${isSdo ? 'SDO' : it.inst} lúc ${fmtUTC(it.date)} UTC` + (isSdo ? ` · ${it.inst.slice(4)}` : '') + (it.live ? ' · mới nhất' : ' · đi kèm')
+              + (st === 'live-loading' ? ' (đang tải ảnh mới…)' : st === 'live-failed' ? ` (không tải được ảnh mới: ${sdo.err})` : '')]);
+            rows.push(['Nhìn từ Trái Đất', `B₀ = ${sdo.BP.B0 >= 0 ? '+' : ''}${sdo.BP.B0.toFixed(2).replace('.', ',')}° · P = ${sdo.BP.P >= 0 ? '+' : ''}${sdo.BP.P.toFixed(1).replace('.', ',')}° (ảnh đã xoay cho bắc lên trên)`]);
+          } else rows.push(['Ảnh thật', st === 'failed' ? 'không tải được ảnh đi kèm' : 'đang tải…']);
+          if (qs.has('sdodbg')) for (const k in sdo.img) rows.push(['sdodbg ' + k, `${sdo.img[k].inst} ${Math.round(sdo.img[k].ms)} ms · c=(${sdo.img[k].geo.x.toFixed(4)}, ${sdo.img[k].geo.y.toFixed(4)}) r=${sdo.img[k].geo.z.toFixed(4)} n=${sdo.img[k].geo.w}`]);
+        }
         rows.push([`Chu kỳ quay ở vĩ độ ${Math.abs(lat / D2R).toFixed(0)}°`, `${P.toFixed(1)} ngày`], ...starHud(ctx, 1, 5772, 1));
         return rows;
       },
@@ -1811,7 +2302,7 @@ const sun = {
       },
       exit(ctx) {
         // leave the shared camera controls as we found them
-        if (cam.mode !== 0) { cam.mode = 0; cam.i = -1; cam.step = -1; ctx.controls.target.set(0, 0, 0); ctx.camera.up.set(0, 1, 0); }
+        if (cam.mode !== 0) { cam.mode = 0; cam.i = -1; cam.step = -1; cam.dest = null; ctx.controls.target.set(0, 0, 0); ctx.camera.up.set(0, 1, 0); }
         ctx.controls.minDistance = defMin;
       },
     };

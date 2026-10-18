@@ -1,0 +1,31 @@
+Sun scene (js/scenes/stars.js) — bundled solar images
+=====================================================
+
+Courtesy of NASA/SDO and the AIA, EVE, and HMI science teams.
+Public domain (NASA imagery; see https://sdo.gsfc.nasa.gov/data/rules.php).
+
+These are the "browse" quick-look JPEGs published by the SDO mission at
+https://sdo.gsfc.nasa.gov/assets/img/browse/2026/10/18/ (solar north up, P angle already removed).
+They are the offline / snapshot fallback for the "Mặt Trời hôm nay (SDO)" mode.
+
+  sdo_aia304_20261018_053854.jpg    SDO/AIA 304 Å (He II), 2026-10-18 05:38:54 UTC
+                                    from 20261018_053854_2048_0304.jpg (2048 px, re-encoded q92)
+  sdo_aia171_20261018_053634.jpg    SDO/AIA 171 Å (Fe IX), 2026-10-18 05:36:34 UTC
+                                    from 20261018_053634_2048_0171.jpg (resampled to 1536 px)
+  sdo_hmi_cont_20261018_053000.jpg  SDO/HMI quick-look continuum (617.3 nm), 2026-10-18 05:30:00 UTC
+                                    from 20261018_053000_2048_HMIIC.jpg (resampled to 1536 px)
+
+Only change besides resampling: the burned-in timestamp label in the bottom-left corner (off the
+solar disc) was replaced by the mirror image of the label-free bottom-right corner, so the text does
+not end up projected into the corona.
+
+Live mode (network, at runtime; nothing stored in the repository):
+  * GOES-19 SUVI 304 Å / 171 Å composites — NOAA Space Weather Prediction Center,
+    https://services.swpc.noaa.gov/images/animations/suvi/primary/ (public domain, US government).
+  * SDO/HMI intensitygram — NOAA SWPC mirror, https://services.swpc.noaa.gov/images/animations/sdo-hmii/
+    (Courtesy of NASA/SDO and the HMI science team).
+  SDO/AIA itself is not served with CORS headers (sdo.gsfc.nasa.gov, JSOC, iSWA, LMSAL, and
+  Helioviewer, which only allows helioviewer.org), so a WebGL page on another origin cannot use it live.
+
+Colour table: sdoaia304 is IDL colour table 3 ("Red Temperature"), as in SunPy
+(sunpy/visualization/colormaps/color_tables.py, data/idl_3.csv); sdoaia171 is (r0, c0, b0) of the same.
