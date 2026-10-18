@@ -140,6 +140,23 @@ input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;bac
 #warp{position:fixed;inset:0;z-index:15;pointer-events:none;opacity:0;transition:opacity .55s ease;background:radial-gradient(circle at center,transparent 0,transparent 8%,rgba(0,0,0,.0) 9%),repeating-conic-gradient(from 0deg,rgba(255,255,255,.0) 0deg 2.2deg,rgba(190,215,255,.16) 2.4deg 2.6deg,rgba(255,255,255,0) 2.8deg 5deg);mask-image:radial-gradient(circle,transparent 6%,#000 60%);-webkit-mask-image:radial-gradient(circle,transparent 6%,#000 60%)}
 #warp.on{opacity:1;animation:warpSpin 1.2s linear infinite}
 @keyframes warpSpin{from{transform:scale(1) rotate(0)}to{transform:scale(1.6) rotate(4deg)}}
+/* scene loader: pure CSS animation (compositor), so it keeps moving while the GPU compiles shaders */
+#loader{position:fixed;inset:0;z-index:16;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,#07070b 0%,#000 70%);opacity:0;pointer-events:none;transition:opacity .45s ease}
+#loader.on{opacity:1;pointer-events:auto;cursor:progress}
+#loader .inner{text-align:center;padding:24px 16px;width:min(420px,100%)}
+#loader .orb{width:84px;height:84px;margin:0 auto 26px;border-radius:50%;position:relative;background:radial-gradient(circle at 50% 50%,var(--c1,#fff3d6) 0%,var(--c2,#ff9a3c) 42%,transparent 72%);filter:blur(.3px);animation:ldPulse 2.4s ease-in-out infinite}
+#loader .orb::after{content:'';position:absolute;inset:-14px;border-radius:50%;border:1px solid transparent;border-top-color:rgba(255,255,255,.55);border-right-color:rgba(255,255,255,.12);animation:ldSpin 1.1s linear infinite}
+@keyframes ldPulse{0%,100%{transform:scale(.92);opacity:.85}50%{transform:scale(1.04);opacity:1}}
+@keyframes ldSpin{to{transform:rotate(360deg)}}
+#loader .nm{font-family:var(--serif);font-weight:300;font-size:clamp(24px,4vw,34px);letter-spacing:.06em}
+#loader .stage{margin-top:10px;font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--dim);text-transform:uppercase;min-height:1.4em}
+#loader .bar{margin:18px auto 0;height:2px;width:100%;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden;position:relative}
+#loader .bar i{position:absolute;inset:0 auto 0 0;width:0;background:linear-gradient(90deg,var(--amber2),var(--amber));transition:width .5s ease}
+#loader .bar i::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.7),transparent);animation:ldShine 1.3s linear infinite}
+@keyframes ldShine{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+#loader .hint{margin-top:16px;font-size:11.5px;line-height:1.5;color:var(--dim);opacity:0;transition:opacity .8s}
+#loader .hint.on{opacity:1}
+@media (prefers-reduced-motion:reduce){#loader .orb,#loader .orb::after,#loader .bar i::after{animation:none}}
 #snap{position:fixed;left:8px;top:8px;z-index:99;max-width:60vw;white-space:pre-wrap;font:11px var(--mono);color:#ff8080;background:rgba(0,0,0,.75);padding:6px 8px;border-radius:6px;display:none}
 #snap.err{display:block}
 
@@ -317,6 +334,7 @@ body.cine #skipTour{display:block}
 
 <div id="catalog"><div class="top"><div><h3>DANH MỤC VŨ TRỤ</h3><p>Mỗi thiên thể được dựng lại từ vật lý thật — chọn một nơi để đến.</p></div><button class="close" id="catClose">ĐÓNG · ESC</button></div><div id="catGroups"></div></div>
 <div id="warp"></div>
+<div id="loader" aria-live="polite"><div class="inner"><div class="orb"></div><div class="nm" id="ldName"></div><div class="stage" id="ldStage"></div><div class="bar"><i id="ldBar"></i></div><div class="hint" id="ldHint">Lần đầu mở, card đồ hoạ phải biên dịch shader của cảnh này — có thể mất một lúc. Những lần sau sẽ nhanh hơn nhiều.</div></div></div>
 <pre id="snap"></pre>
 
 <div id="help" class="overlay"><div class="card glass">
@@ -1830,6 +1848,11 @@ async function switchScene(id, opts = {}) {
   sceneState.switching = true; sceneState.switchingError = false;
   const instant = !!opts.instant;
   if (!instant) { audio.whoosh(); $('warp').classList.add('on'); await fadeTo(1, 650); }
+  // from here until the reveal the frame loop draws nothing: rendering a material whose shader is still
+  // compiling forces a synchronous compile, which freezes the page (tens of seconds for the big scenes)
+  // (not in snap mode: headless virtual time would run out while the async compile is polled)
+  sceneState.hold = !SNAP;
+  const loader = instant || SNAP ? null : showLoader(def);
   const old = sceneState.cur;
   if (old.builtin) { clearAll(); P.splitOn = false; updateSplit(); }
   else if (sceneState.inst) { if (sceneState.inst.overlay) overlayScene.remove(sceneState.inst.overlay); try { sceneState.inst.exit?.(sceneCtx(old)); } catch (e) { console.error(e); } }
@@ -1854,20 +1877,28 @@ async function switchScene(id, opts = {}) {
       sceneState.loadErrors.push(`${id}: ${e.message}`);
     }
   }
-  if (!ok) { sceneState.switching = false; sceneState.cur = old; toast(`Không mở được “${def.name}”.`); await fadeTo(0, 400); $('warp').classList.remove('on'); return switchScene(old.builtin ? 'blackhole' : old.id, { instant: true, force: true }); }
+  if (!ok) { sceneState.hold = false; loader?.done(); sceneState.switching = false; sceneState.cur = old; toast(`Không mở được “${def.name}”.`); await fadeTo(0, 400); $('warp').classList.remove('on'); return switchScene(old.builtin ? 'blackhole' : old.id, { instant: true, force: true }); }
   camera.up.set(0, 1, 0);
   const fin = placeCamera(def), start = instant ? fin : placeCamera(def, 2.4);
   camera.position.copy(start.pos); controls.target.copy(start.tgt); camera.lookAt(controls.target);
   camera.fov = P.fov; camera.updateProjectionMatrix();
   rebuildScenePanel(); updateSceneChrome(); syncUI();
-  try { await renderer.compileAsync(bhScene, ortho); } catch (e) { /* compiled on first render instead */ }
+  loader?.stage('Biên dịch shader', 0.45);
+  try { await Promise.all([renderer.compileAsync(bhScene, ortho), renderer.compileAsync(overlayScene, camera)]); } catch (e) { /* compiled on first render instead */ }
   // scenes that stream large assets (textures) expose `ready`; hold the transition until they arrive
   if (sceneState.inst && sceneState.inst.ready) {
-    let slow = setTimeout(() => toast(`Đang tải dữ liệu cho “${def.name}”…`, 2500), 700);
+    loader?.stage('Tải dữ liệu', 0.75);
     try { await Promise.race([sceneState.inst.ready, new Promise(r => setTimeout(r, SNAP ? 60000 : 15000))]); }
     catch (e) { console.error(`[scene ${id}] assets`, e); sceneState.loadErrors.push(`${id} assets: ${e && e.message || e}`); }
-    clearTimeout(slow);
   }
+  // first frames upload textures and finish any remaining GPU work: let them happen behind the loader
+  sceneState.hold = false;
+  if (loader) {
+    loader.stage('Dựng khung hình đầu tiên', 0.92);
+    for (let i = 0; i < 3; i++) await new Promise(r => requestAnimationFrame(r));
+    loader.done();
+  }
+  resetPerf();   // the load stall must not count as slow frames for the adaptive resolution
   if (!opts.keepHash) history.replaceState(null, '', '#' + def.id);
   state.lastInteract = performance.now();
   if (!instant) {
@@ -1879,6 +1910,27 @@ async function switchScene(id, opts = {}) {
   sceneState.switching = false;
   if (!instant && def.intro) toast(def.intro, 7000);
 }
+// Loader shown over the black transition; only appears if loading takes more than a moment, so cached
+// scenes switch without a flash. Returns { stage(text, progress0to1), done() }.
+function showLoader(def) {
+  const el = $('loader'), bar = $('ldBar'), hint = $('ldHint'), t0 = performance.now();
+  const sw = def.swatch || ['#fff3d6', '#ff9a3c'];
+  el.style.setProperty('--c1', sw[0]); el.style.setProperty('--c2', sw[1]);
+  $('ldName').textContent = def.name;
+  $('ldStage').textContent = 'Khởi tạo cảnh…'; bar.style.width = '15%';
+  hint.classList.remove('on');
+  const showT = setTimeout(() => el.classList.add('on'), 220);
+  const hintT = setTimeout(() => hint.classList.add('on'), 3500);
+  return {
+    stage(text, p) { $('ldStage').textContent = text + '…'; bar.style.width = Math.round(p * 100) + '%'; },
+    done() {
+      clearTimeout(showT); clearTimeout(hintT);
+      if (!el.classList.contains('on')) return;
+      bar.style.width = '100%'; el.classList.remove('on');
+      console.info(`[scene ${def.id}] loaded in ${Math.round(performance.now() - t0)} ms`);
+    },
+  };
+}
 function fadeTo(v, ms) {
   const from = state.fade, t0 = performance.now();
   return new Promise(res => { const st = () => { const k = Math.min(1, (performance.now() - t0) / ms); state.fade = from + (v - from) * k; if (k < 1) requestAnimationFrame(st); else res(); }; st(); });
@@ -1888,6 +1940,7 @@ function fadeTo(v, ms) {
 /* Main loop                                                            */
 /* ------------------------------------------------------------------ */
 let last = performance.now(), hudTimer = 0, perfAcc = 0, perfN = 0, perfTimer = 0, fpsShown = 0;
+function resetPerf() { perfAcc = 0; perfN = 0; perfTimer = 0; last = performance.now(); }
 const tmpV = new V3();
 function frame(now) {
   requestAnimationFrame(frame);
@@ -1994,7 +2047,7 @@ function frame(now) {
   finalPass.uniforms.uFade.value = state.fade;
   bloomPass.strength = P.bloom;
 
-  if (innerWidth < 8 || innerHeight < 8) return;
+  if (innerWidth < 8 || innerHeight < 8 || sceneState.hold) return;
   if (canvas.width < 8) resize();
   renderer.setRenderTarget(rtBH);
   renderer.render(bhScene, ortho);
@@ -2011,7 +2064,8 @@ function frame(now) {
   if (perfTimer > 1.5) {
     const avg = perfAcc / perfN; fpsShown = 1 / avg;
     if (P.autoQuality && state.started) {
-      if (avg > 1 / 38 && resScale > 0.4) { resScale = Math.max(0.4, resScale - 0.1); resize(); }
+      if (avg > 1 / 20 && resScale > 0.4) { resScale = Math.max(0.4, resScale - 0.2); resize(); }   // far too slow: step down hard
+      else if (avg > 1 / 38 && resScale > 0.4) { resScale = Math.max(0.4, resScale - 0.1); resize(); }
       else if (avg < 1 / 57 && resScale < quality.scale) { resScale = Math.min(quality.scale, resScale + 0.05); resize(); }
     }
     perfAcc = 0; perfN = 0; perfTimer = 0;

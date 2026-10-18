@@ -1660,13 +1660,9 @@ function fitDisc(v, n) {
 // G = the same after multi-scale Gaussian normalisation (Morgan & Druckmüller 2014): for scales w = 1.5…24 px
 // (at R☉ = 800 px) C_w = arctan(k (B − ⟨B⟩_w)/σ_w), averaged, added to a gamma-stretched B. Coefficients fitted
 // so the result has the value distribution of NASA Goddard's processed 304 frames.
-async function decodeDisc(img, src) {
-  const t0 = performance.now();
-  const n = Math.min(2048, img.width);
-  const cv = document.createElement('canvas'); cv.width = cv.height = n;
-  const g = cv.getContext('2d', { willReadFrequently: true });
-  g.drawImage(img, 0, 0, n, n);
-  const px = g.getImageData(0, 0, n, n).data, N = n * n;
+// Pure (pixels in, RG8 bytes out) so it can run in the decode worker; ~1–3 s of arithmetic at 2048².
+async function decodePixels(px, n, src) {
+  const N = n * n;
   const B = new Float32Array(N);
   if (src.table === 'hmi') for (let i = 0; i < N; i++) B[i] = px[4 * i + 1] / 255;    // HMI: green ∝ intensity (red saturates)
   else { const inv = invTable(src.table); for (let i = 0; i < N; i++) B[i] = inv[px[4 * i] + px[4 * i + 1] + px[4 * i + 2]]; }
@@ -1696,6 +1692,54 @@ async function decodeDisc(img, src) {
       out[2 * i] = Math.round(B[i] * 255); out[2 * i + 1] = Math.round(Math.min(1, Math.max(0, G)) * 255);
     }
   }
+  return { out, n, cx, cy, R };
+}
+// The decode runs in a worker built from the functions above, so entering the Sun never stalls the page.
+// Falls back to the main thread (yielding between scales) if workers / OffscreenCanvas are unavailable.
+let decodeWorker = null, decodeSeq = 0;
+const decodeJobs = new Map();
+function getDecodeWorker() {
+  if (decodeWorker !== null) return decodeWorker;
+  try {
+    const body = [`const idl3JS = ${idl3JS};`, invTable, boxBlur, gauss3, fitDisc, decodePixels, `
+onmessage = async e => {
+  const { id, bmp, src } = e.data;
+  try {
+    const n = Math.min(2048, bmp.width), cv = new OffscreenCanvas(n, n), g = cv.getContext('2d', { willReadFrequently: true });
+    g.drawImage(bmp, 0, 0, n, n); bmp.close();
+    const r = await decodePixels(g.getImageData(0, 0, n, n).data, n, src);
+    postMessage({ id, r }, [r.out.buffer]);
+  } catch (err) { postMessage({ id, error: String(err && err.message || err) }); }
+};`].join('\n');
+    decodeWorker = new Worker(URL.createObjectURL(new Blob([body], { type: 'text/javascript' })));
+    decodeWorker.onmessage = e => {
+      const job = decodeJobs.get(e.data.id); if (!job) return;
+      decodeJobs.delete(e.data.id);
+      if (e.data.error) job.rej(new Error(e.data.error)); else job.res(e.data.r);
+    };
+  } catch (e) { decodeWorker = false; }
+  return decodeWorker;
+}
+async function decodeInWorker(img, src) {
+  const w = getDecodeWorker();
+  if (!w || typeof OffscreenCanvas === 'undefined') throw new Error('no worker');
+  const bmp = await createImageBitmap(img), id = ++decodeSeq;
+  return new Promise((res, rej) => { decodeJobs.set(id, { res, rej }); w.postMessage({ id, bmp, src }, [bmp]); });
+}
+function decodeOnMain(img, src) {
+  const n = Math.min(2048, img.width);
+  const cv = document.createElement('canvas'); cv.width = cv.height = n;
+  const g = cv.getContext('2d', { willReadFrequently: true });
+  g.drawImage(img, 0, 0, n, n);
+  return decodePixels(g.getImageData(0, 0, n, n).data, n, src);
+}
+async function decodeDisc(img, src) {
+  const t0 = performance.now();
+  let r;
+  // snapshots decode on the main thread: headless virtual time runs out while the page idles on a worker
+  try { if (SNAP_MODE) throw new Error('no worker'); r = await decodeInWorker(img, src); }
+  catch (e) { if (e.message !== 'no worker') console.warn('SDO decode worker', e); r = await decodeOnMain(img, src); }
+  const { out, n, cx, cy, R } = r;
   const tex = new THREE.DataTexture(out, n, n, THREE.RGFormat, THREE.UnsignedByteType);
   tex.generateMipmaps = true; tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter;
   tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping; tex.unpackAlignment = 1; tex.needsUpdate = true;
