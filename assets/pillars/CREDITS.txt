@@ -1,0 +1,61 @@
+Pillars of Creation (M16) — data for the "emission-nebula" scene (js/scenes/nebulae/pillars.js)
+==================================================================================================
+
+SOURCE IMAGES (all Creative Commons Attribution 4.0 International, https://creativecommons.org/licenses/by/4.0/;
+ESA/Hubble and ESA/Webb require the full credit line to be shown — it is in the scene's facts card)
+
+1. Hubble 2014, WFC3/UVIS visible — "New view of the Pillars of Creation — visible" (heic1501a)
+   https://esahubble.org/images/heic1501a/   (large JPEG, 6780 x 7071 px)
+   https://esahubble.org/media/archives/images/large/heic1501a.jpg
+   Credit: NASA, ESA/Hubble and the Hubble Heritage Team
+   Filters: F502N [O III] (blue), F657N Hα + [N II] (green), F673N [S II] (red).
+   Field 4.53' x 4.72', north 35.0° left of vertical, RA 18h18m52.72s Dec −13°50'21.97".
+
+2. JWST 2022, NIRCam — "Webb Takes a Stunning, Star-Filled Portrait of the Pillars of Creation (Full View)" (weic2216b)
+   https://esawebb.org/images/weic2216b/   (large JPEG, 8423 x 14589 px)
+   https://esawebb.org/media/archives/images/large/weic2216b.jpg
+   Credit: NASA, ESA, CSA, STScI; Joseph DePasquale (STScI), Anton M. Koekemoer (STScI), Alyssa Pagan (STScI)
+   Filters F090W, F187N, F200W, F335M, F444W, F470N. Field 4.21' x 7.30', north 2.6° right of vertical.
+
+Studied for reference only (not shipped): heic1501b (Hubble 2014 WFC3/IR), opo9544a (Hubble 1995 WFPC2,
+J. Hester & P. Scowen), weic2216a (Webb, cropped), weic2218a (Webb MIRI, NASA, ESA, CSA, STScI,
+J. DePasquale, A. Pagan), and McLeod et al. 2015, MNRAS 450, 1057, "The Pillars of Creation revisited
+with MUSE" (arXiv:1504.03323) for the 3D geometry (§4.2, Fig. 21), photo-evaporation flow (~8 km/s,
+vrel −3.4 … −7.1 km/s for P1a/P1b/P2/P3), mass-loss rate (70 M☉/Myr) and lifetime (~3 Myr).
+
+FILES (all derived from 1 and 2; total ≈ 6.6 MB)
+  hst.webp        2048 x 2136  Hubble mosaic, Lanczos-downsampled (0.1327"/px = 0.00367 ly/px), stars removed
+  jwst.webp       2048 x 2136  NIRCam mosaic resampled onto the same grid (published WCS + a 2.7"/2.9" star-matched
+                               refinement), the ~2 000 brighter stars removed (the ~18 000 faint ones stay); the three corners
+                               the NIRCam mosaic does not cover are filled by pyramid inpainting
+  matte.webp        2048 x 2136  lossless: R = dust matte α (canonical opacity), G = ionisation-front mask,
+                               B = distance to dust (/0.6 ly)
+  geo.bin         512 x 534 x 4 little-endian uint16, rows bottom-up: slab half-thickness h [0, 2.5 ly],
+                               slab centre zc [−4, 4 ly], and the z-range [−9, 9 ly] occupied by any slab within
+                               0.3 ly (empty-space skipping)
+  bg_hst.jpg, bg_jw.jpg        1536 x 1068  the H II cavity background with the pillars inpainted away,
+                               extended to 3 x 2 frames (blurred, fading to the mean colour)
+  dust_hst.jpg, dust_jw.jpg    512 x 534  dust source function averaged over dusty pixels (pillar sides)
+  hst_head.webp, jwst_head.webp 1536 x 912  native-resolution (0.040"/px) crops of the head of the left pillar
+                               (EGGs), stars removed — Hubble pixels x[1840,3376) y[750,1662) of heic1501a
+  stars.json      2 647 stars measured in the two mosaics (position, Hubble / natural / NIRCam disc
+                               amplitude·colour, disc width and spike strength, kind) + 12 O stars of NGC 6611
+                               placed above the frame + brightness pools for synthesising stars beyond the data
+
+PROCESSING (pipeline/ — Python 3 + numpy, scipy, Pillow; run in this order on the downloaded JPEGs)
+  s1_register.py   downsample Hubble to 2048 px; resample NIRCam onto that grid from the published WCS
+  s2_stars.py hst  multi-scale star detection (ring test, spike-aware), radial-halo subtraction,
+                   spike/core masks, push-pull inpainting + grain; removes knots on ionisation fronts
+  s3_matte.py, s3b_mask.py, s4_geo.py
+                   dust matte from background-normalised log(R/B) colour of both releases + darkness,
+                   hand-traced pillar outlines (polys.py) with ragged multi-scale edges, per-structure depth
+                   zc from McLeod et al. 2015 (P1a −2.0 → −1.0 ly tip toward us; base cloud +0.6; P1b +1.0 → +0.2;
+                   P2 +2.0 → +0.6; P3 +1.8 → +2.4; veil/globules +1.4…+1.6), round cross-sections
+  s2_stars.py jw   NIRCam stars (bright → removed, faint → kept; red stars inside dust = embedded protostars)
+  s2b_shift.py     star-matched refinement of the NIRCam registration
+  s5_export.py     background sheets, textures, geometry, per-star fits of the removed light
+  s6_detail.py     native-resolution head crops
+
+The depth model, slab thicknesses, the inpainted background behind the pillars, the dust colour on
+the hidden sides and the positions of the NGC 6611 O stars (≈ 7.5 ly above the frame, towards
+HD 168076) are modelled, not measured.

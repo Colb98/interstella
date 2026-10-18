@@ -1,0 +1,49 @@
+Horsehead Nebula (Barnard 33 / IC 434) — data for js/scenes/nebulae/horsehead.js (scene "dark-nebula").
+
+All textures here are DERIVED from the photographs below: each image was converted back to linear
+radiance (inverse of the app's ACES + gamma 2.2 display transform), its stars were measured and removed,
+and it was decomposed into
+  *_b.jpg   emission behind the dust B (star-free image where not darkened, smooth fill behind the dust)
+  *_l.jpg   the dust's own light L = I − B·exp(−τ), stored per unit of the depth profile (L·τ/(1−e^−τ))
+  vis_*_d.jpg  R = sqrt(τ_V/10) dust optical depth, G = h/2 ly assumed half-thickness, B = ionised-gas
+               fraction of L
+  vis_w_gain.png  low-frequency colour gain matching the Hα mosaic to the ESO frame (log2-encoded)
+  stars_*.bin   float32 [x, y, F_r, F_g, F_b, τ_V] per star: sky-plane position (ly), photometry
+               (linear radiance × ly²) and the dust column at that position
+Registration between the images: star matching (similarity / affine fits, 0.5–2.5 px rms) and, for
+JWST, the footprint drawn in ESA/Webb's comparison graphic weic2411c refined with 33 matched stars.
+Encodings: *_b texel^2.2 × scale, *_l texel^2.5 × scale (scales in horsehead.js, SC).
+
+Source images and licences
+--------------------------
+1. ESO VLT / FORS2, "The Horsehead Nebula" (eso0202a), 2002.
+   https://www.eso.org/public/images/eso0202a/   (file: https://cdn.eso.org/images/large/eso0202a.jpg)
+   Credit: ESO. Licence: Creative Commons Attribution 4.0 International (CC BY 4.0).
+   -> vis_c_b.jpg, vis_c_l.jpg, vis_c_d.jpg, stars_vis.bin (inside the frame)
+
+2. NASA, ESA, and the Hubble Heritage Team (STScI/AURA), "Hubble sees a horse of a different colour"
+   (heic1307a), WFC3/IR 2013.
+   https://esahubble.org/images/heic1307a/   (file: https://cdn.esahubble.org/archives/images/large/heic1307a.jpg)
+   Licence: CC BY 4.0.  -> ir_h_b.jpg, ir_h_l.jpg, stars_ir.bin / stars_jwst.bin (Hubble footprint)
+
+3. ESA/Webb, NASA, CSA, K. Misselt (University of Arizona) and A. Abergel (IAS/University Paris-Saclay,
+   CNRS), "Horsehead Nebula (NIRCam image)" (weic2411a), 2024; footprint from weic2411c.
+   https://esawebb.org/images/weic2411a/   (file: https://cdn.esawebb.org/archives/images/large/weic2411a.jpg)
+   Licence: CC BY 4.0.  -> ir_j_b.jpg, ir_j_l.jpg, stars_jwst.bin (Webb footprint)
+
+4. ESA/Euclid/Euclid Consortium/NASA, image processing by J.-C. Cuillandre (CEA Paris-Saclay) and
+   G. Anselmi, "Euclid's view of the Horsehead Nebula", 2023 (Early Release Observations).
+   https://www.esa.int/ESA_Multimedia/Images/2023/11/Euclid_s_view_of_the_Horsehead_Nebula
+   (file via Wikimedia Commons: https://commons.wikimedia.org/wiki/File:Euclid%E2%80%99s_view_of_the_Horsehead_Nebula_ESA25170866.jpg)
+   Licence: CC BY-SA 3.0 IGO. The derived files ir_e_b.jpg, ir_e_l.jpg and the Euclid part of
+   stars_ir.bin / stars_jwst.bin are shared under the same licence (CC BY-SA 3.0 IGO).
+
+5. Gianni Lacroce, "IC 434 Horsehead Nebula B33, Flame Nebula NGC 2024" (Hα-dominated wide field).
+   https://commons.wikimedia.org/wiki/File:Ic434_Horsehead_Nebula_B33_Flame_Nebula_Ngc2024.jpg
+   Licence: CC0 1.0 (public domain dedication); credited anyway.
+   -> vis_w_b.jpg, vis_w_l.jpg, vis_w_d.jpg, vis_w_gain.png, vis_far.jpg, stars_vis.bin (outside the ESO frame).
+   Plate scale from σ Ori – Alnitak (49.7′ apart): 1.861″/px; ESO frame = 6.58′ = 2.63 ly at 1 375 ly.
+
+Also consulted (not redistributed): ESO/Digitized Sky Survey 2 wide field of Orion's Belt and the Flame
+Nebula (via Wikimedia Commons,
+CC BY 4.0) and ESO/VISTA eso0949n for the layout of the Flame Nebula, NGC 2023 and Alnitak.

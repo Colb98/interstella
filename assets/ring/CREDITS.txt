@@ -1,0 +1,65 @@
+Ring Nebula (M57, NGC 6720) data for the "Tinh vân Chiếc Nhẫn" scene (js/scenes/nebulae/ring.js).
+
+All source images are released under the Creative Commons Attribution 4.0 International licence
+(https://esahubble.org/copyright/, https://esawebb.org/copyright/) and must be credited visibly; the
+scene shows the credit line in its facts panel and in the HUD ("Nguồn ảnh") for the active image.
+
+SOURCES
+  Hubble 2013 (WFC3: He II 469, [O III] 502, Hβ, Hα, [N II] 658, [S II] 673 nm, continuum 645 nm)
+    heic1310a  "Ring Nebula (Messier 57)"  3179x3179, 2.10′ field, north 11.7° left of vertical
+    https://esahubble.org/images/heic1310a/   (large JPEG: https://esahubble.org/media/archives/images/large/heic1310a.jpg)
+    Credit: NASA, ESA, and C. Robert O’Dell (Vanderbilt University)
+
+  Hubble + Large Binocular Telescope composite (deep halo)
+    heic1310b  "Ring Nebula (Hubble/LBT composite)"  7000x6500, 4.62′ x 4.29′, north up
+    https://esahubble.org/images/heic1310b/   (large JPEG: https://esahubble.org/media/archives/images/large/heic1310b.jpg)
+    Credit: NASA, ESA, C. Robert O’Dell (Vanderbilt University), and David Thompson (LBTO)
+
+  JWST NIRCam 2023 (F162M, F212N H2, F300M, F335M PAH)
+    weic2320b  "Ring Nebula (NIRCam image)"  4097x4156, 2.14′ x 2.17′, north 140.2° right of vertical
+    https://esawebb.org/images/weic2320b/   (large JPEG: https://esawebb.org/media/archives/images/large/weic2320b.jpg)
+    Credit: ESA/Webb, NASA, CSA, M. Barlow, N. Cox, R. Wesson
+
+  JWST MIRI 2023 (F560W, F770W PAH, F1000W, F1130W PAH, F1280W, F1500W, F1800W, F2100W, F2550W)
+    weic2320c  "Ring Nebula (MIRI image)"  1257x1015, 2.33′ x 1.88′, north 132.9° right of vertical
+    https://esawebb.org/images/weic2320c/   (large JPEG: https://esawebb.org/media/archives/images/large/weic2320c.jpg)
+    Credit: ESA/Webb, NASA, CSA, M. Barlow, N. Cox, R. Wesson
+
+FILES (all in one sky frame: the heic1310a orientation, x right / y up, centred on the central star)
+  ring_hubble.jpg        3072x3072  ±64″ (0.0417″/px)   heic1310a
+  ring_nircam.jpg        3072x3072  ±64″ (0.0417″/px)   weic2320b
+  ring_miri.jpg          1024x1024  ±64″ (0.125″/px)    weic2320c
+  ring_*_wide.jpg        1024x1024  ±160″ (0.3125″/px)  the same image, outside its field the deep
+                                                         heic1310b halo (red channel), tinted per
+                                                         image to match it at 48–62″
+  ring_knots.png         512x512    ±64″  where the dark cometary knots sit in heic1310a (density map
+                                          for the procedural close-up knots)
+  ring_meta.json         star catalogues (position ″, peak colour, disc radius, local background) of
+                         the field stars removed from each image, the ring's ridge radius per 5° of
+                         azimuth (from the [N II] channel), registration parameters
+
+PROCESSING (python / numpy / scipy; script kept outside the repo)
+  1. Registration: each image is rotated by its published orientation and scaled by its published
+     field of view, then translated so that field stars match heic1310a (least-squares similarity
+     fit on matched stars: LBT 50 stars, rms 0.14″; MIRI 81 stars, rms 0.18″; NIRCam 31 matches).
+     Fitted rotations/scales agree with the published values to < 0.15° and < 0.2 %, no mirror flip.
+  2. Resampled (cubic, Gaussian pre-filter when downsampling) onto the common grid.
+  3. Stars removed: compact peaks above a local median, saturated stars and their traced diffraction
+     spikes masked, holes filled by multi-scale normalised convolution. The stars are re-drawn by
+     the scene as point sprites with each telescope's PSF, at the catalogued positions.
+  4. Black level subtracted (3rd percentile beyond 50″); low-frequency mismatch to the deep LBT halo
+     removed near the frame edge; cross-faded into the tinted LBT halo over 46–62″.
+  JPEG quality 94 (inner) / 92 (wide). Total ≈ 4.2 MB.
+
+SCIENCE REFERENCES (geometry and numbers used by the 3D model)
+  O'Dell, Ferland, Henney & Peimbert 2013, AJ 145, 92 — "Studies of NGC 6720 with calibrated HST/WFC3
+    emission-line filter images I: structure and evolution" (arXiv:1301.6636): main ring = thick
+    equatorial band (44″ x 30″ semi-axes, polar semi-axis ≈ 59″) with a central cavity and polar lobes
+    pointing nearly at us; He II → [O III] → H I → [N II]/[S II] ionisation stratification; inner halo
+    loops within ~65″, outer halo radius ≈ 115″; central star ≈ 120 000 K; knots at the ionisation front.
+  Wesson et al. 2024, MNRAS 528, 3392 — "JWST observations of the Ring Nebula (NGC 6720): I. Imaging
+    of the rings, globules, and arcs" (arXiv:2308.09027): ~20 000 globules, 0.2″ (≈150 au),
+    n ≈ 10⁵–10⁶ cm⁻³; cavity radius ≈ 25″, shell outer radius 44″ x 35″; ~10 concentric arcs, spacing
+    ≈ 1.5″ (orbit of a low-mass companion, P ≈ 280 yr); 300–400 radial "spikes" in the halo, ~0.4″
+    wide, ~20″ long; distance 790 ± 30 pc; T_eff ≈ 135 000 K, L ≈ 310 L☉; age ≈ 4 000 yr.
+  Illustration of the 3D structure: heic1310c, https://esahubble.org/images/heic1310c/

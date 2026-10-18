@@ -18,6 +18,10 @@ export const MODULES = [
   'lava.js',
   'browndwarf.js',
   'galaxy.js',
-  'nebulae.js',
+  // one module per nebula
+  'nebulae/pillars.js',
+  'nebulae/ring.js',
+  'nebulae/crab.js',
+  'nebulae/horsehead.js',
   'small.js',
 ];

@@ -1,0 +1,58 @@
+Crab Nebula (M1) data for the "Tàn dư siêu tân tinh" scene (js/scenes/nebulae/crab.js).
+All maps are derived products (registered, star-removed, decomposed, re-encoded) made with
+src/prep_crab.py from the images below. Please keep these credit lines visible with the scene.
+
+crab_hst.webp   4096x4096 lossy WebP (filament emission, Hubble)
+  Source: ESA/Hubble heic0515a "Crab Nebula" (Hubble Space Telescope WFPC2 mosaic, 2005),
+  large JPEG 3864x3864, 6.41' field, north up.
+  https://esahubble.org/images/heic0515a/
+  https://cdn.esahubble.org/archives/images/large/heic0515a.jpg
+  Credit: NASA, ESA and Allison Loll/Jeff Hester (Arizona State University).
+          Acknowledgement: Davide De Martin (ESA/Hubble).
+  Licence: Creative Commons Attribution 4.0 International (CC BY 4.0), ESA/Hubble image use policy
+           (https://esahubble.org/copyright/) - credit must be shown.
+
+crab_jwst.webp  4096x4096 lossy WebP (filament / dust emission, Webb)
+  Source: ESA/Webb weic2326a "Crab Nebula" (JWST NIRCam + MIRI, 2023; 1.62, 4.8, 5.6, 11, 18,
+  21 µm), large JPEG 10509x9151.
+  https://esawebb.org/images/weic2326a/
+  https://cdn.esawebb.org/archives/images/large/weic2326a.jpg
+  Credit: NASA, ESA, CSA, STScI, T. Temim (Princeton University).
+  Licence: Creative Commons Attribution 4.0 International (CC BY 4.0), ESA/Webb image use policy.
+  Registered to the Hubble frame on 6 field stars (similarity transform, rms 1.7 Hubble px).
+  Outside the Webb field the map is filled with recoloured Hubble data (feathered over 6").
+
+crab_aux.webp   2048x2048 lossy WebP
+  R = Hubble synchrotron map, G = Webb synchrotron map (smooth lower envelope of the images),
+  B = Chandra X-ray image:
+  Source: Chandra X-ray Observatory image of the Crab Nebula (released 2008-11-05), ACIS,
+  ObsIDs 1997 and 4607, crab_lg.jpg 3300x3300 (scale from the 2-arcmin bar of crab_scale.jpg).
+  https://chandra.harvard.edu/photo/2008/crab/
+  https://chandra.harvard.edu/photo/2008/crab/crab_lg.jpg
+  Credit: NASA/CXC/SAO/F. Seward et al.
+  Licence: NASA/CXC material, no copyright asserted; use under NASA media guidelines with
+           acknowledgement of NASA/SAO (https://chandra.harvard.edu/photo/image_use.html).
+
+crab_dust.webp  2048x2048 lossy WebP
+  R/G = absorption A (Hubble/Webb) such that filaments + synchrotron x (1 - A) = the image.
+
+crab_meta.json
+  Outline radius R(theta) of the nebula (180 bins, arcsec, from the Hubble image), synchrotron
+  colours, and the field-star catalogue for the sprite overlay:
+  Gaia DR3 (ESA/Gaia/DPAC), VizieR catalogue I/355/gaiadr3, cone 9' around the Crab pulsar,
+  G < 20.8: https://vizier.cds.unistra.fr/viz-bin/VizieR?-source=I/355/gaiadr3
+  Gaia data: CC BY-SA 3.0 IGO (https://www.cosmos.esa.int/web/gaia-users/license).
+  The same Gaia positions (4.5' cone) were used to remove the stars from the image maps.
+
+Encoding of the RGB maps: radiance x under the host's ACES tone curve (inverse tone mapped, so the
+Earth view reproduces the photograph), stored as (x / (1 + x))^(1/2.2).
+
+3D geometry and other references (not redistributed, used for the model):
+  T. Martin, D. Milisavljevic, L. Drissen 2021, "3D mapping of the Crab Nebula with SITELLE -
+    I. Deconvolution and kinematic reconstruction", MNRAS 502, 1864 (arXiv:2101.02709):
+    filaments on a shell in a honeycomb pattern, overall "heart-shaped" boundary symmetric about
+    the plane of the pulsar-wind torus, bays where the expansion is restricted.
+  C.-Y. Ng & R. W. Romani 2004, ApJ 601, 479: torus axis PA 126 deg, inclination 63 deg.
+  M. C. Weisskopf et al. 2000, ApJ 536, L81 (Chandra inner ring ~14", torus, jet).
+  Chandra + Hubble movies of the inner nebula (wisps, ~0.5 c): https://chandra.harvard.edu/photo/2002/0052/
+  NASA/STScI/Caltech-IPAC "Crab Nebula 3D visualization" (F. Summers et al.) - style reference.
