@@ -1,6 +1,6 @@
 # Scene contract
 
-Interstella is a catalog of astrophysical objects. The host (`index.html`) owns the renderer,
+Interstellar is a catalog of astrophysical objects. The host (`index.html`) owns the renderer,
 camera, post-processing (bloom → ACES tone map → grain), UI chrome and audio. Each catalog entry
 is a **scene** defined in one module under `js/scenes/`. `js/scenes/moon.js` is a complete,
 working reference — read it first and copy its structure.

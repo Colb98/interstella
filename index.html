@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Interstella — Black Hole</title>
+<title>Interstellar — Danh mục vũ trụ</title>
 <meta name="description" content="Mô phỏng hố đen Schwarzschild ray-traced theo thuyết tương đối rộng, thời gian thực trên GPU.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -124,11 +124,16 @@ input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;bac
 #catalog .close{background:none;border:1px solid var(--faint);border-radius:20px;color:var(--dim);padding:7px 14px;font-size:11px;letter-spacing:.14em;cursor:pointer}
 #catalog .group{margin:0 0 28px}
 #catalog .group h4{margin:0 0 12px;font-size:10.5px;font-weight:500;letter-spacing:.32em;color:var(--dim);text-transform:uppercase}
-#catalog .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}
-.ccard{position:relative;text-align:left;background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:14px;padding:14px;cursor:pointer;transition:transform .25s,border-color .25s,background .25s;overflow:hidden}
-.ccard:hover{transform:translateY(-2px);border-color:rgba(255,181,107,.45);background:rgba(255,255,255,.06)}
+#catalog .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
+.ccard{position:relative;display:flex;flex-direction:column;text-align:left;background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:14px;padding:0;cursor:pointer;transition:transform .25s,border-color .25s,background .25s,box-shadow .25s;overflow:hidden}
+.ccard:hover{transform:translateY(-2px);border-color:rgba(255,181,107,.45);background:rgba(255,255,255,.06);box-shadow:0 10px 34px -12px var(--glow,rgba(255,180,100,.35))}
 .ccard.cur{border-color:var(--amber)}
-.ccard .orb{width:54px;height:54px;border-radius:50%;margin-bottom:12px;box-shadow:0 0 28px var(--glow,rgba(255,180,100,.35))}
+/* real render of the scene (assets/thumbs/<id>.webp); the swatch gradient underneath is the fallback */
+.ccard .shot{position:relative;width:100%;aspect-ratio:4/3;background:#000;overflow:hidden}
+.ccard .shot i{position:absolute;inset:0;background-size:cover;background-position:center;transition:transform .6s cubic-bezier(.2,.7,.2,1)}
+.ccard:hover .shot i{transform:scale(1.06)}
+.ccard .shot::after{content:'';position:absolute;inset:auto 0 0;height:38%;background:linear-gradient(transparent,rgba(6,6,10,.55));pointer-events:none}
+.ccard .txt{padding:11px 14px 13px}
 .ccard .nm{font-size:14px;font-weight:500}
 .ccard .st{font-size:11px;color:var(--dim);margin-top:3px;line-height:1.4}
 .ccard .badge{position:absolute;top:12px;right:12px;font-family:var(--mono);font-size:9px;color:var(--amber);letter-spacing:.15em}
@@ -206,7 +211,7 @@ body.cine #skipTour{display:block}
 #intro.gone{opacity:0;pointer-events:none}
 #intro .inner{text-align:center;padding:24px}
 #intro .eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.35em;color:var(--dim);text-transform:uppercase}
-#intro h1{font-weight:300;font-size:clamp(40px,8vw,96px);letter-spacing:.42em;margin:22px 0 8px;padding-left:.42em;background:linear-gradient(180deg,#fff 20%,#ffcf98 70%,#ff8a4c);-webkit-background-clip:text;background-clip:text;color:transparent}
+#intro h1{font-weight:300;font-size:clamp(24px,7vw,96px);letter-spacing:.42em;margin:22px 0 8px;padding-left:.42em;background:linear-gradient(180deg,#fff 20%,#ffcf98 70%,#ff8a4c);-webkit-background-clip:text;background-clip:text;color:transparent}
 #intro .poem{font-family:var(--serif);font-style:italic;font-weight:300;font-size:clamp(18px,2.2vw,24px);color:var(--dim);margin:0}
 #enterBtn{margin-top:46px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.3);border-radius:40px;padding:15px 34px;font-size:12px;letter-spacing:.32em;text-transform:uppercase;cursor:pointer;transition:all .4s}
 #enterBtn:not(:disabled):hover{background:rgba(255,181,107,.15);border-color:var(--amber);color:var(--amber);box-shadow:0 0 40px rgba(255,140,60,.25)}
@@ -226,6 +231,11 @@ body.cine #skipTour{display:block}
   #rayCard{top:58px;bottom:auto;right:12px;width:200px}
   #rayCard .legend{display:none}
 }
+@media (max-width:520px){
+  #catalog .cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .ccard .txt{padding:9px 10px 10px}
+  .ccard .nm{font-size:13px}
+}
 </style>
 <script type="importmap">
 { "imports": {
@@ -240,7 +250,7 @@ body.cine #skipTour{display:block}
 
 <div id="ui">
   <header id="brand">
-    <div class="logo">INTERSTELLA</div>
+    <div class="logo">INTERSTELLAR</div>
     <div class="sub" id="brandSub">Hố đen Schwarzschild · ray-tracing trắc địa null trên GPU</div>
     <div class="massline"><span id="massName"></span> · <span class="fps" id="fps"></span></div>
   </header>
@@ -351,7 +361,7 @@ body.cine #skipTour{display:block}
 <div id="intro">
   <div class="inner">
     <div class="eyebrow">Danh mục vũ trụ · dựng lại từ vật lý thật · thời gian thực</div>
-    <h1>INTERSTELLA</h1>
+    <h1>INTERSTELLAR</h1>
     <p class="poem">“Nơi ngay cả ánh sáng cũng phải cúi đầu.”</p>
     <button id="enterBtn" disabled>Đang uốn cong không-thời gian…</button>
     <div class="hint">🎧 Nên dùng tai nghe · nhạc nền được tạo theo thời gian thực</div>
@@ -1724,8 +1734,10 @@ function buildCatalog() {
     for (const s of list) {
       const c = document.createElement('button'); c.className = 'ccard'; c.dataset.id = s.id;
       const [c0, c1] = s.swatch || ['#ffffff', '#333333'];
-      const bg = s.orbCss || `radial-gradient(circle at 35% 35%, ${c0}, ${c1} 75%)`;
-      c.innerHTML = `<div class="orb" style="background:${bg};--glow:${c0}55"></div><div class="nm">${s.name}</div><div class="st">${s.subtitle || ''}</div>`;
+      const orb = s.orbCss || `radial-gradient(circle at 35% 35%, ${c0}, ${c1} 75%)`;
+      const bg = `url(assets/thumbs/${s.id}.webp) center/cover no-repeat, ${orb}`;
+      c.style.setProperty('--glow', c0 + '66');
+      c.innerHTML = `<div class="shot"><i style="background:${bg}"></i></div><div class="txt"><div class="nm">${s.name}</div><div class="st">${s.subtitle || ''}</div></div>`;
       c.onclick = () => { closeCatalog(); switchScene(s.id); };
       g.querySelector('.cards').appendChild(c);
     }
@@ -1990,7 +2002,7 @@ function frame(now) {
   composer.render();
   if (state.shot) {
     state.shot = false;
-    const a = document.createElement('a'); a.download = `interstella-${Date.now()}.png`; a.href = canvas.toDataURL('image/png'); a.click();
+    const a = document.createElement('a'); a.download = `interstellar-${Date.now()}.png`; a.href = canvas.toDataURL('image/png'); a.click();
     toast('Đã lưu ảnh chụp.', 1800);
   }
 
