@@ -1682,6 +1682,8 @@ function sceneCtx(def) {
   return sceneState.ctx = {
     THREE, shared, camera, controls, renderer, overlayScene, bbTexture: bbTex, bbColor: bbJS, bhUniforms, bhGlobals: P,
     quality, params: sceneState.params[def.id], audio: sceneAudio, toast, fmt, time: timeInfo, scene: def, syncUI,
+    // field of view in degrees; the host restores the scene default on the next scene switch
+    setFov: deg => { P.fov = Math.max(5, Math.min(110, deg)); syncUI(); },
   };
 }
 async function loadScenes() {

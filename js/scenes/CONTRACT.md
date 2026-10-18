@@ -76,6 +76,7 @@ time          { sim, wall, dt } seconds; sim = wall × global time-speed slider 
 quality       { scale, steps, k } at creation time
 audio         ping(freq, gain, pan) · click(gain, pan, brightness0to1) · tone(freq, dur, gain, pan, type) · ringdown() · started
 toast(html, ms), fmt.{dist(m), time(s), sci(x), num(x)}
+setFov(deg)   change the camera field of view (e.g. a telescope or geostationary framing); reset on scene switch
 syncUI()      refresh the panel after changing ctx.params from code (the host also calls it after actions and at 10 Hz)
 bhGlobals     the host's global settings object (read-only for scenes, e.g. timeScale, exposure)
 ```

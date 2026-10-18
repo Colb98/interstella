@@ -1,0 +1,33 @@
+Neptune data for the "Sao Hải Vương" scene (js/scenes/planets/neptune.js).
+
+neptune_opal2018.webp  1024x512 lossless WebP, equirectangular, u = east longitude / 360 (System III,
+  0..360 E), v = planetographic latitude (+90 at the top row).
+  Source: Outer Planet Atmospheres Legacy (OPAL) program, Hubble Space Telescope WFC3/UVIS, cycle 25,
+  Neptune rotation 2 (2018 Nov 5, 03:58-14:08 UT), global maps in F657N, F547M, F467M and FQ727N
+  (FITS, Minnaert-corrected, 2 px/deg), hlsp_opal_hst_wfc3-uvis_neptune-2018b_<filter>_v1_globalmap.fits
+  https://archive.stsci.edu/hlsp/opal/opal-neptune-cycle-25
+  PI A. Simon (GO13937); Simon et al. 2015, ApJ 812, 55; Wong et al. 2020. doi:10.17909/T9G593
+  Licence: CC BY 4.0. "This work used data acquired from the NASA/ESA HST Space Telescope, associated
+  with OPAL program (PI: Simon, GO13937), and archived by the Space Telescope Science Institute,
+  which is operated by the Association of Universities for Research in Astronomy, Inc., under NASA
+  contract NAS 5-26555."
+  Processing (Python/NumPy, not shipped): I/F scale factors from the OPAL README; each filter divided by
+  its zonal median (relative reflectance); limb-fit artefacts and the data edge masked (eroded 7 px);
+  residual limb/seam trends removed with a 60-deg (luminance) / 25-deg (colour ratio) longitudinal
+  high-pass; the smoothed F547M zonal profile multiplied back into R, G, B; unobserved latitudes
+  (north of ~44 N, tilted away from Earth in 2018) set to the zonal value; rows box-filtered in
+  longitude by 1/cos(lat) px toward the poles; Lanczos-resampled from 720x361.
+  Channels: R,G,B = relative reflectance in F657N, F547M, F467M (value/2: 0.5 = latitude mean);
+            A = FQ727N methane-band excess over the zonal median ((rel-1)/2): high clouds.
+  Absolute colour/brightness are applied in the shader (see below), not stored here.
+
+Calibration references (not redistributed):
+  Voyager 2 ISS images, NASA/JPL, public domain: PIA01492 (full disc, GDS), PIA00052 (GDS close-up),
+  PIA01142 (GDS, Scooter, DS2), PIA00064 (DS2 at high resolution), PIA00058 (cirrus shadows),
+  PIA00046, PIA02245. https://photojournal.jpl.nasa.gov/
+  True colour: P. G. J. Irwin et al. 2024, MNRAS 527, 11521, "Modelling the seasonal cycle of Uranus's
+  colour and magnitude, and comparison with Neptune" (re-calibrated Voyager 2 colour using HST/STIS
+  and VLT/MUSE): disc-centre chromaticity linear sRGB 0.50 : 0.84 : 1.00.
+  Zonal winds: L. A. Sromovsky et al. 1993, Icarus 105, 140 (u = -398 + 0.188 d^2 - 1.2e-5 d^4 m/s).
+  GDS shape oscillation (8 d) and drift (1.3 deg/month): Sromovsky et al. 1993; Polvani et al. 1990.
+  JWST NIRCam 2022 Neptune release (NASA/ESA/CSA/STScI) for the near-IR rendition.

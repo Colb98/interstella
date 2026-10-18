@@ -1,0 +1,52 @@
+Venus data for the "Sao Kim" scene (js/scenes/planets/venus.js). All maps: simple cylindrical,
+planetocentric latitude, EAST longitude -180..+180 (left edge = 180 W), north at the top.
+
+venus_radar_8k.webp  8192x4096 greyscale lossy WebP (q80)
+  NASA/JPL Magellan SAR, USGS Astrogeology "Venus Magellan C3-MDIR Global Mosaic 2025m"
+  (Magellan_C3-Midr_mosaic_2025m, 18775x9388, 8-bit DN). Public domain (U.S. Government work).
+  https://planetarymaps.usgs.gov/mosaic/Venus_Magellan_C3-MDIR_Global_Mosaic_2025m.tif
+  Area-averaged to 8192x4096; data gaps filled by a push-pull interpolation plus synthetic speckle.
+
+venus_maat_radar.webp  2816x2112 greyscale lossy WebP (q80)
+  NASA/JPL Magellan SAR, USGS Astrogeology "Venus Magellan LeftLook mosaic global 225m"
+  (only the window around Maat Mons / Ozza Mons was fetched with HTTP range requests):
+  https://planetarymaps.usgs.gov/mosaic/Venus_Magellan_LeftLook_mosaic_global_225m.tif
+  Window: east longitude -171.49937 .. -159.50050 (188.50 .. 200.50 E), latitude -3.49947 .. +5.49962,
+  2x2 averaged to 450 m/pixel. Public domain.
+
+venus_topo_base.webp    1024x512 lossless WebP, R*256+G = elevation in metres + 4000
+venus_topo_detail.webp  4096x2048 greyscale lossy WebP (q92): residual to the base's bilinear
+                        (texel-centre, longitude-wrapping) up-sampling, companded:
+                        x = (byte - 128)/127, residual = 2500 m * x * |x|   (rms error ~9 m)
+  NASA/JPL Magellan altimetry, USGS Astrogeology "Venus Magellan Global Topography 4641m v02"
+  (GTDR, 8192x4096 int16 metres above 6051.0 km). Public domain.
+  https://planetarymaps.usgs.gov/mosaic/Venus_Magellan_Topography_Global_4641m_v02.tif
+  Gaps filled (push-pull), re-referenced to the 6051.8 km mean radius (-800 m), Gaussian sigma 1.2 px
+  then 2x2 averaged to 4096x2048 (9.3 km/pixel).
+
+venus_uv365.webp  2048x1024 greyscale lossy WebP (q90): relative 365 nm cloud-top albedo,
+                  value = 0.78 + (1.56 - 0.78) * byte/255  (1 = image median at |lat| < 40)
+  JAXA/ISAS Akatsuki UVI Level 3 longitude-latitude maps v1.1, 365 nm filter, orbit r0057:
+  26 images 2017-08-14 03:04 UT .. 2017-08-19 15:04 UT (phase angles 0.9 - 20.6 deg).
+  Murakami, S., Ogohara, K., Takagi, M., Kashimura, H., Yamada, M., Kouyama, T., Horinouchi, T., Imamura, T.:
+  Venus Climate Orbiter Akatsuki UVI Longitude-Latitude Map Data v1.1, JAXA DARTS,
+  https://doi.org/10.17597/isas.darts/vco-00016 ; data: https://data.darts.isas.jaxa.jp/pub/pds3/extras/vco_uvi_l3_v1.1/
+  Licence: ISAS Data Policy (compatible with CC BY 4.0) — credit "JAXA/ISAS/DARTS, Akatsuki UVI team".
+  Processing: Minnaert photometric correction (k = 0.85, mu0, mu > 0.2); zonal winds measured by
+  cross-correlating image pairs 4 h apart in 2-degree latitude bands (equator 103 m/s, 20 deg 97 m/s,
+  33 deg 80 m/s, 45 deg 62 m/s, 51 deg 47 m/s, 63 deg 30 m/s, westward); every image shifted along
+  a smooth fit of that profile to the reference time 2017-08-16 21:04 UT and blended with
+  viewing-geometry and time weights. Poleward of ~74 deg (not observed) the map is a smooth fill.
+
+venus_ir226.webp  2048x1024 greyscale lossy WebP (q90): night-side 2.26 um radiance anomaly,
+                  ln(I/I_ref) = -0.75 + 1.60 * byte/255, limb darkening removed
+  JAXA/ISAS Akatsuki IR2 Level 3 longitude-latitude maps v1.0, 2.26 um filter, orbits r0024-r0025:
+  27 images 2016-08-15 .. 2016-08-30 (night side only, incidence > 104 deg, emission angle < 72 deg).
+  https://data.darts.isas.jaxa.jp/pub/pds3/extras/vco_ir2_l3_v1.0/  Licence: ISAS Data Policy (CC BY 4.0
+  compatible) — credit "JAXA/ISAS/DARTS, Akatsuki IR2 team".
+  Processing: per image ln I fitted against 1/mu and a terminator stray-light term and the fit removed,
+  large scales (>~15 deg) of each image replaced by the all-image zonal mean, lower-cloud winds measured by
+  cross-correlation (~76 m/s at low latitudes, falling poleward of ~48 deg), images shifted to a common
+  reference time and blended (noisy images down-weighted). Poleward of ~52 deg: smooth fill (the shader adds the polar collar and vortex).
+
+Built with Python (NumPy, SciPy, Pillow, h5py); scripts not shipped.

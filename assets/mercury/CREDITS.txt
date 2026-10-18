@@ -1,0 +1,41 @@
+Mercury data for the "Sao Thủy" scene (js/scenes/planets/mercury.js).
+All source products are NASA / USGS data in the public domain (U.S. Government works; MESSENGER
+data courtesy NASA / Johns Hopkins University Applied Physics Laboratory / Carnegie Institution of
+Washington, distributed by the PDS Imaging Node and USGS Astrogeology Science Center).
+Map projection of every file: equirectangular (simple cylindrical), planetocentric latitude,
+east-positive longitude -180..+180 (left to right), north up, sphere R = 2439.4 km.
+
+mercury_lum_4k.jpg  4096x2048 greyscale JPEG q84
+  Luminance (0.6 x 750 nm + 0.4 x 430 nm) of the MESSENGER MDIS 3-colour basemap ("MD3",
+  R/G/B = 1000/750/430 nm), 64 pixels/degree (665 m/px), PDS data set MESS-H-MDIS-5-RDR-MD3-V1.0:
+  https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Mercury_MESSENGER_MDIS_Basemap_MD3Color_Mosaic_Global_665m.tif
+  (USGS Astrogeology: "Mercury MESSENGER MDIS Basemap MD3 Color Global Mosaic 665m").
+  Polar no-data pixels filled with the mean of their latitude row. Area-averaged (box) to 4096x2048.
+
+mercury_md3_1k.jpg  1024x512 RGB JPEG q92
+  The same MD3 3-colour basemap, area-averaged; used only for the (desaturated) natural colour.
+
+mercury_enh_2k.jpg  2048x1024 RGB JPEG q90
+  MESSENGER MDIS enhanced-colour basemap (R = PC2, G = PC1, B = 430/1000 nm ratio), 665 m/px:
+  https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Mercury_MESSENGER_MDIS_Basemap_EnhancedColor_Mosaic_Global_665m.tif
+  (USGS Astrogeology: "Mercury MESSENGER MDIS Basemap Enhanced Color Global Mosaic 665m").
+
+mercury_dem_2k.webp  2048x1024 lossless WebP     (DEM base)
+mercury_dem_detail_4k.jpg  4096x2048 greyscale JPEG q88   (DEM detail)
+  USGS MESSENGER global DEM, 665 m/px, v2 (Becker et al. 2016, "First global digital elevation model
+  of Mercury", LPSC 47, #2959), heights relative to the 2440 km sphere:
+  https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/Mercury_Messenger_USGS_DEM_Global_665m_v2.tif
+  Rolled from 0..360 to -180..+180 E, area-averaged to 4096x2048 (3.7 km/px). Stored in two parts to
+  fit the size budget:
+    base:   2048x1024 area average, R,G = round((metres + 12000) / 8) as a 16-bit big-endian integer.
+    detail: 4096x2048, value = 128 + round((DEM - bilinear upsample of base) / 6 m), clamped 0..255.
+  Reconstruction: DEM = bilinear(base) + (detail - 128) * 6 m  (rms error 15 m).
+
+Ephemeris and rotation used by the scene (no data files):
+  JPL "Keplerian Elements for Approximate Positions of the Major Planets" (E. M. Standish),
+  https://ssd.jpl.nasa.gov/planets/approx_pos.html ; IAU WGCCRE 2015 rotation model for Mercury
+  (Archinal et al. 2018, Celest. Mech. Dyn. Astron. 130:22). Phase curve: Mallama, Wang & Howard 2002,
+  Icarus 155, 253.
+
+Reference images used only for visual comparison (not shipped): NASA/JHUAPL/CIW PIA12371,
+PIA16853, PIA17280.

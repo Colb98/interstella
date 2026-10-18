@@ -1,4 +1,4 @@
-Earth data for the "Trái Đất" scene (js/scenes/rocky.js) — all public domain (U.S. Government works).
+Earth data for the "Trái Đất" scene (js/scenes/planets/earth.js, formerly rocky.js) — all public domain (U.S. Government works).
 
 earth_color_8k.jpg  8192x4096 sRGB JPEG q90
   NASA Earth Observatory, Blue Marble: Next Generation, base map (no shaded relief, no clouds),
@@ -30,3 +30,32 @@ earth_clouds_4k.jpg  4096x2048 greyscale JPEG
   https://eoimages.gsfc.nasa.gov/images/imagerecords/57000/57747/cloud_combined_8192.tif
 
 Built with Pillow + NumPy (scripts not shipped).
+
+--- added for the moving Earth (js/scenes/planets/earth.js) ---
+
+earth_color_jan_4k.jpg  4096x2048 sRGB JPEG q88
+  NASA Earth Observatory, Blue Marble: Next Generation base map, January 2004
+  (world.200401.3x5400x2700.jpg), Reto Stöckli / NASA GSFC. Lanczos-resampled to 4096x2048.
+  Blended with the June map by date (winter snow cover, seasonal vegetation).
+
+earth_storms.jpg  2048x1024 greyscale JPEG (4x2 cells of 512x512)
+  Seven real storms from NASA GIBS (Global Imagery Browse Services) WMS, VIIRS Corrected
+  Reflectance True Color (Suomi NPP / NOAA-20), public domain:
+    cell 0  Hurricane Irma, 2017-09-05, centre 16.95N 59.0W, half-size 8 deg   (VIIRS_SNPP)
+    cell 1  Hurricane Florence, 2018-09-11, 27.5N 66.3W, 8 deg                 (VIIRS_SNPP)
+    cell 2  North Pacific cyclone, 2022-02-01/02, 48.2N 174.6W, 13 deg        (VIIRS_SNPP)
+    cell 3  Southern Indian Ocean cyclone, 2026-10-16, 51.0S 109.6E, 13 deg   (VIIRS_NOAA20)
+    cell 4  Developing West-Pacific tropical storm, 2026-10-16, 11.0N 152.0E, 8 deg (VIIRS_NOAA20)
+    cell 5  Southeast Pacific cut-off low off Chile, 2026-10-16, 42.6S 92.5W, 11 deg (VIIRS_NOAA20)
+    cell 6  North Atlantic cyclone, 2023-03-10, 50.3N 33.9W, 11 deg          (VIIRS_SNPP)
+  Each cell is storm-centred azimuthal-equidistant (north up, x east), half-size as listed.
+  Cloud brightness = true-colour luminance above the clear ocean / Blue Marble land surface,
+  whiteness-weighted, tone-matched to the Blue Marble cloud composite (0.84 * v^1.5).
+  https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi
+
+moon_lroc_1k.jpg  1024x512 sRGB JPEG
+  NASA Scientific Visualization Studio, CGI Moon Kit (svs.gsfc.nasa.gov/4720), LRO LROC WAC colour
+  mosaic, lroc_color_poles_1k.jpg. Ernie Wright / NASA GSFC SVS. Public domain.
+
+Optional at runtime (toggle "Mây thật"): yesterday's VIIRS_NOAA20_CorrectedReflectance_TrueColor
+global mosaic (4096x2048) fetched from the NASA GIBS WMS; nothing is stored.

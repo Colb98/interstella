@@ -1,0 +1,31 @@
+Jupiter data for the "Sao Mộc" scene (js/scenes/planets/jupiter.js).
+
+Source: Hubble Space Telescope, Outer Planet Atmospheres Legacy (OPAL) program, Cycle 32, WFC3/UVIS global maps
+of Jupiter, 11-12 December 2025 (rotation 1 = "2025a", rotation 2 = "2025b").
+  Credit: NASA, ESA, A. A. Simon (NASA GSFC), M. H. Wong (UC Berkeley) and the OPAL team.
+  Licence: CC BY 4.0 (as stated in the FITS headers).
+  https://archive.stsci.edu/hlsp/opal  ->  https://archive.stsci.edu/hlsp/opal/opal-jupiter-cycle-32
+  Files used (3600x1800, 10 px/deg, cylindrical, planetographic latitude, Minnaert-corrected I/F):
+    hlsp_opal_hst_wfc3-uvis_jupiter-2025a_{f631n,f502n,f467m,f395n,fq889n,f275w}_v1_globalmap.fits
+    hlsp_opal_hst_wfc3-uvis_jupiter-2025{a,b}_f395n-f502n-f631n_v1_globalmap.tif  (wind measurement, colour stretch fit)
+
+jupiter_vis.jpg  3600x1800, linear encoding: I/F = 0.3 + 0.7 * value
+  True colour from calibrated I/F (FITS x the readme's I/F factors): R = 631 nm, G = 0.65*502 + 0.35*631,
+  B = 0.85*467 + 0.15*502. The disc-mean colour ratios already agree with Karkoschka's (1998) full-disc albedo
+  (scale factors 1.00 / 0.98 applied). Poleward of 60 deg the row means are tied to a smooth trend (the limb
+  Minnaert correction over-brightens there) and poleward of ~74 deg the map fades to the 73 deg row mean
+  (the scene draws the polar cyclone fields there, after Juno/JunoCam: PIA21641, PIA22335/22336, PIA24967).
+  The Great Red Spot (38.1 E, 22.8 S) and Oval BA (147.3 E, 33.6 S) are in-painted with the same latitudes
+  from 140 deg / -62 deg of longitude away, so the flow model can move them as separate vortices.
+jupiter_ir.jpg  3600x1800: R = I/F(889 nm, CH4) / 0.22, G = I/F(275 nm) / 0.42, B = I/F(395 nm) / 0.8 (linear),
+  same in-painting.
+jupiter_vortices.jpg  720x640 atlas, the original (not in-painted) neighbourhoods: GRS lon +-24 x lat +-16 deg
+  at (0,0), Oval BA +-12 x +-8 deg at (480,0); rows 320-639: the same for the IR channels.
+jupiter_profiles.json  0.5 deg steps:
+  wind         zonal wind (m/s, System III): measured by cross-correlating the 2025a and 2025b maps latitude by
+               latitude (separation one System III rotation, 35 730 s), blended with the Voyager/Cassini profile
+               (Limaye 1986, Porco et al. 2003) where the correlation is poor (> 73 deg, weak texture);
+  windMeasured, quality   the raw measurement and its normalised correlation peak;
+  meanVis / meanIR        longitudinal mean I/F per latitude; turb  relative small-scale cloud contrast.
+
+Built with Python (NumPy + Pillow) from the files above; scripts not shipped.

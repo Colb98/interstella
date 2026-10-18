@@ -72,33 +72,159 @@ float granule(vec3 p, float t, float seed){
   return mix(body, -1.0 - 0.4 * smoothstep(0.35, 0.0, sqrt(d2) - sqrt(d1)) * (1.0 - life), lane) - 0.2;
 }
 #if KIND == 0
-// Solar granulation, closer to DKIST/Hinode imagery: a multiplicatively weighted Voronoi (each cell has
-// its own size, so granules range ~0.7–1.5× and edges become curved), brightness peaking in the cell
-// middle (hot up-flow) and falling into lanes of varying width; some large granules "explode" with a
-// dark centre; magnetic bright points sit in the lanes; mesogranular-scale brightness modulation.
-float sunGranule(vec3 p, float t, float seed){
-  vec3 i = floor(p), f = fract(p);
-  float d1 = 8.0, d2 = 8.0;
-  vec3 h1 = vec3(0.0), g1 = vec3(0.0); float w1 = 1.0;
-  for (int z = -1; z <= 1; z++) for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++){
-    vec3 o = vec3(float(x), float(y), float(z));
-    vec3 h = hash33(i + o + seed);
-    vec3 g = hash33(i + o + seed + 71.3);
-    float w = 0.75 + 0.6 * g.x;                                   // per-granule size
-    vec3 r = o + 0.5 + 0.38 * sin(TAU * h + t * (0.6 + 0.8 * h.zxy)) - f;
-    float d = length(r) / w;
-    if (d < d1){ d2 = d1; d1 = d; h1 = h; g1 = g; w1 = w; } else if (d < d2) d2 = d;
+// ==== The living photosphere =======================================================================
+// Everything below runs on solar clocks (seconds on the Sun, see sunClock() in JS) in a reference frame that
+// turns with the equator. No pattern is a texture that slides: every convective cell is an individual that is
+// born, lives and dies, and is carried by the flows of the larger scales while it lives; time-dependent noise
+// uses time as a 4th dimension (snoise4), so it evolves in place instead of translating.
+uniform vec4 uClk;   // x: fast clock τf mod P1, y: floor(τf/P1) mod 4096, z: slow clock τs mod P2, w: floor(τs/P2) mod 4096  [solar s]
+uniform vec2 uRef;   // cos, sin of the reference frame's angle Ω_eq·τ
+uniform vec2 uDOm;   // Ω(φ) − Ω_eq = x·sin²φ + y·sin⁴φ  [rad per solar second]
+#define CLKP1 1048576.0
+#define CLKP2 67108864.0
+uniform vec2 uTp;    // the fast / slow clocks folded back and forth (ping-pong), for noise that evolves in place
+#define TF uClk.x
+#define TS uClk.z
+#define TPF uTp.x
+#define TPS uTp.y
+// 4D simplex noise (Ashima / Gustavson): the 4th coordinate is time, so a pattern evolves in place without any
+// drift or change of scale. Range ~[-1, 1].
+float permute(float x){ return mod(((x * 34.0) + 1.0) * x, 289.0); }
+float taylorInvSqrt(float r){ return 1.79284291400159 - 0.85373472095314 * r; }
+vec4 grad4(float j, vec4 ip){
+  vec4 p, s;
+  p.xyz = floor(fract(vec3(j) * ip.xyz) * 7.0) * ip.z - 1.0;
+  p.w = 1.5 - dot(abs(p.xyz), vec3(1.0));
+  s = vec4(lessThan(p, vec4(0.0)));
+  p.xyz = p.xyz + (s.xyz * 2.0 - 1.0) * s.www;
+  return p;
+}
+float snoise4(vec4 v){
+  const vec4 C = vec4(0.138196601125011, 0.276393202250021, 0.414589803375032, -0.447213595499958);
+  vec4 i = floor(v + dot(v, vec4(0.309016994374947451)));
+  vec4 x0 = v - i + dot(i, C.xxxx);
+  vec4 i0; vec3 isX = step(x0.yzw, x0.xxx); vec3 isYZ = step(x0.zww, x0.yyz);
+  i0.x = isX.x + isX.y + isX.z; i0.yzw = 1.0 - isX;
+  i0.y += isYZ.x + isYZ.y; i0.zw += 1.0 - isYZ.xy;
+  i0.z += isYZ.z; i0.w += 1.0 - isYZ.z;
+  vec4 i3 = clamp(i0, 0.0, 1.0), i2 = clamp(i0 - 1.0, 0.0, 1.0), i1 = clamp(i0 - 2.0, 0.0, 1.0);
+  vec4 x1 = x0 - i1 + C.xxxx, x2 = x0 - i2 + C.yyyy, x3 = x0 - i3 + C.zzzz, x4 = x0 + C.wwww;
+  i = mod(i, 289.0);
+  float j0 = permute(permute(permute(permute(i.w) + i.z) + i.y) + i.x);
+  vec4 j1 = permute(permute(permute(permute(i.w + vec4(i1.w, i2.w, i3.w, 1.0)) + i.z + vec4(i1.z, i2.z, i3.z, 1.0))
+            + i.y + vec4(i1.y, i2.y, i3.y, 1.0)) + i.x + vec4(i1.x, i2.x, i3.x, 1.0));
+  vec4 ip = vec4(1.0 / 294.0, 1.0 / 49.0, 1.0 / 7.0, 0.0);
+  vec4 p0 = grad4(j0, ip), p1 = grad4(j1.x, ip), p2 = grad4(j1.y, ip), p3 = grad4(j1.z, ip), p4 = grad4(j1.w, ip);
+  vec4 nr = taylorInvSqrt(vec4(dot(p0, p0), dot(p1, p1), dot(p2, p2), dot(p3, p3)));
+  p0 *= nr.x; p1 *= nr.y; p2 *= nr.z; p3 *= nr.w; p4 *= taylorInvSqrt(dot(p4, p4));
+  vec3 m0 = max(0.6 - vec3(dot(x0, x0), dot(x1, x1), dot(x2, x2)), 0.0);
+  vec2 m1 = max(0.6 - vec2(dot(x3, x3), dot(x4, x4)), 0.0);
+  m0 *= m0; m1 *= m1;
+  return 49.0 * (dot(m0 * m0, vec3(dot(p0, x0), dot(p1, x1), dot(p2, x2))) + dot(m1 * m1, vec2(dot(p3, x3), dot(p4, x4))));
+}
+vec3 toRef(vec3 q){ return vec3(uRef.x * q.x - uRef.y * q.z, q.y, uRef.y * q.x + uRef.x * q.z); }
+float dOmega(float s2){ return uDOm.x * s2 + uDOm.y * s2 * s2; }
+// horizontal basis: e1 points east (direction of rotation), e2 north; damped within ~17° of the poles
+void tBasis(vec3 n, out vec3 e1, out vec3 e2){ vec3 a = vec3(-n.z, 0.0, n.x); e1 = a / max(length(a), 0.3); e2 = cross(n, e1); }
+// Life of the cell living in lattice cell c: lifetimes Tmin…Tmin+Tspan, staggered phases. Each lifetime is an
+// integer fraction of the clock period P, so the clock can wrap without any jump.
+// Returns (life fraction u 0→1, age [s], cycle index — a new seed position for every life).
+vec3 cellLife(vec3 c, float t, float wraps, float P, float Tmin, float Tspan){
+  vec3 h = hash33(c + 0.37);
+  float nC = floor(P / (Tmin + Tspan * h.x));
+  float ph = t * (nC / P) + h.y;
+  float u = fract(ph);
+  return vec3(u, u * P / nC, mod(floor(ph) + wraps * nC, 4096.0));
+}
+// Supergranulation (~30 Mm cells living 1–2 days), built like the granulation one scale up: x in cell units,
+// scale = cell units per R☉. Returns (distance to the cell border e = F2−F1, normalised radius 0 centre → 1 border,
+// distance from the centre) and the unit vector pointing away from the cell centre (the horizontal outflow).
+vec3 superGran(vec3 x, vec3 n, float scale, float dOm, out vec3 dir){
+  vec3 c0 = floor(x);
+  float slab = 0.5 + 0.5 * dot(abs(n), vec3(1.0));
+  vec3 drift = vec3(n.z, 0.0, -n.x) * (dOm * scale);   // differential rotation relative to the frame
+  float d1 = 9.0, d2 = 9.0; vec3 v1 = vec3(0.0, 0.0, 1.0);
+  for (int k = 0; k < 27; k++){
+    vec3 c = c0 + vec3(float(k % 3), float((k / 3) % 3), float(k / 9)) - 1.0;
+    if (abs(dot(c + 0.5 - x, n)) > slab) continue;   // the whole lattice cell lies outside the surface shell
+    vec3 L = cellLife(c, uClk.z, uClk.w, CLKP2, 86400.0, 86400.0);
+    float w = smoothstep(0.0, 0.25, L.x) * smoothstep(1.0, 0.75, L.x);
+    if (w < 0.004) continue;
+    vec3 v = c + hash33(c + L.z * vec3(0.371, 1.713, 0.917) + 5.1) - x;
+    if (abs(dot(v, n)) > 0.5) continue;               // only cells centred within ½ unit of the surface
+    v += drift * L.y;
+    v -= n * dot(v, n);
+    float d = length(v) - (0.5 * w - 0.8 * (1.0 - w));   // growing / shrinking cells (additive weights)
+    if (d < d1){ d2 = d1; d1 = d; v1 = v; } else if (d < d2) d2 = d;
   }
-  float life = 0.5 + 0.5 * sin(t * 0.45 + TAU * h1.y);
-  float prof = 1.0 - smoothstep(0.0, 0.85, d1);                  // dome: hot up-flow in the middle, cooling outward
-  float body = (0.55 + 0.45 * h1.x) * (0.5 + 0.5 * life) * (0.0 + 1.0 * pow(prof, 1.4));
-  if (g1.y > 0.8 && w1 > 1.1) body *= 1.0 - 0.65 * exp(-d1 * d1 / 0.048);   // exploding granule
-  float sn = snoise(p * 0.7 + seed);
-  float lw = 0.16 + 0.2 * (0.5 + 0.5 * sn);                                 // lanes of varying width, soft edges
-  float lane = 1.0 - smoothstep(0.0, lw, d2 - d1);
-  lane *= lane * (3.0 - 2.0 * lane);
-  float bp = lane * smoothstep(0.55, 0.9, snoise(p * 2.7 + seed * 1.7)); // bright points in the lanes
-  return mix(body, -0.8 - 0.3 * sn, lane * lane) + 1.6 * bp + 0.1;
+  float e = d2 - d1, r = length(v1);
+  dir = -v1 / max(r, 1e-4);
+  return vec3(e, clamp(r / (r + 0.5 * e), 0.0, 1.0), r);
+}
+// Granulation (G-band / continuum, DKIST/SST-like). An additively weighted Voronoi of living granules (1 unit ≈
+// 1.09 Mm): each is born as a point, swells and pushes its neighbours' lanes back, lives 5–12 min while being
+// carried by the mesogranular and supergranular outflows and by differential rotation, and then either fades,
+// squeezed out by its neighbours, or — a third of the big ones — "explodes": its centre darkens and it splits
+// into 2–3 fragments that move apart. vel: horizontal flow at x (units per solar second); lwk: lane-width factor.
+// Returns (brightness ≈ −1…1, lane mask).
+vec2 granulation(vec3 x, vec3 n, vec3 vel, float lwk){
+  // search a 4×4×4 block of lattice cells centred on x (at least 1.5 cells around it), so that with the
+  // radius and drift limits below the three nearest granules are always found: no seams even at ~150 px/granule
+  vec3 c0 = floor(x - 0.5) - 1.0;
+  float slab = 0.5 + 0.5 * dot(abs(n), vec3(1.0));
+  float d1 = 9.0, d2 = 9.0, d3 = 9.0, A1 = 0.0, dk1 = 0.0, w1 = 1.0, in1 = 9.0, sp1 = 0.0, r1 = 0.0;
+  for (int k = 0; k < 64; k++){
+    vec3 c = c0 + vec3(float(k % 4), float((k / 4) % 4), float(k / 16));
+    if (abs(dot(c + 0.5 - x, n)) > slab) continue;   // the whole lattice cell lies outside the surface shell
+    vec3 L = cellLife(c, uClk.x, uClk.y, CLKP1, 300.0, 420.0);
+    float u = L.x;
+    float w = smoothstep(0.0, 0.3, u) * smoothstep(1.0, 0.8, u);
+    if (w < 0.004) continue;
+    vec3 g = hash33(c + L.z * vec3(0.371, 1.713, 0.917));
+    vec3 v = c + g - x;
+    if (abs(dot(v, n)) > 0.5) continue;                 // seeds within ½ unit of the surface: ≈ 1 granule per unit²
+    vec3 g2 = fract(g.yzx * 41.73 + g.zxy * 17.31 + g * 7.13);   // more per-life random numbers
+    vec3 dr = (vel + (g2 - 0.5) * 6e-4) * L.y;          // carried by the flows (+ its own ~0.3 km/s wander)
+    v += dr * min(1.0, 0.4 / max(length(dr), 1e-4));     // (at most 0.4 units ≈ 430 km in one life)
+    v -= n * dot(v, n);
+    float a = 0.75 + 0.5 * g2.z;                       // size
+    float R = 0.42 * a * w - 0.7 * (1.0 - w);           // ≤ 0.53: growing granules push their lanes outward
+    float A = (0.75 + 0.25 * g2.y) * (0.6 + 0.4 * w) * (1.0 - 0.25 * u);   // young granules: strongest up-flow
+    float d = length(v) - R, inner = 9.0, sp = 0.0, dk = 0.0, Ru = R;
+    if (a > 0.95 && g2.x < 0.45){
+      // exploding granule: the centre darkens, then 2–3 fragments move apart. The fragments ("sisters") form
+      // one cell whose outline is the union of theirs; the lane between them deepens as they separate.
+      float us = 0.45 + 0.12 * g2.y, ns = g2.x < 0.13 ? 3.0 : 2.0;
+      sp = smoothstep(us, 1.0, u);
+      dk = smoothstep(us - 0.25, us, u) * (1.0 - 0.5 * sp);   // the up-flow in the middle weakens
+      vec3 e = normalize(cross(n, g2 - 0.5) + 1e-5) * (0.45 * a * sqrt(sp));
+      float Rs = R * (1.0 - 0.3 * sp), s1 = 9.0, s2 = 9.0;
+      for (int j = 0; j < 3; j++){
+        if (float(j) >= ns) break;
+        float an = TAU * float(j) / ns;
+        float ds = length(v + e * cos(an) + cross(n, e) * sin(an)) - Rs;
+        if (ds < s1){ s2 = s1; s1 = ds; } else if (ds < s2) s2 = ds;
+      }
+      d = s1; inner = s2 - s1; Ru = Rs;
+    }
+    if (d < d1){ d3 = d2; d2 = d1; d1 = d; A1 = A; dk1 = dk; w1 = w; in1 = inner; sp1 = sp; r1 = d + Ru; } else if (d < d2){ d3 = d2; d2 = d; } else if (d < d3) d3 = d;
+  }
+  // Intensity profile (in units of the temperature perturbation; I/I_mean ≈ 1 + 0.3·g): a bright dome
+  // (centre ≈ 1.2) that darkens smoothly over its outer ~30 % to ≈ 1.0 at the edge, diffuse lanes ~200–330 km
+  // wide (≈ 0.7) and darker knots where several lanes meet (≈ 0.55).
+  float h = 0.5 * (d2 - d1);                           // distance to the middle of the nearest lane (1 unit ≈ 1.09 Mm)
+  float s = clamp(r1 / max(r1 + h, 1e-3), 0.0, 1.0);   // 0 at the up-flow centre → 1 at the granule's edge
+  float dome = 1.0 - smoothstep(0.5, 1.05, s);
+  dome *= 2.0 - dome;                                  // flat-topped
+  float body = A1 * (1.15 * dome - 0.1);
+  // exploding granule: the centre darkens and the rim stays bright (a ring), before the fragments separate
+  body += A1 * dk1 * (0.5 * exp(-pow((s - 0.72) / 0.16, 2.0)) - 1.1 * exp(-s * s / 0.16));
+  float lw = (0.13 + 0.07 * (1.0 - w1)) * lwk;         // lane half-width (lanes ≈ 0.25–0.4 units, diffuse)
+  float lane = 1.0 - smoothstep(0.0, lw, h);
+  lane = max(lane, (1.0 - smoothstep(0.0, lw * 0.9, 0.5 * in1)) * smoothstep(0.0, 0.5, sp1));   // the splitting lane
+  float knot = 1.0 - smoothstep(0.0, lw * 2.6, 0.5 * (d3 - d1));                             // lane junctions
+  float g = mix(body, -1.0 - 0.6 * knot, max(lane, 0.8 * knot));
+  return vec2(g - 0.15, lane);
 }
 // ---- prominences, rendered as volumes (see promMarch) ------------------------------------------------
 uniform vec4 uPrA[NP];   // foot-point centre C (unit vector, world), type (0 hedgerow, 1 flux-rope arch, 2 loop arcade, 3 erupting rope)
@@ -120,10 +246,74 @@ vec3 lut171(float x){ x = max(x, 0.0); return vec3(x, 0.6 * pow(x, 1.15), 0.1 * 
 vec3 lutView(float x){ return uView < 1.5 ? lutHa(x) : (uView < 2.5 ? lut304(x) : lut171(x)); }
 #endif
 vec3 warp3(vec3 p){ return p + 0.45 * vec3(snoise(p * 0.31), snoise(p * 0.31 + 17.1), snoise(p * 0.31 + 31.7)); }
-// a finer second warp makes granule borders irregular and rounded instead of straight polygon edges
-vec3 warpFine(vec3 p){ return p + 0.16 * vec3(snoise(p * 1.6 + 5.3), snoise(p * 1.6 + 41.2), snoise(p * 1.6 + 77.9)); }
 
 #if KIND <= 1
+#if KIND == 0
+// ---- sunspots (SST/DKIST-like) -----------------------------------------------------------------------------
+// In the spot's own polar frame (r in spot radii). The penumbra is a few hundred thin, slightly curved filaments,
+// each with a dark core flanked by bright edges (Scharmer et al. 2002) and a bright head (a penumbral grain) at its
+// inner end; every filament ends at its own radius, so the outer boundary is ragged and interleaves with the
+// granulation. Bright knots move inward in the inner penumbra (~0.8 km/s) and outward with the Evershed flow in
+// the outer (~4 km/s). The umbra is ~4 000 K (~15 % of the photospheric intensity, dark red-brown) with flickering
+// umbral dots, and some spots are crossed by a light bridge of weak, elongated convection.
+// Returns the temperature factor; fac collects facular strength, gsup how much granulation survives.
+float spotField(vec3 q, float fp, inout float fac, inout float gsup){
+  float tf = 1.0;
+  for (int i = 0; i < NS; i++){
+    vec4 s = uSpot[i], x = uSpotX[i];
+    if (x.w <= 0.0) continue;
+    vec3 dv = q - s.xyz;
+    float d2 = dot(dv, dv);
+    if (d2 > x.w * x.w * 4.0) continue;
+    fac += x.z * exp(-d2 / (x.w * x.w));
+    if (s.w <= 0.0) continue;
+    float dist = sqrt(d2);
+    float wob = 1.0 + 0.16 * snoise(dv * (2.2 / s.w) + x.y) + 0.06 * snoise(dv * (7.0 / s.w) + x.y);
+    float r = dist / (s.w * wob);
+    if (r > 1.3) continue;
+    vec3 e1 = tangentU(s.xyz), e2 = cross(s.xyz, e1);
+    vec2 uv = vec2(dot(dv, e1), dot(dv, e2)) / s.w;
+    float um = x.x, dMm = dist * 696.0;
+    // ---- penumbral filaments
+    // ~0.7 Mm between filaments, so big spots have more of them (x.w/3.2 ≈ the spot's nominal radius)
+    float NFIL = floor(clamp(TAU * x.w / 3.2 * 696.0 / 0.7, 70.0, 420.0));
+    float ac = atan(uv.y, uv.x) / TAU * NFIL + 1.5 * sin(r * 2.6 + x.y) + 1.6 * snoise(vec3(uv * 2.3, x.y + TF / 20000.0));
+    float jf = floor(ac), fx = ac - jf - 0.5, sx = fx < 0.0 ? -1.0 : 1.0;
+    float lodF = 1.0 - smoothstep(0.25, 0.8, fp / (TAU * s.w * max(r, 0.3) / NFIL));   // filaments ≳ 1.5 px
+    vec3 hj = hash33(vec3(mod(jf, NFIL), x.y, 3.7)), hn = hash33(vec3(mod(jf + sx, NFIL), x.y, 3.7));
+    float head = um + 0.03 + 0.16 * hj.x * hj.x, tail = 0.84 + 0.36 * hj.y, tailN = 0.84 + 0.36 * hn.y;
+    float alongJ = smoothstep(head - 0.05, head + 0.01, r) * smoothstep(tail + 0.03, tail - 0.06, r);
+    float alongN = smoothstep(tailN + 0.03, tailN - 0.06, r);
+    float pm = mix(alongJ, alongN * step(um + 0.1, r), 0.5 * smoothstep(0.0, 0.5, abs(fx)));   // continuous across filaments
+    pm = mix(smoothstep(1.12, 0.9, r), pm, lodF);
+    float wj = 0.035 + 0.07 * hj.z;                                          // each filament its own width
+    float body = exp(-fx * fx / wj), core = exp(-fx * fx / (0.08 * wj)) * smoothstep(head, head + 0.12, r);
+    float inner = 1.0 - smoothstep(0.45, 0.8, (r - head) / max(tail - head, 0.1));
+    float knots = mix(pow(0.5 + 0.5 * sin((dMm + 0.0008 * TF) * 4.2 + TAU * hj.z), 6.0),     // inward-moving grains
+                      pow(0.5 + 0.5 * sin((dMm - 0.004 * TF) * 3.0 + 9.0 * hj.z), 6.0), 1.0 - inner);   // Evershed
+    float hd = exp(-pow((r - head - 0.02) / 0.04, 2.0));
+    float lit = step(0.2, hj.x) * (0.45 + 0.75 * fract(hj.z * 7.3));          // brightness; some filaments missing
+    float filI = lit * (0.85 * body - 0.6 * core + body * (0.6 * hd + 0.35 * knots));
+    float tp = 0.92 + 0.075 * mix(0.3, filI, lodF);
+    // ---- umbra, umbral dots, light bridge
+    float umb = smoothstep(um + 0.04, um - 0.04, r);
+    float dots = lodF * smoothstep(0.55, 0.95, snoise(dv * (60.0 / s.w) + s.xyz * (TF / 500.0) + x.y * 3.0));
+    float tu = uSpotT.x * (1.0 + 0.13 * dots);
+    if (fract(x.y * 3.71) < 0.55){
+      float pb = x.y * 5.1;
+      vec2 db = vec2(cos(pb), sin(pb));
+      float vb = dot(uv, vec2(-db.y, db.x)) + 0.07 * sin(dot(uv, db) * 6.0 + x.y);
+      float lb = exp(-vb * vb / 0.009) * step(fract(x.y * 1.37), 0.8);
+      float cell = snoise(vec3(uv * vec2(9.0, 22.0), x.y + TF / 400.0));
+      tu = mix(tu, 0.84 + 0.06 * cell * lodF, lb * smoothstep(1.0, 0.6, r));
+    }
+    float P = max(max(umb, pm), smoothstep(um + 0.14, um + 0.04, r));   // spot area
+    tf = min(tf, mix(1.0, mix(tp, tu, umb), P));
+    gsup = min(gsup, 1.0 - P);
+  }
+  return tf;
+}
+#else
 // ---- sunspots / starspots ------------------------------------------------------------------------
 // Strong magnetic flux tubes suppress convection: the umbra is ~1500 K cooler than the photosphere,
 // the penumbra is made of radial filaments (inclined field), and the surrounding plage/faculae are hot
@@ -139,23 +329,26 @@ float spotField(vec3 q, float fp, inout float fac, inout float gsup){
     fac += x.z * exp(-d2 / (x.w * x.w));
     if (s.w <= 0.0) continue;
     float dist = sqrt(d2);
-    float wob = 1.0 + 0.2 * snoise(q * (2.2 / s.w) + x.y) + 0.08 * snoise(q * (7.0 / s.w) + x.y);
+    // all spot structure lives in the spot's own frame (dv), so it travels with the spot
+    float wob = 1.0 + 0.2 * snoise(dv * (2.2 / s.w) + x.y) + 0.08 * snoise(dv * (7.0 / s.w) + x.y);
     float r = dist / (s.w * wob);
     if (r > 1.25) continue;
     vec3 e1 = tangentU(s.xyz), e2 = cross(s.xyz, e1);
     float ang = atan(dot(dv, e2), dot(dv, e1));
     float lodF = 1.0 - smoothstep(0.012 * s.w, 0.04 * s.w, fp);
-    float fil = snoise(vec3(cos(ang) * 24.0, sin(ang) * 24.0, r * 2.2 + x.y)) * lodF;
+    vec2 cs = vec2(cos(ang), sin(ang));
+    float fil = snoise(vec3(cs * 24.0, r * 2.2 + x.y)) * lodF;
+    float dots = lodF * smoothstep(0.6, 0.95, snoise(dv * (60.0 / s.w) + x.y * 3.0));   // umbral dots
     float pen = smoothstep(1.0, uSpotT.z > 0.001 ? 0.9 : 0.7, r);   // M-dwarf spots: soft edges, little penumbra
     float umb = smoothstep(x.x + 0.05, x.x - 0.05, r);
     float tp = uSpotT.y * (1.0 + uSpotT.z * fil);
-    float dots = lodF * smoothstep(0.6, 0.95, snoise(q * (60.0 / s.w) + x.y * 3.0));   // umbral dots
     float tu = uSpotT.x * (1.0 + 0.06 * dots);
     tf = min(tf, mix(1.0, mix(tp, tu, umb), pen));
     gsup = min(gsup, 1.0 - pen);
   }
   return tf;
 }
+#endif
 #endif
 
 #if KIND == 1
@@ -181,6 +374,63 @@ void flareField(vec3 q, inout float T, inout vec3 glow){
 #endif
 
 #if KIND <= 1
+#if KIND == 0
+// The solar photosphere: granulation carried by meso- and supergranular flows, the magnetic network on the
+// supergranule borders, spots and faculae. Brightness is a temperature perturbation turned into radiance by emit().
+vec3 photosphere(vec3 q, float mu, float fp){
+  vec3 n = toRef(q);                         // position in the frame turning with the equator
+  float dOm = dOmega(n.y * n.y);
+  float cs = 1.0 / uGranF, sgF = uGranF / 28.0;
+  float lodG = 1.0 - smoothstep(0.3 * cs, 1.1 * cs, fp);    // granules smaller than a pixel average out
+  float lodS = 1.0 - smoothstep(0.25 / sgF, 0.8 / sgF, fp);
+  float fac = 0.0, gsup = 1.0;
+  float tf = spotField(q, fp, fac, gsup);
+  float g = 0.0, net = 0.0;
+  vec3 dir = vec3(0.0), sg = vec3(1.0, 0.5, 0.0);
+  if (lodS > 0.001 || lodG > 0.001) sg = superGran(n * sgF, n, sgF, dOm, dir);
+  // the magnetic network: flux swept to the supergranule borders by their outflow; patchy, slowly evolving
+  if (lodS > 0.001) net = lodS * smoothstep(0.3, 0.0, sg.x) * smoothstep(-0.2, 0.6, snoise4(vec4(n * (sgF * 4.0), TPS / 150000.0)));
+  if (lodG > 0.001){
+    vec3 x = n * uGranF;
+    vec3 e1, e2; tBasis(n, e1, e2);
+    // horizontal flows that carry the granules (granule units per solar second; 1 unit ≈ 1 087 km):
+    //   supergranular outflow, 0 at the centre and at the border, peak ~0.35 km/s
+    vec3 vel = dir * (1.3e-3 * sg.y * (1.0 - sg.y));
+    //   mesogranulation (~6 Mm, lives hours, ~0.5 km/s). Only seen through what it carries, so cheap 3D noise
+    //   evolved by sliding the sample along the vertical is enough (its scale drifts by a few % per hour)
+    vec3 xm = x * 0.16 + n * (TPF / 9000.0);
+    float m1 = snoise(xm);
+    vel += (e1 * m1 + e2 * snoise(xm + 31.7)) * 6e-4;
+    //   differential rotation relative to the frame (up to ~0.6 km/s at high latitude)
+    vel += vec3(n.z, 0.0, -n.x) * (dOm * uGranF);
+    // a slowly morphing warp makes the lanes irregular (not straight Voronoi edges) and of varying width
+    float lodW = 1.0 - smoothstep(0.08 * cs, 0.3 * cs, fp);
+    float lodX = 1.0 - smoothstep(0.012 * cs, 0.04 * cs, fp);   // extreme close-ups: granules ≳ 50 px
+    vec2 wn = vec2(0.0);
+    if (lodW > 0.0){ vec3 xw = x * 1.3; wn = vec2(snoise4(vec4(xw, TPF / 500.0)), snoise4(vec4(xw + 17.3, TPF / 500.0))) * lodW; }
+    vec3 xg = x + (e1 * wn.x + e2 * wn.y) * 0.26;
+    if (lodX > 0.0) xg += (e1 * snoise4(vec4(x * 4.7, TPF / 200.0)) + e2 * snoise4(vec4(x * 4.7 + 9.1, TPF / 200.0))) * (0.05 * lodX);   // ragged lane edges
+    vec2 gr = granulation(xg, n, vel, 0.75 + 0.5 * wn.y);
+    g = gr.x * (0.88 + 0.22 * m1);                                   // mesogranular brightness modulation
+    g += 0.16 * lodW * (1.0 - gr.y) * snoise4(vec4(x * 3.1, TPF / 150.0));   // structure inside the granules, ~3 min
+    if (lodX > 0.0) g += 0.09 * lodX * (1.0 - gr.y) * snoise4(vec4(x * 9.0, TPF / 80.0));   // ~100 km structure
+    // magnetic bright points (~100–200 km) jostling in the lanes, chained into "filigree" in the network and plage
+    float lodB = 1.0 - smoothstep(0.08 * cs, 0.25 * cs, fp);
+    float bpn = mix(snoise4(vec4(x * 2.3, TPF / 200.0)), snoise4(vec4(x * 5.5, TPF / 150.0)), 0.6 * lodB);
+    float bp = gr.y * gr.y * smoothstep(0.35, 0.8, bpn) * (0.12 + 0.88 * net + min(fac, 1.0));
+    g = (g + 2.6 * bp) * lodG;
+  }
+  float T = uTeff * (1.0 + uGranAmp * 0.06 * g * gsup);
+  // below the resolution: the averaged granulation leaves a fine, evolving grain
+  if (lodG < 0.999) T *= 1.0 + uGranAmp * 0.006 * (1.0 - lodG) * gsup * (snoise4(vec4(n * 160.0, TPF / 600.0)) + 0.6 * snoise4(vec4(n * 47.0, TPF / 6000.0)));
+  T *= tf;
+  // faculae: contrast grows toward the limb (we look at the hot walls of flux tubes side-on)
+  float lw = pow(1.0 - mu, 1.3) * smoothstep(0.0, 0.12, mu);
+  T *= 1.0 + (0.08 * min(fac, 1.5) * (0.3 + 0.7 * net) + 0.007 * net) * lw * gsup;
+  return emit(T) * limbDark(mu);
+}
+#else
+// red dwarf (KIND 1): two cross-faded granulation epochs sheared by the rotation
 vec3 photosphere(vec3 q, float mu, float fp){
   // Differential rotation shears everything attached to the surface. To keep the shear bounded the
   // granulation pattern is re-seeded every epoch and two staggered epochs are cross-faded (granules
@@ -192,17 +442,9 @@ vec3 photosphere(vec3 q, float mu, float fp){
   float lodG = 1.0 - smoothstep(0.3 * cs, 1.1 * cs, fp);   // granules smaller than a pixel average out
   float g = 0.0, net = 0.0;
   if (lodG > 0.001){
-#if KIND == 0
-    float lodW = 1.0 - smoothstep(0.08 * cs, 0.3 * cs, fp);   // the fine warp only matters when granules are big on screen
-    if (wA > 0.001){ vec3 w = warp3(qa * uGranF); if (lodW > 0.0) w = mix(w, warpFine(w), lodW); g += wA * sunGranule(w, uGranT, uEp.z * 13.0); }
-    if (wB > 0.001){ vec3 w = warp3(qb * uGranF); if (lodW > 0.0) w = mix(w, warpFine(w), lodW); g += wB * sunGranule(w, uGranT, uEp.w * 13.0); }
-    g *= 0.85 + 0.3 * snoise(qa * uGranF * 0.17);  // mesogranular brightness modulation
-    g += 0.08 * snoise(qa * uGranF * 3.1);         // sub-granular texture
-#else
     if (wA > 0.001) g += wA * granule(warp3(qa * uGranF), uGranT, uEp.z * 13.0);
     if (wB > 0.001) g += wB * granule(warp3(qb * uGranF), uGranT, uEp.w * 13.0);
     g += 0.12 * snoise(qa * uGranF * 3.1);    // sub-granular texture
-#endif
     g *= lodG;
   }
   // supergranulation (~30 000 km): its boundaries collect magnetic field → bright network
@@ -216,28 +458,28 @@ vec3 photosphere(vec3 q, float mu, float fp){
   float fac = 0.0, gsup = 1.0;
   float tf = spotField(q, fp, fac, gsup);
   float T = uTeff * (1.0 + uGranAmp * 0.06 * g * gsup);
-#if KIND == 0
-  T *= 1.0 + uGranAmp * 0.006 * (1.0 - lodG) * gsup * (snoise(q * 160.0) + 0.6 * snoise(q * 47.0));
-#endif
   T *= tf;
   // faculae: contrast grows toward the limb (we look at the hot walls of flux tubes side-on)
   float lw = pow(1.0 - mu, 1.3) * smoothstep(0.0, 0.12, mu);
   T *= 1.0 + (0.08 * min(fac, 1.5) * (0.3 + 0.7 * net) + 0.007 * net) * lw * gsup;
   vec3 c;
-#if KIND == 1
   vec3 glow = vec3(0.0);
   flareField(q, T, glow);
   c = emit(T) * limbDark(mu) + glow;
-#else
-  c = emit(T) * limbDark(mu);
-#endif
   return c;
 }
+#endif
 
 // chromosphere seen edge-on above the limb: H-alpha pink, a forest of spicules (jets ~3 000–10 000 km)
 vec3 chromosphere(vec3 s, float h){
+  if (h > 0.02) return vec3(0.0);   // nothing left above ~14 Mm
+#if KIND == 0
+  float sp = snoise4(vec4(s * 240.0, TPF / 500.0));
+  float sp2 = snoise4(vec4(s * 700.0, TPF / 300.0));
+#else
   float sp = snoise(s * 240.0 + vec3(0.0, uGranT * 0.05, 0.0));
   float sp2 = snoise(s * 700.0 - vec3(uGranT * 0.03));
+#endif
   float hs = 0.0045 + 0.007 * (0.5 + 0.5 * sp);
   float e = exp(-h / 0.0011) + 0.4 * smoothstep(hs, hs * 0.4, h) * (0.5 + 0.5 * sp2);
   return HALPHA * e * uChromo;
@@ -327,36 +569,34 @@ vec3 corona(vec3 s, float b){
 }
 
 // ---- the chromosphere / transition region / low corona seen on the disc through narrow-band filters ----
-// Cellular noise that also returns the offset to the nearest feature point (the supergranule centre).
-vec4 worleyV(vec3 p){
-  vec3 i = floor(p), f = fract(p);
-  float d1 = 8.0, d2 = 8.0; vec3 r1 = vec3(0.0);
-  for (int z = -1; z <= 1; z++) for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++){
-    vec3 o = vec3(float(x), float(y), float(z));
-    vec3 r = o + hash33(i + o) - f;
-    float d = dot(r, r);
-    if (d < d1){ d2 = d1; d1 = d; r1 = r; } else if (d < d2) d2 = d;
-  }
-  return vec4(r1, sqrt(d2) - sqrt(d1));
-}
-// One epoch of the supergranular pattern (≈ 30 Mm cells). Magnetic flux swept to the cell borders makes the
-// bright network; dark fibrils (mottles, the on-disc counterparts of spicules) fan out from it into the cells.
-vec2 chromoNet(vec3 qq, float lodM){
-  vec4 w = worleyV(qq);
-  float edge = smoothstep(0.45, 0.0, w.w) * max(0.2 + 0.8 * snoise(qq * 1.7 + 4.0), 0.0);
+// The supergranular pattern (superGran: living ≈ 30 Mm cells) seen from above. Magnetic flux swept to the cell
+// borders makes the bright network; dark fibrils and mottles (the on-disc counterparts of spicules) fan out
+// of it into the cells. Each fibril shoots out of the network and retracts again within ~5–10 min, and the
+// fans sway. n: point in the rotating frame; returns (network, mottle darkness).
+vec2 chromoNet(vec3 n, float sgF, float dOm, float lodM){
+  vec3 dir; vec3 sg = superGran(n * sgF, n, sgF, dOm, dir);
+  vec3 xs = n * sgF;
+  float edge = smoothstep(0.45, 0.0, sg.x) * max(0.2 + 0.8 * snoise4(vec4(xs * 1.7 + 4.0, TPS / 60000.0)), 0.0);
   // dark mottles cluster around the network; below the pixel scale they average to a darker cell rim
-  float rim = smoothstep(0.0, 0.12, w.w) * smoothstep(0.9, 0.1, w.w);
-  float mot = 0.35 * rim * (0.6 + 0.4 * snoise(qq * 3.3 + 9.0));
+  float rim = smoothstep(0.0, 0.12, sg.x) * smoothstep(0.9, 0.1, sg.x);
+  float mot = 0.35 * rim * (0.6 + 0.4 * snoise4(vec4(xs * 3.3 + 9.0, TPF / 900.0)));
   if (lodM > 0.01){
-    // fibrils radiate from the cell centre: noise in the local polar frame (direction, radius) of the cell
-    vec3 d = -w.xyz; float r = length(d);
-    vec3 cc = qq + w.xyz;                                       // cell centre: a per-cell offset
-    mot = mix(mot, smoothstep(-0.3, 0.8, snoise(d / max(r, 1e-3) * 10.0 + cc * 3.1 + r * 1.6)) * rim * 0.8, lodM);
+    // fibrils radiate from the cell centre: noise in the local polar frame (direction, distance) of the cell
+    vec3 cc = xs - dir * sg.z;                                   // cell centre (moves with the cell)
+    float sw = 0.1 * sin(TF / 420.0 + dot(cc, vec3(1.7, 2.3, 3.1)));
+    vec3 d = dir * cos(sw) + cross(n, dir) * sin(sw);            // the fan sways
+    float fb = smoothstep(-0.3, 0.8, snoise(d * 10.0 + cc * 3.1 + n * (TF / 600.0) + sg.z * 1.6));
+    // how far each fibril reaches into the cell grows and shrinks (spicules shooting up and fading)
+    // (from the network ~2–10 Mm into the cell; e = sg.x is twice the distance to the border, in 30 Mm units)
+    float reach = 0.06 + 0.3 * smoothstep(-0.5, 0.7, snoise(d * 5.0 + cc * 2.3 + n * (TF / 330.0) + 7.0));
+    float ext = smoothstep(reach, reach * 0.35, sg.x) * smoothstep(0.0, 0.06, sg.x);
+    mot = mix(mot, fb * ext * 0.95, lodM);
   }
   return vec2(edge, mot);
 }
 // Hα fibrils: dark, field-aligned streaks fanning out of plage / around sunspots (superpenumbrae),
-// tracing the canopy field that spreads from the active region.
+// tracing the canopy field that spreads from the active region. They sway slowly and carry the inverse
+// Evershed flow (chromospheric material falling in toward the spot at a few km/s).
 float plageFibrils(vec3 q, float fp){
   float fib = 0.0;
   for (int i = 0; i < NS; i++){
@@ -366,9 +606,9 @@ float plageFibrils(vec3 q, float fp){
     float r = length(dv) / (x.w * 2.0);
     if (r > 1.7 || r < 0.05) continue;
     vec3 e1 = tangentU(sp.xyz), e2 = cross(sp.xyz, e1);
-    float ang = atan(dot(dv, e2), dot(dv, e1)) + 0.5 * sin(r * 3.0 + x.y);   // slightly curved
+    float ang = atan(dot(dv, e2), dot(dv, e1)) + 0.5 * sin(r * 3.0 + x.y) + 0.04 * sin(TF / 700.0 + r * 4.0 + x.y);   // curved, swaying
     float lodF = 1.0 - smoothstep(0.004 * x.w * 6.0, 0.02 * x.w * 6.0, fp);
-    float n = snoise(vec3(cos(ang) * 9.0, sin(ang) * 9.0, r * 1.2 + x.y));
+    float n = snoise(vec3(cos(ang) * 9.0, sin(ang) * 9.0, (length(dv) * 696.0 + TF * 0.005) * 0.012 + x.y + TF / 4000.0));
     float f = mix(0.45, smoothstep(-0.1, 0.7, n), lodF);
     fib = max(fib, f * smoothstep(0.25, 0.55, r) * smoothstep(1.7, 1.0, r) * min(x.z, 1.0));
   }
@@ -376,29 +616,25 @@ float plageFibrils(vec3 q, float fp){
 }
 // Disc intensity (1 ≈ quiet-Sun mean) in the current narrow-band view; act = plage / active-region strength.
 float chromoI(vec3 q, float mu, float fp){
-  float om = omegaAt(q.y * q.y);
+  vec3 nr = toRef(q);
   float sgF = uGranF / 28.0;
   float lodN = 1.0 - smoothstep(0.1 / sgF, 0.45 / sgF, fp);
   float lodM = 1.0 - smoothstep(0.012 / sgF, 0.03 / sgF, fp);      // mottles (period ≈ 0.1/sgF) need ≥ 3 px
   vec2 n = vec2(0.0);
-  if (lodN > 0.001){
-    if (uEpW > 0.001) n += uEpW * chromoNet(rotY(q, -om * uEp.x) * sgF + uEp.z * 7.31, lodM);
-    if (uEpW < 0.999) n += (1.0 - uEpW) * chromoNet(rotY(q, -om * uEp.y) * sgF + uEp.w * 7.31, lodM);
-    n *= lodN;
-  }
+  if (lodN > 0.001) n = lodN * chromoNet(nr, sgF, dOmega(nr.y * nr.y), lodM);
   float fac = 0.0, gsup = 1.0;
   float tf = spotField(q, fp, fac, gsup);
   float spot = smoothstep(0.985, 0.72, tf);                     // 0 outside, ~1 in the umbra
   float pen = smoothstep(0.995, 0.93, tf);
   float lodF = 1.0 - smoothstep(0.0003, 0.0009, fp);              // 380⁻¹ R☉ period needs ≥ 3 px
-  float fine = snoise(q * 380.0) * lodF;
-  float mid = snoise(q * 90.0 + 2.0);                            // plage patchiness at ~5 Mm
+  float fine = snoise4(vec4(nr * 380.0, TPF / 400.0)) * lodF;         // fine chromospheric structure, ~5 min
+  float mid = snoise4(vec4(nr * 90.0 + 2.0, TPS / 20000.0));          // plage patchiness at ~5 Mm, hours
   float pl = min(fac, 1.4) * max(0.35 + 0.6 * n.x + 0.35 * mid + 0.2 * fine, 0.0);  // plage: patchy, brightest on the network
   float I;
   if (uView < 1.5){
     // H-alpha line centre: weak limb darkening, bright network & plage, dark mottles and fibrils, dark spots
     float fib = plageFibrils(q, fp);
-    float big = snoise(q * 9.0 + 4.0);                           // enhanced / quiet network patches
+    float big = snoise4(vec4(nr * 9.0 + 4.0, TPS / 400000.0));        // enhanced / quiet network patches
     I = 0.92 + 0.32 * n.x * (1.0 + 0.5 * big) - 0.5 * n.y + 0.06 * fine + 0.05 * big + 0.6 * pl - 0.32 * fib * (1.0 - min(fac, 1.0) * 0.6);
     I *= (0.6 + 0.4 * sqrt(mu)) * (1.0 - 0.45 * pen - 0.45 * spot);
     I += 0.1 * exp(-mu / 0.03);                                // the chromosphere thickens toward the limb
@@ -408,7 +644,7 @@ float chromoI(vec3 q, float mu, float fp){
     I *= 1.0 + 0.7 * exp(-mu / 0.12);
   } else {
     // Fe IX 171 Å (~0.7 MK): faint mottled disc ("moss"), bright fuzzy active regions, dark coronal holes
-    float moss = 0.5 + 0.5 * snoise(q * 45.0) * snoise(q * 13.0 + 3.0);
+    float moss = 0.5 + 0.5 * snoise4(vec4(nr * 45.0, TPF / 2000.0)) * snoise(nr * 13.0 + 3.0);
     float hole = smoothstep(0.72, 0.9, abs(q.y)) * (1.0 - 0.8 * uActivity);
     I = (0.2 + 0.16 * moss + 0.08 * n.x + 1.1 * pow(min(fac, 1.4), 1.3) * (0.5 + 0.5 * fine)) * (1.0 - 0.75 * hole);
     I *= 1.0 + 1.2 * exp(-mu / 0.08);
@@ -426,8 +662,9 @@ float spiculeForest(vec3 sp, vec3 vh, float h, float fpx){
   vec3 s = sp + tang * h * (0.8 * snoise(sp * 35.0));            // jets lean in clumps
   const float F = 1150.0;
   float lodS = 1.0 - smoothstep(0.5 / F, 2.5 / F, fpx);
-  float n = snoise(s * F + vh * (h * 110.0 - uGranT * 0.12));
-  float n2 = snoise(s * 700.0 + vh * (uGranT * 0.05));
+  // jets rise at ~25 km/s (constant phase h·110 − 0.004·t) and live ~4–8 min
+  float n = snoise(s * F + vh * (h * 110.0 - TF * 0.004));
+  float n2 = snoise(s * 700.0 + vh * (TF / 420.0));
   float n3 = snoise(s * 70.0 + 5.0);
   float hn = 0.5 + 0.5 * n2;
   float top = (0.003 + 0.0095 * hn * hn) * (0.75 + 0.35 * n3);               // jet tops: 2–9 Mm, most short
@@ -751,7 +988,16 @@ void main(){
   {
     vec3 ref = uBright * bb(uTeff) * pow(uTeff / uTref, uIexp);   // the star's own mean surface
     vec3 x = surf / ref;
+#if KIND == 0
+    // The Sun: the same stretch, continued above the mean with the same slope and a soft shoulder (so the bright
+    // granule domes keep their shading), and eased toward a linear response in the deep shadows, so a ~4 000 K
+    // umbra (~15 % of the photospheric intensity) stays dark red-brown instead of being crushed to black.
+    vec3 lo = mix(pow(max(x, 0.0), vec3(uStretch)), 0.6 * x, pow(clamp(1.0 - x, 0.0, 1.0), vec3(3.0)));
+    vec3 hi = 1.0 + uStretch * (x - 1.0) / (1.0 + 2.0 * max(x - 1.0, 0.0));
+    surf = ref * mix(lo, hi, step(1.0, x));
+#else
     surf = ref * mix(pow(max(x, 0.0), vec3(uStretch)), x, step(1.0, x));
+#endif
   }
   float tEnd = cov > 0.5 ? tHit : 1e9;
   float skyK = uSkyK;
@@ -1041,6 +1287,7 @@ function makeStar(ctx, kind, cfg) {
     uEarthPos: { value: new THREE.Vector3() }, uEarthOn: { value: 0 }, uSirA: { value: 0 }, uSirDir: { value: new THREE.Vector3(0, 0, 1) },
     uPrA: { value: v4arr(NP) }, uPrB: { value: v4arr(NP) }, uPrC: { value: v4arr(NP) }, uPrD: { value: v4arr(NP) }, uPrE: { value: v4arr(NP) },
     uCme: { value: new THREE.Vector4() }, uCmeB: { value: 0 }, uView: { value: 0 }, uLoopK: { value: 0 },
+    uClk: { value: new THREE.Vector4() }, uTp: { value: new THREE.Vector2() }, uRef: { value: new THREE.Vector2(1, 0) }, uDOm: { value: new THREE.Vector2() },
   };
   const material = new THREE.ShaderMaterial({
     uniforms: U, defines: { KIND: kind, NS, NL, NF, NP },
@@ -1089,7 +1336,36 @@ function activeRegions(t, tRot, activity, omegaFn, cfg, out) {
 /* ============================================================================================== */
 // Snodgrass & Ulrich (1990) sidereal rotation: Ω = 14.713 − 2.396 sin²φ − 1.787 sin⁴φ  °/day
 const SUN_OMEGA_DEG = [14.713, -2.396, -1.787];
-const SUN_DPS = 0.05;         // days of solar rotation per sim-second (≈ 85 s per rotation at 6×)
+const SUN_DPS = 0.05;         // days of solar rotation per "rotation second" tRot (≈ 85 s per rotation at 6× on the full disc)
+
+// ---- solar time-lapse ------------------------------------------------------------------------------------
+// The Sun's processes span seven orders of magnitude in time: granules live 5–12 min, mesogranules hours,
+// supergranules 1–2 days, active regions weeks, a rotation takes 25–35 days. Like real solar movies (DKIST
+// close-ups play at seconds-to-minutes per frame, SDO full-disc movies at hours per frame) the time-lapse
+// factor follows the field of view: SUN_LAPSE_NEAR solar seconds per sim-second at 0.25 R☉ above the surface
+// (2 min per wall second at the default 6×: a granule lives 3–6 s on screen; half that rate in the closest
+// DKIST-like views), SUN_LAPSE_FAR from 2.5 R☉ out
+// (7.2 h per wall second: a rotation in ~85 s), log-log in between. All processes share this one clock τ, so
+// their relative rates are the real ones. Small-scale processes run on a fast clock τf = τ capped at
+// LAPSE_CAP_F per wall second (granules never shorter than ~1 s on screen — by then they are sub-pixel anyway);
+// the supergranular network on τs capped at LAPSE_CAP_S.
+const SUN_LAPSE_NEAR = 20, SUN_LAPSE_FAR = 86400 * SUN_DPS, LAPSE_CAP_F = 480, LAPSE_CAP_S = 43200;
+const CLK_P1 = 2 ** 20, CLK_P2 = 2 ** 26;      // clock periods in the shader (must match P1 / P2 in GLSL)
+const SNAP_MODE = typeof location !== 'undefined' && new URLSearchParams(location.search).has('snap');
+function sunLapse(alt) {
+  const lg = (a, b) => Math.min(1, Math.max(0, Math.log(Math.max(alt, 1e-6) / a) / Math.log(b / a)));
+  // DKIST-like fields (≲ 7 Mm above the surface): 1 s = 1 min, so a single big granule is followed in detail
+  if (alt < 0.25) return SUN_LAPSE_NEAR * Math.pow(2, lg(0.01, 0.25) - 1);
+  return SUN_LAPSE_NEAR * Math.pow(SUN_LAPSE_FAR / SUN_LAPSE_NEAR, lg(0.25, 2.5));
+}
+// "1 s = 2 phút" — a duration in solar seconds, in Vietnamese
+function fmtSolar(sec) {
+  const n = (v, d) => v.toFixed(d).replace('.', ',');
+  if (sec < 90) return `${n(sec, 0)} giây`;
+  if (sec < 5400) return `${n(sec / 60, sec < 600 ? 1 : 0)} phút`;
+  if (sec < 2 * 86400) return `${n(sec / 3600, sec < 36000 ? 1 : 0)} giờ`;
+  return `${n(sec / 86400, 1)} ngày`;
+}
 
 // ---- prominences (CPU side) ----------------------------------------------------------------------------
 // 39 candidate prominences (30 quiescent filament channels); each is re-born every `life` sim-seconds at a new place (a hash of its slot and
@@ -1189,13 +1465,13 @@ const sun = {
     ['Tuổi', '4,6 tỷ năm'],
   ],
   unitKm: R_SUN_KM,
-  camera: { distance: 3.5, polar: 82, azimuth: 20, min: 1.03, max: 30, fov: 45 },
+  camera: { distance: 3.5, polar: 82, azimuth: 20, min: 1.01, max: 30, fov: 45 },   // min: 7 Mm above the surface: ~50 granules, a DKIST-like field
   exposure: 1.0,
   bloom: 0.25,
   params: [
     { key: 'view', label: 'Bước sóng quan sát', type: 'seg', options: [['wl', 'Ánh sáng trắng'], ['ha', 'Hα 656 nm'], ['euv304', 'EUV 304 Å'], ['euv171', 'EUV 171 Å']], default: 'wl', note: 'Ánh sáng trắng: quang cầu. Hα: sắc cầu — tai lửa sáng ở rìa, sợi tối trên đĩa. 304 Å (He II): sắc cầu–vùng chuyển tiếp. 171 Å (Fe IX): vành nhật hoa ~1 triệu K với các vòng từ. Ảnh hẹp băng là đơn sắc; màu là bảng màu quy ước (như SDO).' },
     { key: 'activity', label: 'Mức hoạt động (vết đen)', type: 'range', min: 0, max: 1, step: 0.01, default: 0.6, note: 'Chu kỳ 11 năm: 0 = cực tiểu (đĩa trơn, vành nhật hoa dẹt theo xích đạo), 1 = cực đại (nhiều nhóm vết đen, các tia vành nhật hoa tỏa mọi hướng).' },
-    { key: 'granulation', label: 'Độ tương phản hạt', type: 'range', min: 0, max: 2, step: 0.01, default: 1, note: 'Hạt nóng hơn rãnh tối ~200–300 K; thấy rõ khi lại gần (khoảng cách < 1.2).' },
+    { key: 'granulation', label: 'Độ tương phản hạt', type: 'range', min: 0, max: 2, step: 0.01, default: 1, note: 'Hạt nóng hơn rãnh tối ~200–300 K; thấy rõ khi lại gần (khoảng cách < 1.2). Thời gian được tua nhanh theo khoảng cách, như phim của kính thiên văn mặt trời: cận cảnh 1 s ≈ 2 phút (từng hạt sinh ra, phình, tách đôi rồi tan trong vài giây), toàn đĩa 1 s ≈ 7 giờ (thấy Mặt Trời quay). Thanh “Tốc độ thời gian” nhân thêm hệ số này.' },
     { key: 'corona', label: 'Vành nhật hoa', type: 'range', min: 0, max: 2, step: 0.01, default: 0.6 },
     { key: 'prominences', label: 'Sắc cầu & tai lửa', type: 'range', min: 0, max: 2, step: 0.01, default: 1, note: 'Mật độ plasma trong tai lửa. Ở ánh sáng trắng tai lửa gần như vô hình (chỉ lộ ra khi nhật thực); hãy xem ở Hα.' },
     { key: 'eclipse', label: 'Nhật thực toàn phần', type: 'toggle', default: false, note: 'Mặt Trăng che vừa khít quang cầu (chỉ ở ánh sáng trắng).' },
@@ -1229,7 +1505,18 @@ const sun = {
     const V3 = THREE.Vector3, Y = new V3(0, 1, 0);
     const camDir = new V3();
     const gone = new Set();
-    let regs = [], items = [], erupt = null, lastT = null, nVisible = 0, nFil = 0;
+    let regs = [], items = [], erupt = null, lastT = null, lastRot = null, nVisible = 0, nFil = 0;
+    // solar clocks (solar seconds): τ for everything, τf / τs for the fast / slow small-scale processes
+    const clk = { tau: 0, tf: 0, ts: 0, S: SUN_LAPSE_FAR, SF: SUN_LAPSE_FAR, k: 6 };
+    const omS = SUN_OMEGA_DEG.map(v => v * D2R / 86400);   // rad per solar second
+    // snapshots must be a pure function of the requested t (the page keeps running while the headless browser
+    // captures it): there the solar clocks are frozen at ?t= and the lapse is fixed by the requested camera
+    let snapLapse = null, snapT = null;
+    if (SNAP_MODE) {
+      const q = new URLSearchParams(location.search), c = q.get('cam');
+      if (q.get('t') !== null) snapT = +q.get('t');
+      snapLapse = c ? sunLapse(+c.split(',')[0] - 1) : (q.get('sunlimb') !== null || q.get('erupt') !== null || /[lr]/.test(q.get('sunact') || '')) ? SUN_LAPSE_NEAR : SUN_LAPSE_FAR;
+    }
     // camera: 0 free, 1 flying to the featured prominence, 2 following it, 3 flying back to the full disc
     const cam = { mode: 0, i: -1, k: -1, t0: 0, dur: 2.2, fromPos: new V3(), fromTgt: new V3(), fromUp: new V3(0, 1, 0), step: -1 };
     const defMin = sun.camera.min;
@@ -1345,40 +1632,53 @@ const sun = {
         }
       },
       update(dt, ctx) {
-        const p = ctx.params, t = ctx.time.sim;
-        const dts = lastT === null ? 0 : t - lastT; lastT = t;
-        U.uGranT.value = t * 0.12;
-        U.uRotT.value = t;
-        epochs(U, t, 160);
+        const p = ctx.params, t = snapT ?? ctx.time.sim;
+        // ---- solar clocks: the time-lapse follows the camera's altitude (see sunLapse) ----
+        const ts = ctx.bhGlobals?.timeScale ?? 6, alt = Math.max(0, ctx.camera.position.length() - 1);
+        const S = snapLapse ?? sunLapse(alt);
+        const SF = Math.min(S, LAPSE_CAP_F / Math.max(ts, 1e-3)), SS = Math.min(S, LAPSE_CAP_S / Math.max(ts, 1e-3));
+        if (snapLapse !== null || lastT === null) { clk.tau = S * t; clk.tf = SF * t; clk.ts = SS * t; }
+        else { const d = t - lastT; clk.tau += S * d; clk.tf += SF * d; clk.ts += SS * d; }
+        lastT = t; clk.S = S; clk.SF = SF; clk.k = ts;
+        const tRot = clk.tau / SUN_LAPSE_FAR;            // in the old "rotation seconds" (SUN_DPS days each)
+        const dts = lastRot === null ? 0 : tRot - lastRot; lastRot = tRot;
+        const pp = (x, P) => P / 2 - Math.abs((x % P) - P / 2);
+        U.uClk.value.set(clk.tf % CLK_P1, Math.floor(clk.tf / CLK_P1) % 4096, clk.ts % CLK_P2, Math.floor(clk.ts / CLK_P2) % 4096);
+        U.uTp.value.set(pp(clk.tf, CLK_P1), pp(clk.ts, CLK_P2));
+        const th = (omS[0] * clk.tau) % (2 * Math.PI);
+        U.uRef.value.set(Math.cos(th), Math.sin(th));
+        U.uDOm.value.set(omS[1], omS[2]);
+        U.uGranT.value = ctx.time.sim * 0.12;             // prominence / loop internal motions (unchanged)
+        U.uRotT.value = tRot;
         U.uActivity.value = p.activity; U.uGranAmp.value = p.granulation;
         const view = Math.max(0, VIEWS.indexOf(p.view));
         U.uView.value = view;
         // like a solar telescope's exposure: high-resolution close-ups are exposed a little darker so the
         // granules don't clip, the full disc a little brighter so its centre reads white
-        U.uBright.value = 0.42 + 0.3 * smooth(1.1, 2.0, ctx.camera.position.length());
+        U.uBright.value = 0.17 + 0.55 * smooth(1.1, 2.0, ctx.camera.position.length());
         U.uCorona.value = p.corona; U.uChromo.value = 0.18 * p.prominences; U.uProm.value = p.prominences;
         U.uEclipse.value = ease(U.uEclipse.value, p.eclipse && view === 0 ? 1 : 0, dt * 2.5, this);
-        regs = activeRegions(t, t, p.activity, omegaFn, regCfg, spots);
+        regs = activeRegions(tRot, tRot, p.activity, omegaFn, regCfg, spots);
         camDir.copy(ctx.camera.position).normalize();
 
         // snapshot hooks for the headless checker: ?sunlimb=<0 hedgerow|1 arch|2 arcade> ?erupt=<seconds>
         if (!this.__dbg) {
           this.__dbg = true;
           const q = new URLSearchParams(location.search);
-          items = collect(t, p.activity);
+          items = collect(tRot, p.activity);
           if (q.get('sunlimb') !== null) { const it = biggest(+q.get('sunlimb')); if (it) { cam.step = it.type; setFeatured(it, ctx, true); } }
           // ?sunact=<keys>: run the dock actions in order (exercises the real fly-in / eruption code paths)
           for (const ch of q.get('sunact') || '') ({ l: () => this.limbTour(ctx), r: () => this.erupt(ctx), v: () => sun.actions[0].run(ctx) })[ch]?.();
           if (q.get('erupt') !== null) {
             this.erupt(ctx, +q.get('erupt'), true);
-            if (erupt && q.get('sunlimb') !== null) { items = collect(t, p.activity); const it = findItem(erupt.i, erupt.k); if (it) setFeatured(it, ctx, true); }
+            if (erupt && q.get('sunlimb') !== null) { items = collect(tRot, p.activity); const it = findItem(erupt.i, erupt.k); if (it) setFeatured(it, ctx, true); }
           }
         }
         if (erupt) {
           erupt.age += dt;
           if (erupt.age > ERUPT_DUR) { gone.add(erupt.i + ':' + erupt.k); erupt = null; U.uCme.value.w = 0; U.uCmeB.value = 0; }
         }
-        items = collect(t, p.activity);
+        items = collect(tRot, p.activity);
 
         // ---- upload the prominences that matter for this view ----
         const feat = cam.mode === 1 || cam.mode === 2 ? findItem(cam.i, cam.k) : null;
@@ -1467,16 +1767,27 @@ const sun = {
           camera.up.lerpVectors(cam.fromUp, Y, e).normalize();
           camera.lookAt(target);
           if (k >= 1) { cam.mode = 0; ctx.controls.minDistance = defMin; camera.up.copy(Y); }
+        } else if (!SNAP_MODE && dts > 0) {
+          // close to the surface the "telescope" tracks the rotation, like a real solar telescope, so what you
+          // see moving is the plasma itself and not the whole field sliding past
+          const k = smooth(0.6, 0.2, alt);
+          if (k > 0) {
+            const w = omegaFn(camDir.y * camDir.y) * dts * k;
+            camera.position.applyAxisAngle(Y, w); target.applyAxisAngle(Y, w);
+          }
         }
-        if (camera.position.length() < 1.004) camera.position.setLength(1.004);
+        if (camera.position.length() < 1.003) camera.position.setLength(1.003);
       },
       hud(ctx) {
         let g = 0, s = 0;
         for (const r of regs) if (r.envS > 0.05) { g++; s += r.size > 0.016 ? 2 + Math.round(r.size * 300) : 1; }
         const lat = Math.asin(Math.max(-1, Math.min(1, ctx.camera.position.y / ctx.camera.position.length())));
         const P = 360 / (SUN_OMEGA_DEG[0] + SUN_OMEGA_DEG[1] * Math.sin(lat) ** 2 + SUN_OMEGA_DEG[2] * Math.sin(lat) ** 4);
+        const rate = clk.S * clk.k, rateF = clk.SF * clk.k;
         const rows = [
           ['Bước sóng', VIEW_NAME[Math.max(0, VIEWS.indexOf(ctx.params.view))]],
+          ['Tua nhanh thời gian', rate <= 0 ? 'tạm dừng' : `1 s = ${fmtSolar(rate)} trên Mặt Trời` +
+            (rateF > 0 && rateF < 0.9 * rate ? ` (hạt đối lưu: ${fmtSolar(rateF)})` : '') + (rateF > 0 ? ` · hạt sống ~${(480 / rateF).toFixed(rateF > 160 ? 1 : 0).replace('.', ',')} s` : '')],
           ['Số vết đen Wolf (R = 10g + s)', `${10 * g + s} · ${g} nhóm`],
           ['Tai lửa gần rìa đĩa · sợi tối trên đĩa', `${nVisible} · ${nFil}`],
         ];

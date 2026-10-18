@@ -1,0 +1,27 @@
+Mars data used by js/scenes/planets/mars.js — all public domain (U.S. Government works: NASA / USGS).
+
+mars_color_8k.jpg (8192 x 4096, simple cylindrical, lon -180..180 E, lat 90N at top)
+  Source: USGS Astrogeology, "Mars Viking Colorized Global Mosaic 925m v1"
+          https://planetarymaps.usgs.gov/mosaic/Mars_Viking_ClrMosaic_global_925m.tif (798 MB, 23059 x 11530, 3 x 8-bit)
+          (Viking Orbiter imagery, NASA/JPL; mosaic and colorization USGS Astrogeology Science Center)
+  Processing: Lanczos-resampled; colour rebuilt for "true colour": the 925 m product's blue band is a flat
+  constant outside the polar caps and its dark terrain is tinted violet, so the red-band/green-band brightness
+  is mapped to Lambert albedo with bright-dust vs. dark-basalt reflectance ratios (red albedo 0.36 / 0.14,
+  G/R 0.53 / 0.67, B/R 0.24 / 0.45; after Mars Express OMEGA and HST spectra); ice from the blue band.
+  Stored as sRGB(albedo / 0.6).
+
+mars_tharsis_color.jpg (4096 x 2048, lon 138W..42W, lat 28N..20S): same source and processing, ~2.6 km/px.
+
+mars_elev_4k.webp (4096 x 2048, lon -180..180 E, lat 90N at top)
+  Source: MGS MOLA Mission Experiment Gridded Data Record (MEGDR) 16 pixel/degree topography, PDS
+          https://pds-geosciences.wustl.edu/mgs/mgs-m-mola-5-megdr-l3-v1/mgsl_300x/meg016/megt90n000eb.img
+          (Smith et al., MGS MOLA team, NASA GSFC; 5760 x 2880 int16 m above the areoid)
+  Encoding: v = round((elevation_m + 9000) / 12); R = v >> 8, G = v & 255 folded (G = 255 - G when R is odd).
+  Lossless WebP.
+
+mars_tharsis_elev.webp (3072 x 1536, lon 138W..42W, lat 28N..20S — Olympus Mons, Tharsis Montes,
+  Noctis Labyrinthus, Valles Marineris)
+  Source: MOLA MEGDR 64 pixel/degree tiles megt90n180gb.img and megt00n180gb.img (same PDS volume, meg064/)
+  Encoding: as above with a 8 m step.
+
+Credit line shown in the app: NASA/JPL Viking Orbiter mosaic (USGS Astrogeology), MGS MOLA MEGDR (NASA GSFC / PDS).

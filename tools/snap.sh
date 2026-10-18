@@ -20,7 +20,7 @@ EDGE="/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
 [ -x "$EDGE" ] || EDGE="/c/Program Files/Google/Chrome/Application/chrome.exe"
 
 if ! curl -s -o /dev/null "http://127.0.0.1:$PORT/index.html"; then
-  (cd "$ROOT" && nohup python -m http.server "$PORT" --bind 127.0.0.1 >/dev/null 2>&1 &)
+  (cd "$ROOT" && nohup python -m http.server "$PORT" --bind 127.0.0.1 </dev/null >/dev/null 2>&1 &)
   for _ in $(seq 1 40); do curl -s -o /dev/null "http://127.0.0.1:$PORT/index.html" && break; python -c "import time; time.sleep(0.25)"; done
 fi
 
@@ -32,10 +32,10 @@ FLAGS=(--headless=new --user-data-dir="$(cygpath -w "$PROFILE")" --no-first-run 
 
 # retry: with several authors snapping at once the page occasionally misses its time budget
 for attempt in 1 2 3; do
-  STATUS=$("$EDGE" "${FLAGS[@]}" --dump-dom "$URL" 2>/dev/null | tr -d '\r' | sed -n 's:.*<pre id="snap"[^>]*>\(.*\)</pre>.*:\1:p' | sed 's/&quot;/"/g; s/&lt;/</g; s/&gt;/>/g; s/&amp;/\&/g')
+  STATUS=$(timeout 150 "$EDGE" "${FLAGS[@]}" --dump-dom "$URL" 2>/dev/null | tr -d '\r' | sed -n 's:.*<pre id="snap"[^>]*>\(.*\)</pre>.*:\1:p' | sed 's/&quot;/"/g; s/&lt;/</g; s/&gt;/>/g; s/&amp;/\&/g')
   if [ -n "$STATUS" ] && ! echo "$STATUS" | grep -q 'not found (loaded:'; then break; fi
 done
-"$EDGE" "${FLAGS[@]}" --screenshot="$(cygpath -w "$(realpath -m "$OUT")")" "$URL" >/dev/null 2>&1
+timeout 150 "$EDGE" "${FLAGS[@]}" --screenshot="$(cygpath -w "$(realpath -m "$OUT")")" "$URL" >/dev/null 2>&1
 rm -rf "$PROFILE"
 if [ -z "$STATUS" ]; then
   echo '{"ok":false,"errors":["no status: the page did not finish within the time budget (module syntax error? check the browser console or run: node --check js/scenes/<file>.js)"]}'

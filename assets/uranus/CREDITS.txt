@@ -1,0 +1,25 @@
+Data behind the "Sao Thien Vuong" (uranus) scene, js/scenes/planets/uranus.js.
+No image files are shipped: at global-map resolution Uranus reduces to latitude profiles plus a few
+discrete storms, so the measured quantities are compiled into the scene as small tables.
+
+Hubble Space Telescope OPAL program (Outer Planet Atmospheres Legacy, PI A. Simon, GO13937)
+  NASA/ESA HST, WFC3/UVIS global maps of Uranus, Cycle 33 (23-24 Oct 2025) and Cycle 22 (8-9 Nov 2014).
+  https://archive.stsci.edu/hlsp/opal   DOI 10.17909/T9G593   Licence: CC BY 4.0
+  Simon et al. 2015, ApJ 812, 55; Wong et al. 2020, ApJS 247, 58.
+  "This work used data acquired from the NASA/ESA HST Space Telescope, associated with OPAL program
+   (PI: Simon, GO13937), and archived by the Space Telescope Science Institute."
+  Used: zonal median I/F of F467M, F547M, F657N (Minnaert-corrected by OPAL, k = 0.85 / 0.80 / 0.57),
+  both rotations averaged -> base albedo and 2025 north-polar-cap profile (tables BASE_VIS, CAP_VIS);
+  bright features in the F845M maps (residual over zonal median > 3.5 %) -> storm list (STORMS).
+  The 2025 storm at 35.6 N drifted ~20 deg between the two rotations (20.4 h), matching the wind fit below.
+
+Zonal winds: L.A. Sromovsky et al. 2015, Icarus 258, 192 ("High S/N Keck and Gemini AO imaging of
+  Uranus during 2012-2014"), Table 5 Fit 1 symmetric Legendre coefficients; polar solid-body rotation
+  62-83 N at 4.08 deg/h; equatorial waves near 4.5 S / 6 S; narrow bands 48-53 N; 600-700 km polar clouds.
+Storm season 2014: I. de Pater et al. 2015, Icarus 252, 121 (Keck NIRC2, brightest 2.2 um storm ~15 N).
+Rotation period 17.247864 h: L. Lamy et al. 2025, Nature Astronomy (HST auroral tracking).
+Pole: IAU WGCCRE 2015 (RA 257.311, Dec -15.175). Orbit: JPL approximate Keplerian elements (Standish).
+Rings: R.G. French et al. 1991 (Uranian ring orbits), Nicholson et al. 2018 (Planetary Ring Systems);
+  dusty nu/mu rings: Showalter & Lissauer 2006, Science 311, 973.
+Visual references only (not shipped): Voyager 2 true-colour Uranus (NASA/JPL, public domain);
+  JWST NIRCam 2023 (NASA, ESA, CSA, STScI, J. DePasquale), release 2023-117.
